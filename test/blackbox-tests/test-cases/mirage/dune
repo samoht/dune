@@ -1,0 +1,10 @@
+(mirage
+  (name unikernel)
+  (config config)
+  (context
+    (name foo)
+    (target unix))
+  (context
+    (name bar)
+    (target unix)
+    (hello foo)))

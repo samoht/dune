@@ -141,7 +141,7 @@ let gen_depends_alias ~sctx ~dir (stanza : Dune_file.Mirage.t) =
       let pkgs = Build.lines_of (Path.build (config_libs dir name)) in
       let action =
         Command.run ~dir:(Path.build dir) duniverse
-          [ A "init"; A "--no-submodules"; Command.Args.dyn pkgs ]
+          [ A "init"; A "--pull-mode=source"; Command.Args.dyn pkgs ]
       in
       SC.add_alias_action sctx ~dir ~loc:(Some loc) alias action ~stamp:name)
     stanza.contexts
