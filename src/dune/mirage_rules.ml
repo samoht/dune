@@ -90,7 +90,11 @@ let gen_query_files ~sctx ~dir (stanza : Dune_file.Mirage.t) =
              ~stdout_to)
       in
       add_rule "libraries" (config_libs dir name);
-      add_rule "packages" (config_pkgs dir name))
+      add_rule "packages" (config_pkgs dir name);
+      let main = Path.Build.relative dir "main.ml" in
+      SC.add_rule sctx ~dir ~loc
+        (Command.run (config_exe ~dir) ~dir:(Path.build dir)
+           [ A "config"; Hidden_targets [ main ]; As args ]))
     stanza.contexts
 
 (* generate <context>.exe *)
@@ -139,10 +143,14 @@ let gen_depends_alias ~sctx ~dir (stanza : Dune_file.Mirage.t) =
   List.iter
     ~f:(fun (loc, name, _args) ->
       let pkgs = Build.lines_of (Path.build (config_libs dir name)) in
-      let action =
+      let init =
         Command.run ~dir:(Path.build dir) duniverse
           [ A "init"; A "--pull-mode=source"; Command.Args.dyn pkgs ]
       in
+      let pull =
+        Command.run ~dir:(Path.build dir) duniverse [ A "pull"; A "--no-cache" ]
+      in
+      let action = Build.progn [ init; pull ] in
       SC.add_alias_action sctx ~dir ~loc:(Some loc) alias action ~stamp:name)
     stanza.contexts
 
@@ -151,28 +159,3 @@ let gen_rules ~sctx ~dir stanza =
   gen_query_files ~sctx ~dir stanza;
   gen_depends_alias ~sctx ~dir stanza;
   gen_context_exe ~sctx ~dir stanza
-
-(* SC.add_rule sctx ~dir (Command.run ~dir:(Path.build dir)
-   ~stdout_to:(Path.Build.relative dir ".config.out") (config_exe ~dir)
-   (*[Command.Args.As ["query-libraires"]*) []); SC.add_rule sctx ~dir (let+
-   lines = Build.lines_of (Path.Build.relative dir ".config.out") in ()) [] *)
-(* let stanza = ( "mirage" , fields (let+ config = field ~default:"config"
-   "config" string and+ code_name = field ~default:"unikernel" "name" string
-   and+ targets = multi_field "target" (fields (let+ name = field "name" string
-   and+ args = leftover_fields in let args = List.map (function | List (_, [
-   Atom (_, a); Atom (_, b) ]) -> (Dune_lang.Atom.print a, Dune_lang.Atom.print
-   b) | _ -> assert false) args in (name, args))) and+ loc = loc and+ project =
-   Dune_project.get_exn () in let gen_files = (* TODO: should be dynamic *) [
-   "main.ml"; "key_gen.ml" ] in let asts = executable ~loc ~name:"config"
-   ~modules:[ config ] ~modes:[ "exe" ] ~libraries:[ "mirage" ] :: List.concat
-   (List.map (fun (name, args) -> let args = List.map (fun (k, v) ->
-   Printf.sprintf "--%s=%s" k v) args in [ rule ~loc ~targets:gen_files ~run: (
-   "./config.exe" :: "config" :: ("--target=" ^ name) :: args ) ; executable
-   ~loc ~name:code_name ~modes:[ "object" ] ~modules: ( code_name :: List.map
-   Filename.remove_extension gen_files ) ~libraries: [ (* TODO: should be
-   dynamic *) "mirage-runtime" ; "mirage-time" ; "duration" ; "mirage-unix" ;
-   "lwt.unix" ; "mirage-clock-unix" ; "mirage-logs" ; "mirage-bootvar-unix" ] ;
-   alias ~loc ~name ~deps:[ code_name ^ ".exe.o" ] ]) targets) in List.concat @@
-   List.map (Dune_file.Stanzas.of_ast project) asts) )
-
-   (* TODO: install opam package or shell out to duniverse *) *)
