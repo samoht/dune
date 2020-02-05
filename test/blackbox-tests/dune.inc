@@ -1345,6 +1345,14 @@
    (progn (run %{exe:cram.exe} -test run.t) (diff? run.t run.t.corrected)))))
 
 (rule
+ (alias mirage)
+ (deps (package dune) (source_tree test-cases/mirage))
+ (action
+  (chdir
+   test-cases/mirage
+   (progn (run %{exe:cram.exe} -test run.t) (diff? run.t run.t.corrected)))))
+
+(rule
  (alias misc)
  (deps (package dune) (source_tree test-cases/misc))
  (action
@@ -2199,6 +2207,7 @@
   (alias github2584)
   (alias github2629)
   (alias github2681)
+  (alias github2848)
   (alias github534)
   (alias github568)
   (alias github597)
@@ -2246,6 +2255,7 @@
   (alias merlin-merlin-tests)
   (alias merlin-src-dirs-of-deps)
   (alias meta-gen)
+  (alias mirage)
   (alias misc)
   (alias missing-loc-run)
   (alias multi-dir)
@@ -2442,6 +2452,7 @@
   (alias github2584)
   (alias github2629)
   (alias github2681)
+  (alias github2848)
   (alias github534)
   (alias github568)
   (alias github597)
@@ -2480,6 +2491,7 @@
   (alias merlin-allow_approximate_merlin)
   (alias merlin-src-dirs-of-deps)
   (alias meta-gen)
+  (alias mirage)
   (alias misc)
   (alias missing-loc-run)
   (alias multi-dir)

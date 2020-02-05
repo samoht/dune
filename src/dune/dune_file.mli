@@ -365,6 +365,17 @@ module Coq : sig
   type Stanza.t += T of t
 end
 
+module Mirage : sig
+  type t =
+    { name : string
+    ; config : string
+    ; loc : Loc.t
+    ; contexts : (Loc.t * string * (Loc.t * string * string) list) list
+    }
+
+  type Stanza.t += T of t
+end
+
 module Coqpp : sig
   type t =
     { modules : string list

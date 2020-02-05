@@ -1963,6 +1963,49 @@ module Coq = struct
   let key = Dune_project.Extension.register syntax unit_stanzas Unit.to_dyn
 end
 
+module Mirage = struct
+  type t =
+    { name : string
+    ; config : string
+    ; loc : Loc.t
+    ; contexts : (Loc.t * string * (Loc.t * string * string) list) list
+    }
+
+  let syntax =
+    Dune_lang.Syntax.create ~name:"mirage"
+      ~desc:"the MirageOS extension (experimental)" [ (0, 1) ]
+
+  type Stanza.t += T of t
+
+  let decode =
+    ( "mirage"
+    , fields
+        (let+ name = field ~default:"unikernel" "name" string
+         and+ loc = loc
+         and+ config = field ~default:"config" "config" string
+         and+ contexts =
+           multi_field "context"
+             (fields
+                (let+ name = field "name" string
+                 and+ args = leftover_fields
+                 and+ loc = loc in
+                 let targets =
+                   List.map
+                     ~f:(function
+                       | List (_, [ Atom (loc, a); Atom (_, b) ]) ->
+                         (loc, Dune_lang.Atom.print a, Dune_lang.Atom.print b)
+                       | _ -> assert false)
+                     args
+                 in
+                 (loc, name, targets)))
+         in
+         [ T { name; loc; config; contexts } ]) )
+
+  let () =
+    Dune_project.Extension.register_simple ~experimental:false syntax
+      (Dune_lang.Decoder.return [ decode ])
+end
+
 module Alias_conf = struct
   type t =
     { name : Alias.Name.t

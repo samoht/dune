@@ -245,6 +245,7 @@ let gen_rules sctx dir_contents cctxs
       | Coqpp.T m ->
         Coq_rules.coqpp_rules ~sctx ~build_dir ~dir:ctx_dir m
         |> Super_context.add_rules ~dir:ctx_dir sctx
+      | Mirage.T m -> Mirage_rules.gen_rules ~sctx ~dir:ctx_dir m
       | _ -> ());
   let dyn_deps =
     let pred =
