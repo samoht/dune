@@ -1,3 +1,4 @@
+open Build.O
 open Import
 module SC = Super_context
 module CC = Compilation_context
@@ -25,10 +26,11 @@ module CC = Compilation_context
 
 let config_exe ~dir = Ok (Path.relative (Path.build dir) "config.exe")
 
+(* generate config.exe *)
 let gen_config_exe ~sctx ~dir (stanza : Dune_file.Mirage.t) =
   let program =
-    { Exe.Program.name = stanza.name
-    ; main_module_name = Module_name.of_string stanza.name
+    { Exe.Program.name = stanza.config
+    ; main_module_name = Module_name.of_string stanza.config
     ; loc = stanza.loc
     }
   in
@@ -37,7 +39,7 @@ let gen_config_exe ~sctx ~dir (stanza : Dune_file.Mirage.t) =
   let modules =
     let impl =
       Module.File.make Dialect.ocaml
-        (Path.relative (Path.build dir) (stanza.name ^ ".ml"))
+        (Path.relative (Path.build dir) (stanza.config ^ ".ml"))
     in
     Modules.singleton_exe
       (Module.of_source ~visibility:Visibility.Private ~kind:Module.Kind.Impl
@@ -72,30 +74,83 @@ let obj_dir dir = Path.Build.relative dir ".mirage"
 
 let config_libs dir name = Path.Build.relative (obj_dir dir) (name ^ ".libs")
 
+let config_pkgs dir name = Path.Build.relative (obj_dir dir) (name ^ ".packages")
+
 (* generate <context>.libs files *)
-let gen_config_libs ~sctx ~dir (stanza : Dune_file.Mirage.t) =
+let gen_query_files ~sctx ~dir (stanza : Dune_file.Mirage.t) =
   List.iter
     ~f:(fun (loc, name, args) ->
-      let output_file = config_libs dir name in
       let args =
         List.map ~f:(fun (_, k, v) -> Printf.sprintf "--%s=%s" k v) args
       in
-      SC.add_rule sctx ~dir ~loc
-        (Command.run (config_exe ~dir) ~dir:(Path.build dir)
-           [ As ("query-libraries" :: args) ]
-           ~stdout_to:output_file))
+      let add_rule kind stdout_to =
+        SC.add_rule sctx ~dir ~loc
+          (Command.run (config_exe ~dir) ~dir:(Path.build dir)
+             [ As ("query" :: kind :: args) ]
+             ~stdout_to)
+      in
+      add_rule "libraries" (config_libs dir name);
+      add_rule "packages" (config_pkgs dir name))
     stanza.contexts
 
-(* let let action = let paths = let+ lines = Build.lines_of (Path.build
-   config_query_libraries_output) in List.map ~f:(fun l -> let name =
-   Lib_name.of_string_exn ~loc:None l in Lib.DB.find libs name) lines in
-   SC.add_rule sctx ~dir action; let all_deps_file = Path.build all_deps_file in
-   Build.memoize (Path.to_string all_deps_file) (Build.map
-   ~f:(parse_module_names ~unit) (Build.lines_of all_deps_file)) *)
+(* generate <context>.exe *)
+let gen_context_exe ~sctx ~dir (stanza : Dune_file.Mirage.t) =
+  let scope = SC.find_scope_by_dir sctx dir in
+  let db = Scope.libs scope in
+  let dune_version = Dune_project.dune_version (Scope.project scope) in
+  List.iter
+    ~f:(fun (loc, name, _args) ->
+      let dyn_flags =
+        let+ libs = Build.lines_of (Path.build (config_libs dir name)) in
+        let exes = [ (loc, name) ] in
+        let deps =
+          List.map
+            ~f:(fun l ->
+              Lib_dep.direct (loc, Lib_name.of_string_exn ~loc:(Some loc) l))
+            libs
+        in
+        let compile =
+          Lib.DB.resolve_user_written_deps_for_exes db exes deps ~pps:[]
+            ~optional:false ~variants:None ~dune_version
+        in
+        let lib_config = Context.lib_config (SC.context sctx) in
+        let mode = Link_mode.Byte in
+        let link = Lazy.force (Lib.Compile.requires_link compile) in
+        let link = Result.ok_exn link in
+        Lib.L.compile_and_link_flags ~compile:link ~link ~mode ~lib_config
+      in
+      let compiler = (SC.context sctx).ocamlc in
+      let target = Path.Build.relative dir (name ^ ".exe") in
+      let args =
+        let open Command.Args in
+        [ Dep (Path.relative (Path.build dir) "main.ml")
+        ; A "-o"
+        ; Target target
+        ; Dyn dyn_flags
+        ]
+      in
+      let action = Command.run ~dir:(Path.build dir) (Ok compiler) args in
+      SC.add_rule ~dir sctx action)
+    stanza.contexts
+
+let gen_depends_alias ~sctx ~dir (stanza : Dune_file.Mirage.t) =
+  let duniverse = SC.resolve_program sctx ~loc:None ~dir "duniverse" in
+  let alias = Alias.make ~dir (Alias.Name.of_string "depends") in
+  List.iter
+    ~f:(fun (loc, name, _args) ->
+      let pkgs = Build.lines_of (Path.build (config_libs dir name)) in
+      let action =
+        Command.run ~dir:(Path.build dir) duniverse
+          [ A "init"; A "--no-submodules"; Command.Args.dyn pkgs ]
+      in
+      SC.add_alias_action sctx ~dir ~loc:(Some loc) alias action ~stamp:name)
+    stanza.contexts
 
 let gen_rules ~sctx ~dir stanza =
   gen_config_exe ~sctx ~dir stanza;
-  gen_config_libs ~sctx ~dir stanza
+  gen_query_files ~sctx ~dir stanza;
+  gen_depends_alias ~sctx ~dir stanza;
+  gen_context_exe ~sctx ~dir stanza
 
 (* SC.add_rule sctx ~dir (Command.run ~dir:(Path.build dir)
    ~stdout_to:(Path.Build.relative dir ".config.out") (config_exe ~dir)
