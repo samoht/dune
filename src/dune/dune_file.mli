@@ -366,11 +366,18 @@ module Coq : sig
 end
 
 module Mirage : sig
-  type t =
+  type instance =
     { name : string
-    ; config : string
     ; loc : Loc.t
-    ; contexts : (Loc.t * string * (Loc.t * string * string) list) list
+    ; target : string
+    ; args : (string * string) list
+    }
+
+  type t =
+    { loc : Loc.t
+    ; name : string
+    ; config : string
+    ; instances : instance list
     }
 
   type Stanza.t += T of t

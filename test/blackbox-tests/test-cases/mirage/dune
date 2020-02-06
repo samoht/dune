@@ -1,6 +1,6 @@
 (mirage
   (name unikernel)
   (config config)
-  (context
+  (instance
     (name foo)
     (target unix)))

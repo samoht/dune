@@ -1964,11 +1964,18 @@ module Coq = struct
 end
 
 module Mirage = struct
-  type t =
+  type instance =
     { name : string
-    ; config : string
     ; loc : Loc.t
-    ; contexts : (Loc.t * string * (Loc.t * string * string) list) list
+    ; target : string
+    ; args : (string * string) list
+    }
+
+  type t =
+    { loc : Loc.t
+    ; name : string
+    ; config : string
+    ; instances : instance list
     }
 
   let syntax =
@@ -1977,29 +1984,27 @@ module Mirage = struct
 
   type Stanza.t += T of t
 
+  let instance : instance Dune_lang.Decoder.t =
+    fields
+      (let+ name = field "name" string
+       and+ target = field "target" string
+       and+ loc = loc
+       and+ args = field_o "args" (repeat (pair string string)) in
+       let args =
+         match args with
+         | Some args -> args
+         | None -> []
+       in
+       { name; loc; args; target })
+
   let decode =
     ( "mirage"
     , fields
         (let+ name = field ~default:"unikernel" "name" string
          and+ loc = loc
          and+ config = field ~default:"config" "config" string
-         and+ contexts =
-           multi_field "context"
-             (fields
-                (let+ name = field "name" string
-                 and+ args = leftover_fields
-                 and+ loc = loc in
-                 let targets =
-                   List.map
-                     ~f:(function
-                       | List (_, [ Atom (loc, a); Atom (_, b) ]) ->
-                         (loc, Dune_lang.Atom.print a, Dune_lang.Atom.print b)
-                       | _ -> assert false)
-                     args
-                 in
-                 (loc, name, targets)))
-         in
-         [ T { name; loc; config; contexts } ]) )
+         and+ instances = multi_field "instance" instance in
+         [ T { name; loc; config; instances } ]) )
 
   let () =
     Dune_project.Extension.register_simple ~experimental:false syntax

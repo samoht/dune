@@ -429,5 +429,11 @@ let gen ~contexts ?(external_lib_deps_mode = false) ?only_packages conf =
             Install_rules.gen_rules sctx ~dir)
       | Context ctx ->
         Context_name.Map.find sctxs ctx
-        |> Option.map ~f:(fun sctx -> gen_rules ~sctx));
+        |> Option.map ~f:(fun sctx ~dir paths ->
+               let () =
+                 match paths with
+                 | [] -> Mirage_rules.init ~dir sctx
+                 | _ -> ()
+               in
+               gen_rules ~sctx ~dir paths));
   sctxs

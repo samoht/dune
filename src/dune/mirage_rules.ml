@@ -3,27 +3,6 @@ open Import
 module SC = Super_context
 module CC = Compilation_context
 
-(* let mirage sctx ~dir = SC.resolve_program sctx ~dir "mirage" ~loc:None
-   ~hint:"try: opam install mirage"
-
-   let atom ~loc str = Dune_lang.Ast.Atom (loc, Dune_lang.Atom.of_string str)
-
-   let list ~loc elts = Dune_lang.Ast.List (loc, elts)
-
-   let executable ~modes ~loc ~name ~modules ~libraries = let atom = atom ~loc
-   and list = list ~loc in list [ atom "executable" ; list [ atom "name"; atom
-   name ] ; list (atom "modules" :: List.map ~f:atom modules) ; list (atom
-   "libraries" :: List.map ~f:atom libraries) ; list (atom "modes" :: List.map
-   ~f:atom modes) ]
-
-   let rule ~loc ~targets ~run = let atom = atom ~loc and list = list ~loc in
-   list [ atom "rule" ; list (atom "targets" :: List.map ~f:atom targets) ; list
-   [ atom "action"; list (atom "run" :: List.map ~f:atom run) ] ]
-
-   let alias ~loc ~name ~deps = let atom = atom ~loc and list = list ~loc in
-   list [ atom "alias" ; list [ atom "name"; atom name ] ; list (atom "deps" ::
-   List.map ~f:atom deps) ] *)
-
 let config_exe ~dir = Ok (Path.relative (Path.build dir) "config.exe")
 
 (* generate config.exe *)
@@ -79,23 +58,51 @@ let config_pkgs dir name = Path.Build.relative (obj_dir dir) (name ^ ".packages"
 (* generate <context>.libs files *)
 let gen_query_files ~sctx ~dir (stanza : Dune_file.Mirage.t) =
   List.iter
-    ~f:(fun (loc, name, args) ->
+    ~f:(fun (i : Dune_file.Mirage.instance) ->
       let args =
-        List.map ~f:(fun (_, k, v) -> Printf.sprintf "--%s=%s" k v) args
+        ("--target=" ^ i.target)
+        :: List.map ~f:(fun (k, v) -> Printf.sprintf "--%s=%s" k v) i.args
       in
       let add_rule kind stdout_to =
-        SC.add_rule sctx ~dir ~loc
+        SC.add_rule sctx ~dir ~loc:i.loc
           (Command.run (config_exe ~dir) ~dir:(Path.build dir)
              [ As ("query" :: kind :: args) ]
              ~stdout_to)
       in
-      add_rule "libraries" (config_libs dir name);
-      add_rule "packages" (config_pkgs dir name);
+      add_rule "libraries" (config_libs dir i.name);
+      add_rule "packages" (config_pkgs dir i.name);
       let main = Path.Build.relative dir "main.ml" in
-      SC.add_rule sctx ~dir ~loc
+      SC.add_rule sctx ~dir ~loc:i.loc
         (Command.run (config_exe ~dir) ~dir:(Path.build dir)
            [ A "config"; Hidden_targets [ main ]; As args ]))
-    stanza.contexts
+    stanza.instances
+
+let gen_global_packages_file ~dir sctx =
+  let stanzas = SC.stanzas sctx in
+  let path d (i : Dune_file.Mirage.instance) =
+    Path.build (config_pkgs d.Dir_with_dune.ctx_dir i.name)
+  in
+  let paths =
+    List.fold_left
+      ~f:(fun acc d ->
+        List.fold_left
+          ~f:(fun acc -> function
+            | Dune_file.Mirage.T s ->
+              List.fold_left
+                ~f:(fun acc i -> path d i :: acc)
+                ~init:acc s.instances
+            | _ -> acc)
+          ~init:acc d.Dir_with_dune.data)
+      ~init:[] stanzas
+  in
+  let dir = obj_dir dir in
+  let target = Path.Build.relative dir "mirage.all-packages" in
+  let action =
+    Build.with_targets ~targets:[ target ]
+      (let+ () = Build.paths paths in
+       Action.Merge_files_into (paths, [], target))
+  in
+  SC.add_rule ~dir sctx action
 
 (* generate <context>.exe *)
 let gen_context_exe ~sctx ~dir (stanza : Dune_file.Mirage.t) =
@@ -103,14 +110,14 @@ let gen_context_exe ~sctx ~dir (stanza : Dune_file.Mirage.t) =
   let db = Scope.libs scope in
   let dune_version = Dune_project.dune_version (Scope.project scope) in
   List.iter
-    ~f:(fun (loc, name, _args) ->
+    ~f:(fun (i : Dune_file.Mirage.instance) ->
       let dyn_flags =
-        let+ libs = Build.lines_of (Path.build (config_libs dir name)) in
-        let exes = [ (loc, name) ] in
+        let+ libs = Build.lines_of (Path.build (config_libs dir i.name)) in
+        let exes = [ (i.loc, i.name) ] in
         let deps =
           List.map
             ~f:(fun l ->
-              Lib_dep.direct (loc, Lib_name.of_string_exn ~loc:(Some loc) l))
+              Lib_dep.direct (i.loc, Lib_name.of_string_exn ~loc:(Some i.loc) l))
             libs
         in
         let compile =
@@ -124,7 +131,7 @@ let gen_context_exe ~sctx ~dir (stanza : Dune_file.Mirage.t) =
         Lib.L.compile_and_link_flags ~compile:link ~link ~mode ~lib_config
       in
       let compiler = (SC.context sctx).ocamlc in
-      let target = Path.Build.relative dir (name ^ ".exe") in
+      let target = Path.Build.relative dir (i.name ^ ".exe") in
       let args =
         let open Command.Args in
         [ Dep (Path.relative (Path.build dir) "main.ml")
@@ -135,27 +142,29 @@ let gen_context_exe ~sctx ~dir (stanza : Dune_file.Mirage.t) =
       in
       let action = Command.run ~dir:(Path.build dir) (Ok compiler) args in
       SC.add_rule ~dir sctx action)
-    stanza.contexts
+    stanza.instances
 
 let gen_depends_alias ~sctx ~dir (stanza : Dune_file.Mirage.t) =
   let duniverse = SC.resolve_program sctx ~loc:None ~dir "duniverse" in
   let alias = Alias.make ~dir (Alias.Name.of_string "depends") in
   List.iter
-    ~f:(fun (loc, name, _args) ->
-      let pkgs = Build.lines_of (Path.build (config_libs dir name)) in
+    ~f:(fun (i : Dune_file.Mirage.instance) ->
+      let pkgs = Build.lines_of (Path.build (config_libs dir i.name)) in
       let init =
-        Command.run ~dir:(Path.build dir) duniverse
+        Command.run ~dir:Path.root duniverse
           [ A "init"; A "--pull-mode=source"; Command.Args.dyn pkgs ]
       in
       let pull =
-        Command.run ~dir:(Path.build dir) duniverse [ A "pull"; A "--no-cache" ]
+        Command.run ~dir:Path.root duniverse [ A "pull"; A "--no-cache" ]
       in
       let action = Build.progn [ init; pull ] in
-      SC.add_alias_action sctx ~dir ~loc:(Some loc) alias action ~stamp:name)
-    stanza.contexts
+      SC.add_alias_action sctx ~dir ~loc:(Some i.loc) alias action ~stamp:i.name)
+    stanza.instances
 
 let gen_rules ~sctx ~dir stanza =
   gen_config_exe ~sctx ~dir stanza;
   gen_query_files ~sctx ~dir stanza;
   gen_depends_alias ~sctx ~dir stanza;
   gen_context_exe ~sctx ~dir stanza
+
+let init ~dir sctx = gen_global_packages_file ~dir sctx
