@@ -47,6 +47,9 @@ module Conditional_choice : sig
   (** Returns the first value whose associated environment is a subset of the
       specified environment. *)
   val choose_for_platform : 'a t -> platform:Solver_env.t -> 'a option
+
+  (** [exists t ~f] returns true if [f] returns true for any value in [t]. *)
+  val exists : 'a t -> f:('a -> bool) -> bool
 end
 
 module Depexts : sig

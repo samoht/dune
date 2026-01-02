@@ -110,6 +110,10 @@ module Conditional_choice = struct
     List.find_map t ~f:(Conditional.evaluate ~platform)
   ;;
 
+  let exists t ~f =
+    List.exists t ~f:(fun (conditional : _ Conditional.t) -> f conditional.value)
+  ;;
+
   (* [contains_solver_env t solver_env] is true iff [solver_env] is part of the
      disjunction in any conditional in [t]. *)
   let contains_solver_env t solver_env =
