@@ -139,6 +139,30 @@ let pp_package { Lock_dir.Pkg.info = { Lock_dir.Pkg_info.name; version; avoid; _
 
 let pp_packages packages = Pp.enumerate packages ~f:pp_package
 
+let pp_packages_by_target packages =
+  let module Duniverse = Dune_pkg.Duniverse in
+  let duniverse_pkgs, opam_pkgs =
+    List.partition packages ~f:(fun pkg ->
+      match Duniverse.classify pkg with
+      | Duniverse.Duniverse -> true
+      | Duniverse.Opam_sandbox -> false)
+  in
+  let sections =
+    [ "duniverse (dune-built)", duniverse_pkgs; "opam sandbox", opam_pkgs ]
+    |> List.filter ~f:(fun (_, pkgs) -> not (List.is_empty pkgs))
+  in
+  match sections with
+  | [] -> Pp.nop
+  | [ (_, pkgs) ] -> pp_packages pkgs
+  | _ ->
+    let pp_section (label, pkgs) =
+      Pp.concat ~sep:Pp.cut [ Pp.verbatim (label ^ ":"); pp_packages pkgs ]
+    in
+    (* Add extra newline between sections using Pp.cut twice *)
+    let sep = Pp.seq Pp.cut Pp.cut in
+    Pp.vbox (Pp.concat ~sep (List.map sections ~f:pp_section))
+;;
+
 module Lock_dirs_arg = struct
   type t =
     | All

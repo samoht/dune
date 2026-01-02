@@ -82,6 +82,10 @@ end
     [lock_dir]. *)
 val pp_packages : Dune_pkg.Lock_dir.Pkg.t list -> User_message.Style.t Pp.t
 
+(** [pp_packages_by_target packages] returns pretty-printed packages grouped by
+    their build target (duniverse for dune-built packages, opam sandbox for others). *)
+val pp_packages_by_target : Dune_pkg.Lock_dir.Pkg.t list -> User_message.Style.t Pp.t
+
 (** [check_pkg_management_enabled ()] checks if package management is enabled in the
     workspace configuration. Raises a user error if it is explicitly disabled. *)
 val check_pkg_management_enabled : unit -> unit Fiber.t

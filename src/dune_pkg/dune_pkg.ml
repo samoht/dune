@@ -1,3 +1,4 @@
+module Duniverse = Duniverse
 module Fetch = Fetch
 module Checksum = Checksum
 module Source = Source

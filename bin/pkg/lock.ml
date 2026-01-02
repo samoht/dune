@@ -282,7 +282,7 @@ let summary_message
           (Path.to_string_maybe_quoted (user_lock_dir_path lock_dir_path)))
      :: (match Lock_dir.Packages.to_pkg_list lock_dir.packages with
          | [] -> Pp.tag User_message.Style.Warning @@ Pp.text "(no dependencies to lock)"
-         | packages -> pp_packages packages)
+         | packages -> pp_packages_by_target packages)
      :: maybe_perf_stats)
     @ maybe_unsolved_platforms_message
 ;;

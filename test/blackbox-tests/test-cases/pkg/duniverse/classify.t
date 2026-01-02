@@ -1,36 +1,73 @@
-Test that packages are correctly classified as duniverse (dune-built) or opam sandbox.
+Test that packages are correctly classified as duniverse (dune-built) or opam sandbox
+in the lock command output.
 
-  $ make_lockdir
+Set up a mock repository:
+
+  $ mkrepo
+
+Non-portable lockdir for simpler output:
+
+  $ export DUNE_CONFIG__PORTABLE_LOCK_DIR=disabled
+
+Create a package that uses dune as its build system:
+
+  $ mkpkg dune-pkg 1.0.0 <<EOF
+  > build: ["dune" "build" "-p" name "-j" jobs]
+  > EOF
+
+Create a package that uses plain opam build commands:
+
+  $ mkpkg opam-pkg 1.0.0 <<EOF
+  > build: ["make" "all"]
+  > install: ["make" "install"]
+  > EOF
+
+Set up workspace with mock repository:
+
+  $ cat >dune-workspace <<EOF
+  > (lang dune 3.20)
+  > (lock_dir
+  >  (path dune.lock)
+  >  (repositories mock))
+  > (repository
+  >  (name mock)
+  >  (url "file://$(pwd)/mock-opam-repository"))
+  > EOF
+
+Create a project that depends on both packages:
 
   $ cat >dune-project <<EOF
   > (lang dune 3.16)
+  > (package (name myproj) (depends dune-pkg opam-pkg))
   > EOF
 
-  $ cat > dune-workspace <<EOF
-  > (lang dune 3.20)
-  > (pkg enabled)
-  > EOF
+Lock the dependencies and verify classification in output:
 
-Create a package that uses dune (has "dune" build command):
+  $ dune pkg lock
+  Solution for dune.lock:
+  duniverse (dune-built):
+  - dune-pkg.1.0.0
+  
+  opam sandbox:
+  - opam-pkg.1.0.0
 
-  $ make_lockpkg dune-pkg <<EOF
-  > (version 1.0.0)
-  > (dune)
-  > EOF
 
-Create a package that uses opam build commands (action):
-
-  $ make_lockpkg opam-pkg <<EOF
-  > (version 1.0.0)
-  > (build (run echo "building with opam"))
-  > EOF
-
-Verify the lockdir contents:
+Verify the lockdir contents show dune packages use dune build command:
 
   $ cat dune.lock/dune-pkg.pkg
   (version 1.0.0)
-  (dune)
+  
+  (build
+   (run dune build -p %{pkg-self:name} -j %{jobs}))
+
 
   $ cat dune.lock/opam-pkg.pkg
   (version 1.0.0)
-  (build (run echo "building with opam"))
+  
+  (install
+   (run make install))
+  
+  (build
+   (run make all))
+
+
