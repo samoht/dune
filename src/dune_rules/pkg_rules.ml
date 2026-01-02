@@ -13,6 +13,7 @@ include struct
   module Depexts = Lock_dir.Depexts
   module Digest_feed = Dune_digest.Feed
   module Dune_dep = Dune_dep
+  module Duniverse = Duniverse
 end
 
 module Variable = struct
@@ -2347,29 +2348,54 @@ let setup_pkg_install_alias =
     |> Gen_rules.rules_here
 ;;
 
-let setup_package_rules db ~package_universe ~dir ~pkg_digest : Gen_rules.result Memo.t =
-  let* pkg = Resolve.resolve db Loc.none pkg_digest package_universe in
-  let paths = Paths.make pkg.pkg_digest package_universe ~relative:Path.Build.relative in
-  let+ directory_targets =
-    let map =
-      let target_dir = paths.target_dir in
-      Path.Build.Map.singleton target_dir Loc.none
+(* Check if a package is classified as duniverse and has sources in the duniverse directory.
+   If so, the package will be built as normal vendored code, not via .pkg/ rules. *)
+let is_duniverse_with_sources (lock_pkg : Lock_dir.Pkg.t) =
+  match Duniverse.classify lock_pkg with
+  | Duniverse.Opam_sandbox -> Memo.return false
+  | Duniverse.Duniverse ->
+    let duniverse_path = Duniverse.package_dir lock_pkg.info.name lock_pkg.info.version in
+    Fs_memo.dir_exists (Path.Outside_build_dir.In_source_dir duniverse_path)
+;;
+
+let setup_package_rules (db : DB.t) ~package_universe ~dir ~pkg_digest
+  : Gen_rules.result Memo.t
+  =
+  (* First check if this package is in duniverse *)
+  let* is_duniverse =
+    match Pkg_digest.Map.find db.pkg_digest_table pkg_digest with
+    | None -> Memo.return false
+    | Some { DB.Pkg_table.pkg; _ } -> is_duniverse_with_sources pkg
+  in
+  if is_duniverse
+  then
+    (* Duniverse packages are built as normal vendored code, skip .pkg/ rules *)
+    Memo.return @@ Gen_rules.make (Memo.return Rules.empty)
+  else
+    let* pkg = Resolve.resolve db Loc.none pkg_digest package_universe in
+    let paths =
+      Paths.make pkg.pkg_digest package_universe ~relative:Path.Build.relative
     in
-    match pkg.info.source with
-    | None -> Memo.return map
-    | Some source ->
-      Lock_dir.source_kind source
-      >>| (function
-       | `Local (`Directory, _) -> map
-       | `Local (`File, _) | `Fetch ->
-         Path.Build.Map.add_exn map paths.source_dir (fst source.url))
-  in
-  let build_dir_only_sub_dirs =
-    Gen_rules.Build_only_sub_dirs.singleton ~dir Subdir_set.empty
-  in
-  let context_name = Package_universe.context_name package_universe in
-  let rules = Rules.collect_unit (fun () -> gen_rules context_name pkg) in
-  Gen_rules.make ~directory_targets ~build_dir_only_sub_dirs rules
+    let+ directory_targets =
+      let map =
+        let target_dir = paths.target_dir in
+        Path.Build.Map.singleton target_dir Loc.none
+      in
+      match pkg.info.source with
+      | None -> Memo.return map
+      | Some source ->
+        Lock_dir.source_kind source
+        >>| (function
+         | `Local (`Directory, _) -> map
+         | `Local (`File, _) | `Fetch ->
+           Path.Build.Map.add_exn map paths.source_dir (fst source.url))
+    in
+    let build_dir_only_sub_dirs =
+      Gen_rules.Build_only_sub_dirs.singleton ~dir Subdir_set.empty
+    in
+    let context_name = Package_universe.context_name package_universe in
+    let rules = Rules.collect_unit (fun () -> gen_rules context_name pkg) in
+    Gen_rules.make ~directory_targets ~build_dir_only_sub_dirs rules
 ;;
 
 let setup_rules ~components ~dir ctx =
