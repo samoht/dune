@@ -1,5 +1,6 @@
 module Duniverse = Duniverse
 module Fetch = Fetch
+module Pkg_cache = Pkg_cache
 module Checksum = Checksum
 module Source = Source
 module Lock_dir = Lock_dir

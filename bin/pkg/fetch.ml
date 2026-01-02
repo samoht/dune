@@ -4,9 +4,52 @@ module Source = Dune_pkg.Source
 module Duniverse = Dune_pkg.Duniverse
 module Rev_store = Dune_pkg.Rev_store
 module OpamUrl = Dune_pkg.OpamUrl
+module Pkg_cache = Dune_pkg.Pkg_cache
 
 (* Get the default lock dir path *)
 let get_default_lock_dir_path () = Dune_rules.Lock_dir.default_source_path |> Path.source
+
+let handle_fetch_error ~name ~version = function
+  | Ok () -> Fiber.return ()
+  | Error (Dune_pkg.Fetch.Unavailable msg) ->
+    let msg =
+      match msg with
+      | Some m -> User_message.to_string m
+      | None -> "unavailable"
+    in
+    User_error.raise
+      [ Pp.textf
+          "Failed to fetch %s.%s: %s"
+          (Package_name.to_string name)
+          (Dune_pkg.Package_version.to_string version)
+          msg
+      ]
+  | Error (Dune_pkg.Fetch.Checksum_mismatch actual) ->
+    User_error.raise
+      [ Pp.textf
+          "Checksum mismatch for %s.%s (got %s)"
+          (Package_name.to_string name)
+          (Dune_pkg.Package_version.to_string version)
+          (Dune_pkg.Checksum.to_string actual)
+      ]
+;;
+
+let do_fetch ~rev_store ~url ~checksum ~target =
+  let loc, opam_url = url in
+  let checksum_opt = Option.map checksum ~f:snd in
+  match OpamUrl.classify opam_url loc with
+  | `Git ->
+    Dune_pkg.Fetch.fetch_git
+      rev_store
+      ~target:(Path.build (Path.Build.of_string target))
+      ~url
+  | `Path _ | `Archive ->
+    Dune_pkg.Fetch.fetch
+      ~unpack:true
+      ~checksum:checksum_opt
+      ~target:(Path.build (Path.Build.of_string target))
+      ~url
+;;
 
 let fetch_package ~rev_store pkg =
   let open Fiber.O in
@@ -38,45 +81,17 @@ let fetch_package ~rev_store pkg =
                (Dune_pkg.Package_version.to_string version)
                target_path
            ]);
-      let loc, opam_url = url in
       let* result =
-        let checksum = Option.map checksum ~f:snd in
-        match OpamUrl.classify opam_url loc with
-        | `Git ->
-          Dune_pkg.Fetch.fetch_git
-            rev_store
-            ~target:(Path.build (Path.Build.of_string target_path))
-            ~url
-        | `Path _ | `Archive ->
-          Dune_pkg.Fetch.fetch
-            ~unpack:true
-            ~checksum
-            ~target:(Path.build (Path.Build.of_string target_path))
-            ~url
+        match checksum with
+        | Some (_, checksum_value) ->
+          (* Use cache for packages with checksums *)
+          Pkg_cache.get_or_fetch ~checksum:checksum_value ~target ~fetch:(fun ~target ->
+            do_fetch ~rev_store ~url ~checksum ~target:(Path.to_string target))
+        | None ->
+          (* No checksum (e.g., git sources), fetch directly *)
+          do_fetch ~rev_store ~url ~checksum ~target:target_path
       in
-      match result with
-      | Ok () -> Fiber.return ()
-      | Error (Dune_pkg.Fetch.Unavailable msg) ->
-        let msg =
-          match msg with
-          | Some m -> User_message.to_string m
-          | None -> "unavailable"
-        in
-        User_error.raise
-          [ Pp.textf
-              "Failed to fetch %s.%s: %s"
-              (Package_name.to_string name)
-              (Dune_pkg.Package_version.to_string version)
-              msg
-          ]
-      | Error (Dune_pkg.Fetch.Checksum_mismatch actual) ->
-        User_error.raise
-          [ Pp.textf
-              "Checksum mismatch for %s.%s (got %s)"
-              (Package_name.to_string name)
-              (Dune_pkg.Package_version.to_string version)
-              (Dune_pkg.Checksum.to_string actual)
-          ])
+      handle_fetch_error ~name ~version result)
 ;;
 
 let fetch_duniverse ~lock_dir_path () =
