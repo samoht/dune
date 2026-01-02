@@ -9,6 +9,7 @@ let man =
 
 let subcommands =
   [ Lock.command
+  ; Fetch.command
   ; Print_solver_env.command
   ; Outdated.command
   ; Validate_lock_dir.command

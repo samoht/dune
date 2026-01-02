@@ -1,3 +1,4 @@
+module Fetch = Fetch
 module Group = Group
 module Lock = Lock
 module Outdated = Outdated
