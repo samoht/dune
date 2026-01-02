@@ -10,7 +10,8 @@ let package_target_to_dyn = function
 ;;
 
 let marker_filename = ".dune-duniverse"
-let duniverse_dir = Path.Source.of_string "duniverse"
+let marker_dirname = "duniverse"
+let duniverse_dir = Path.Source.of_string marker_dirname
 
 let package_dir name version =
   let dirname =

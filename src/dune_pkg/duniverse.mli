@@ -17,6 +17,9 @@ val package_target_to_dyn : package_target -> Dyn.t
 (** The marker file that indicates a directory is a managed duniverse *)
 val marker_filename : string
 
+(** The directory name for duniverse (just the basename, not a path) *)
+val marker_dirname : string
+
 (** [duniverse_dir] returns the path to the duniverse directory relative to
     the project root. *)
 val duniverse_dir : Path.Source.t

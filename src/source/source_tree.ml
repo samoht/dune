@@ -235,11 +235,6 @@ and find_dir_raw
       ~basename
   : Dir0.t Memo.t
   =
-  let status =
-    if Dune_project.cram project && Cram_test.is_cram_suffix basename
-    then Source_dir_status.Data_only
-    else status
-  in
   let* readdir =
     if virtual_
     then Memo.return Dir_contents.empty
@@ -248,6 +243,20 @@ and find_dir_raw
       >>| function
       | Ok dir -> dir
       | Error _ -> Dir_contents.empty
+  in
+  (* Determine the final status for this directory *)
+  let status =
+    (* Override status for cram test directories *)
+    if Dune_project.cram project && Cram_test.is_cram_suffix basename
+    then
+      Source_dir_status.Data_only
+      (* Auto-detect duniverse directory: if it contains the marker file,
+       treat it as vendored so packages are built in the main context *)
+    else if
+      String.equal basename Dune_pkg.Duniverse.marker_dirname
+      && Filename.Set.mem (Dir_contents.files readdir) Dune_pkg.Duniverse.marker_filename
+    then Source_dir_status.Vendored
+    else status
   in
   let* project =
     if status = Data_only
