@@ -23,7 +23,19 @@ let find_package lock_dir name =
   List.find all_pkgs ~f:(fun pkg -> Package_name.equal pkg.Lock_dir.Pkg.info.name name)
 ;;
 
-(* List all patches and their status *)
+(* Common setup for patch commands *)
+let with_lock_dir f =
+  let open Fiber.O in
+  Pkg_common.check_pkg_management_enabled ()
+  >>>
+  let* _workspace = Memo.run (Workspace.workspace ()) in
+  let lock_dir_path = Dune_rules.Lock_dir.default_source_path in
+  let patches_dir = default_patches_dir in
+  f ~lock_dir_path ~patches_dir
+;;
+
+(* ---- List subcommand ---- *)
+
 let list_patches ~lock_dir_path ~patches_dir =
   let lock_dir = Lock_dir.read_disk_exn (Path.source lock_dir_path) in
   let patches_path = Path.source patches_dir in
@@ -80,25 +92,104 @@ let list_patches ~lock_dir_path ~patches_dir =
     Fiber.return ())
 ;;
 
-(* Remove a patch *)
-let remove_patch ~patches_dir name version =
-  let patch_file = patch_path ~patches_dir name version in
-  let patch_full_path = Path.source patch_file in
-  if not (Path.exists patch_full_path)
+module List_cmd = struct
+  let term =
+    let+ builder = Common.Builder.term in
+    let builder = Common.Builder.forbid_builds builder in
+    let common, config = Common.init builder in
+    Scheduler.go_with_rpc_server ~common ~config (fun () ->
+      with_lock_dir (fun ~lock_dir_path ~patches_dir ->
+        list_patches ~lock_dir_path ~patches_dir))
+  ;;
+
+  let info =
+    let doc = "List all patches and their status" in
+    let man =
+      [ `S "DESCRIPTION"
+      ; `P "Lists all patch files in the patches/ directory and shows their status."
+      ; `P "Status can be:"
+      ; `P "  $(b,(current)) - patch matches locked version"
+      ; `P "  $(b,(stale: ...)) - patch is for different version"
+      ; `P "  $(b,(package not in lock)) - package not in lock directory"
+      ]
+    in
+    Cmd.info "list" ~doc ~man
+  ;;
+
+  let command = Cmd.v info term
+end
+
+(* ---- Create subcommand (prepare package for patching) ---- *)
+
+let create_patch ~lock_dir_path ~patches_dir name =
+  let lock_dir = Lock_dir.read_disk_exn (Path.source lock_dir_path) in
+  let pkg =
+    match find_package lock_dir name with
+    | Some pkg -> pkg
+    | None ->
+      User_error.raise
+        [ Pp.textf "Package %s not found in lock directory" (Package_name.to_string name)
+        ]
+  in
+  let version = pkg.info.version in
+  let duniverse_pkg_dir = Duniverse.package_dir name version in
+  let pkg_path = Path.source duniverse_pkg_dir in
+  if not (Path.exists pkg_path)
   then
     User_error.raise
-      [ Pp.textf "Patch %s does not exist" (Path.Source.to_string patch_file) ]
-  else (
-    Fpath.unlink_exn (Path.to_string patch_full_path);
-    Console.print_user_message
-      (User_message.make
-         [ Pp.textf "Removed %s" (Path.Source.to_string patch_file)
-         ; Pp.text "Re-fetch with: dune pkg fetch"
-         ]);
-    Fiber.return ())
+      [ Pp.textf
+          "Package directory %s does not exist."
+          (Path.Source.to_string duniverse_pkg_dir)
+      ; Pp.text "Run 'dune pkg fetch' first to download package sources."
+      ];
+  let _patch_file = patch_path ~patches_dir name version in
+  Console.print_user_message
+    (User_message.make
+       [ Pp.textf
+           "Preparing %s.%s for patching..."
+           (Package_name.to_string name)
+           (Package_version.to_string version)
+       ; Pp.textf "Edit files in %s/ then run:" (Path.Source.to_string duniverse_pkg_dir)
+       ; Pp.textf "  dune pkg patch commit %s" (Package_name.to_string name)
+       ]);
+  Fiber.return ()
 ;;
 
-(* Generate a patch from local changes *)
+module Create_cmd = struct
+  let term =
+    let+ builder = Common.Builder.term
+    and+ pkg_name =
+      Arg.(required & pos 0 (some string) None & info [] ~docv:"PKG" ~doc:None)
+    in
+    let builder = Common.Builder.forbid_builds builder in
+    let common, config = Common.init builder in
+    Scheduler.go_with_rpc_server ~common ~config (fun () ->
+      with_lock_dir (fun ~lock_dir_path ~patches_dir ->
+        let name = Package_name.of_string pkg_name in
+        create_patch ~lock_dir_path ~patches_dir name))
+  ;;
+
+  let info =
+    let doc = "Prepare a package for patching" in
+    let man =
+      [ `S "DESCRIPTION"
+      ; `P
+          "Prepares a package for patching by verifying it exists in the duniverse \
+           directory."
+      ; `P "After running this command, edit the files in duniverse/<pkg>.<version>/."
+      ; `P "Then run $(b,dune pkg patch commit <PKG>) to generate the patch file."
+      ; `S "EXAMPLES"
+      ; `Pre "  dune pkg patch create fmt"
+      ]
+    in
+    Cmd.info "create" ~doc ~man
+  ;;
+
+  let command = Cmd.v info term
+end
+
+(* ---- Commit subcommand ---- *)
+
 let commit_patch ~patches_dir name version =
   let duniverse_pkg_dir = Duniverse.package_dir name version in
   let pkg_path = Path.source duniverse_pkg_dir in
@@ -149,125 +240,112 @@ let commit_patch ~patches_dir name version =
     Fiber.return ())
 ;;
 
-(* Prepare a package for patching *)
-let prepare_patch ~lock_dir_path name =
-  let lock_dir = Lock_dir.read_disk_exn (Path.source lock_dir_path) in
-  let pkg =
-    match find_package lock_dir name with
-    | Some pkg -> pkg
-    | None ->
-      User_error.raise
-        [ Pp.textf "Package %s not found in lock directory" (Package_name.to_string name)
-        ]
-  in
-  let version = pkg.info.version in
-  let duniverse_pkg_dir = Duniverse.package_dir name version in
-  let pkg_path = Path.source duniverse_pkg_dir in
-  if not (Path.exists pkg_path)
+module Commit_cmd = struct
+  let term =
+    let+ builder = Common.Builder.term
+    and+ pkg_name =
+      Arg.(required & pos 0 (some string) None & info [] ~docv:"PKG" ~doc:None)
+    in
+    let builder = Common.Builder.forbid_builds builder in
+    let common, config = Common.init builder in
+    Scheduler.go_with_rpc_server ~common ~config (fun () ->
+      with_lock_dir (fun ~lock_dir_path ~patches_dir ->
+        let lock_dir = Lock_dir.read_disk_exn (Path.source lock_dir_path) in
+        let name = Package_name.of_string pkg_name in
+        let pkg =
+          match find_package lock_dir name with
+          | Some pkg -> pkg
+          | None ->
+            User_error.raise
+              [ Pp.textf
+                  "Package %s not found in lock directory"
+                  (Package_name.to_string name)
+              ]
+        in
+        commit_patch ~patches_dir name pkg.info.version))
+  ;;
+
+  let info =
+    let doc = "Generate patch from local changes" in
+    let man =
+      [ `S "DESCRIPTION"
+      ; `P
+          "Shows instructions for generating a patch file from local modifications to a \
+           duniverse package."
+      ; `P
+          "The generated patch will be stored in patches/<name>@<version>.patch and will \
+           be automatically applied on 'dune pkg fetch'."
+      ; `S "EXAMPLES"
+      ; `Pre "  dune pkg patch commit fmt"
+      ]
+    in
+    Cmd.info "commit" ~doc ~man
+  ;;
+
+  let command = Cmd.v info term
+end
+
+(* ---- Remove subcommand ---- *)
+
+let remove_patch ~patches_dir name version =
+  let patch_file = patch_path ~patches_dir name version in
+  let patch_full_path = Path.source patch_file in
+  if not (Path.exists patch_full_path)
   then
     User_error.raise
-      [ Pp.textf
-          "Package directory %s does not exist."
-          (Path.Source.to_string duniverse_pkg_dir)
-      ; Pp.text "Run 'dune pkg fetch' first to download package sources."
-      ];
-  Console.print_user_message
-    (User_message.make
-       [ Pp.textf
-           "Preparing %s.%s for patching..."
-           (Package_name.to_string name)
-           (Package_version.to_string version)
-       ; Pp.textf "Edit files in %s/ then run:" (Path.Source.to_string duniverse_pkg_dir)
-       ; Pp.textf "  dune pkg patch --commit %s" (Package_name.to_string name)
-       ]);
-  Fiber.return ()
+      [ Pp.textf "Patch %s does not exist" (Path.Source.to_string patch_file) ]
+  else (
+    Fpath.unlink_exn (Path.to_string patch_full_path);
+    Console.print_user_message
+      (User_message.make
+         [ Pp.textf "Removed %s" (Path.Source.to_string patch_file)
+         ; Pp.text "Re-fetch with: dune pkg fetch"
+         ]);
+    Fiber.return ())
 ;;
 
-(* Main command logic *)
-type action =
-  | List
-  | Prepare of Package_name.t
-  | Commit of Package_name.t
-  | Remove of Package_name.t
+module Remove_cmd = struct
+  let term =
+    let+ builder = Common.Builder.term
+    and+ pkg_name =
+      Arg.(required & pos 0 (some string) None & info [] ~docv:"PKG" ~doc:None)
+    in
+    let builder = Common.Builder.forbid_builds builder in
+    let common, config = Common.init builder in
+    Scheduler.go_with_rpc_server ~common ~config (fun () ->
+      with_lock_dir (fun ~lock_dir_path ~patches_dir ->
+        let lock_dir = Lock_dir.read_disk_exn (Path.source lock_dir_path) in
+        let name = Package_name.of_string pkg_name in
+        let pkg =
+          match find_package lock_dir name with
+          | Some pkg -> pkg
+          | None ->
+            User_error.raise
+              [ Pp.textf
+                  "Package %s not found in lock directory"
+                  (Package_name.to_string name)
+              ]
+        in
+        remove_patch ~patches_dir name pkg.info.version))
+  ;;
 
-let run ~lock_dir_path ~patches_dir action =
-  match action with
-  | List -> list_patches ~lock_dir_path ~patches_dir
-  | Prepare name -> prepare_patch ~lock_dir_path name
-  | Commit name ->
-    let lock_dir = Lock_dir.read_disk_exn (Path.source lock_dir_path) in
-    let pkg =
-      match find_package lock_dir name with
-      | Some pkg -> pkg
-      | None ->
-        User_error.raise
-          [ Pp.textf
-              "Package %s not found in lock directory"
-              (Package_name.to_string name)
-          ]
+  let info =
+    let doc = "Remove a patch" in
+    let man =
+      [ `S "DESCRIPTION"
+      ; `P "Removes the patch file for the specified package."
+      ; `P "After removal, run 'dune pkg fetch' to restore the original package source."
+      ; `S "EXAMPLES"
+      ; `Pre "  dune pkg patch remove fmt"
+      ]
     in
-    commit_patch ~patches_dir name pkg.info.version
-  | Remove name ->
-    let lock_dir = Lock_dir.read_disk_exn (Path.source lock_dir_path) in
-    let pkg =
-      match find_package lock_dir name with
-      | Some pkg -> pkg
-      | None ->
-        User_error.raise
-          [ Pp.textf
-              "Package %s not found in lock directory"
-              (Package_name.to_string name)
-          ]
-    in
-    remove_patch ~patches_dir name pkg.info.version
-;;
+    Cmd.info "remove" ~doc ~man
+  ;;
 
-let term =
-  let+ builder = Common.Builder.term
-  and+ list_flag =
-    Arg.(
-      value & flag & info [ "list"; "l" ] ~doc:(Some "List all patches and their status"))
-  and+ commit_flag =
-    Arg.(
-      value
-      & opt (some string) None
-      & info
-          [ "commit"; "c" ]
-          ~docv:"PKG"
-          ~doc:(Some "Generate patch from local changes to PKG"))
-  and+ remove_flag =
-    Arg.(
-      value
-      & opt (some string) None
-      & info [ "remove"; "r" ] ~docv:"PKG" ~doc:(Some "Remove patch for PKG"))
-  and+ pkg_arg = Arg.(value & pos 0 (some string) None & info [] ~docv:"PKG" ~doc:None) in
-  let builder = Common.Builder.forbid_builds builder in
-  let common, config = Common.init builder in
-  Scheduler.go_with_rpc_server ~common ~config (fun () ->
-    let open Fiber.O in
-    Pkg_common.check_pkg_management_enabled ()
-    >>>
-    let* _workspace = Memo.run (Workspace.workspace ()) in
-    let lock_dir_path = Dune_rules.Lock_dir.default_source_path in
-    let patches_dir = default_patches_dir in
-    let action =
-      match list_flag, commit_flag, remove_flag, pkg_arg with
-      | true, None, None, None -> List
-      | false, Some pkg, None, None -> Commit (Package_name.of_string pkg)
-      | false, None, Some pkg, None -> Remove (Package_name.of_string pkg)
-      | false, None, None, Some pkg -> Prepare (Package_name.of_string pkg)
-      | false, None, None, None ->
-        User_error.raise
-          [ Pp.text "No action specified."
-          ; Pp.text
-              "Usage: dune pkg patch <PKG> | --list | --commit <PKG> | --remove <PKG>"
-          ]
-      | _ ->
-        User_error.raise
-          [ Pp.text "Conflicting options. Specify only one action at a time." ]
-    in
-    run ~lock_dir_path ~patches_dir action)
-;;
+  let command = Cmd.v info term
+end
+
+(* ---- Command group ---- *)
 
 let info =
   let doc = "Manage patches for duniverse packages" in
@@ -276,21 +354,23 @@ let info =
     ; `P
         "Create and manage patches for packages in the duniverse. Patches are stored in \
          the patches/ directory and applied automatically when running 'dune pkg fetch'."
-    ; `S "ACTIONS"
-    ; `P "$(b,dune pkg patch PKG) - Prepare a package for patching"
-    ; `P "$(b,dune pkg patch --commit PKG) - Generate patch from local modifications"
-    ; `P "$(b,dune pkg patch --remove PKG) - Remove a patch"
-    ; `P "$(b,dune pkg patch --list) - List all patches and their status"
-    ; `S "EXAMPLES"
-    ; `P "Prepare fmt for patching:"
-    ; `Pre "  dune pkg patch fmt"
-    ; `P "Edit files in duniverse/fmt.0.9.0/, then commit the patch:"
-    ; `Pre "  dune pkg patch --commit fmt"
-    ; `P "List all patches:"
-    ; `Pre "  dune pkg patch --list"
+    ; `S "COMMANDS"
+    ; `P "$(b,dune pkg patch list) - List all patches and their status"
+    ; `P "$(b,dune pkg patch create PKG) - Prepare a package for patching"
+    ; `P "$(b,dune pkg patch commit PKG) - Generate patch from local modifications"
+    ; `P "$(b,dune pkg patch remove PKG) - Remove a patch"
+    ; `S "WORKFLOW"
+    ; `P "1. Run $(b,dune pkg patch create fmt) to prepare for patching"
+    ; `P "2. Edit files in duniverse/fmt.0.9.0/"
+    ; `P "3. Run $(b,dune pkg patch commit fmt) to generate the patch"
+    ; `P "4. The patch is applied automatically on $(b,dune pkg fetch)"
     ]
   in
   Cmd.info "patch" ~doc ~man
 ;;
 
-let command = Cmd.v info term
+let subcommands =
+  [ List_cmd.command; Create_cmd.command; Commit_cmd.command; Remove_cmd.command ]
+;;
+
+let command = Cmd.group info subcommands

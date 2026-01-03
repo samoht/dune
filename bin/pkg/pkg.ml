@@ -2,6 +2,7 @@ module Fetch = Fetch
 module Group = Group
 module Lock = Lock
 module Outdated = Outdated
+module Patch = Patch
 module Pkg_common = Pkg_common
 module Pkg_enabled = Pkg_enabled
 module Print_solver_env = Print_solver_env

@@ -25,46 +25,43 @@ Lock the project:
   - foo.0.0.1
 
 
-Test --list with no patches directory:
-  $ dune pkg patch --list
+
+Test list with no patches directory:
+  $ dune pkg patch list
   No patches directory found.
 
 Create patches directory:
   $ mkdir patches
 
-Test --list with empty patches directory:
-  $ dune pkg patch --list
+Test list with empty patches directory:
+  $ dune pkg patch list
   No patches found.
 
-Test error when no action specified:
-  $ dune pkg patch 2>&1
-  Error: No action specified.
-  Usage: dune pkg patch <PKG> | --list | --commit <PKG> | --remove <PKG>
-  [1]
-
 Test error when package not found:
-  $ dune pkg patch nonexistent 2>&1
+  $ dune pkg patch create nonexistent 2>&1
   Error: Package nonexistent not found in lock directory
   [1]
 
-Test prepare action (package not fetched):
-  $ dune pkg patch foo 2>&1
+Test create action (package not fetched):
+  $ dune pkg patch create foo 2>&1
   Error: Package directory duniverse/foo.0.0.1 does not exist.
   Run 'dune pkg fetch' first to download package sources.
   [1]
 
-Test --commit with package not fetched:
-  $ dune pkg patch --commit foo 2>&1
+Test commit with package not fetched:
+  $ dune pkg patch commit foo 2>&1
   Error: Package directory duniverse/foo.0.0.1 does not exist. Run 'dune pkg
   fetch' first.
   [1]
 
-Test --remove with no patch:
-  $ dune pkg patch --remove foo 2>&1
+Test remove with no patch:
+  $ dune pkg patch remove foo 2>&1
   Error: Patch patches/foo@0.0.1.patch does not exist
   [1]
 
-Test conflicting options:
-  $ dune pkg patch --list --commit foo 2>&1
-  Error: Conflicting options. Specify only one action at a time.
+Test that patch without subcommand shows error:
+  $ dune pkg patch 2>&1
+  dune: required COMMAND name is missing, must be one of 'commit', 'create', 'list' or 'remove'.
+  Usage: dune pkg patch COMMAND …
+  Try 'dune pkg patch --help' or 'dune --help' for more information.
   [1]
