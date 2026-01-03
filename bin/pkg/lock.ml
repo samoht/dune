@@ -8,6 +8,26 @@ module Pin_stanza = Dune_lang.Pin_stanza
 module Pin = Dune_pkg.Pin
 module Solver_env = Dune_pkg.Solver_env
 
+module Lock_format = struct
+  type t = Lock_dir.format =
+    | Directory
+    | Single_file
+
+  let term =
+    let all = [ "directory", Directory; "single-file", Single_file ] in
+    Arg.(
+      value
+      & opt (some (enum all)) None
+      & info
+          [ "format" ]
+          ~doc:
+            (Some
+               "Lock file format. $(b,directory) creates a dune.lock/ directory with \
+                per-package .pkg files (current default). $(b,single-file) creates a \
+                single dune.lock file with repo hashes and package versions."))
+  ;;
+end
+
 module Progress_indicator = struct
   module Per_lockdir = struct
     module State = struct
@@ -446,9 +466,7 @@ let solve_lock_dir
     in
     progress_state := None;
     let+ lock_dir = Lock_dir.compute_missing_checksums ~pinned_packages lock_dir in
-    Ok
-      ( Lock_dir.Write_disk.prepare ~portable_lock_dir ~lock_dir_path ~files lock_dir
-      , summary_message )
+    Ok (lock_dir_path, lock_dir, files, summary_message)
 ;;
 
 let solve
@@ -460,6 +478,7 @@ let solve
       ~lock_dirs
       ~print_perf_stats
       ~portable_lock_dir
+      ~format
   =
   let open Fiber.O in
   (* a list of thunks that will perform all the file IO side
@@ -515,11 +534,22 @@ let solve
                (Path.to_string_maybe_quoted (user_lock_dir_path path))
            ; Pp.vbox (Pp.concat ~sep:Pp.cut messages)
            ]))
-  | Ok write_disks_with_summaries ->
-    let write_disk_list, summary_messages = List.split write_disks_with_summaries in
+  | Ok solutions ->
+    let lock_dirs_with_summaries, summary_messages =
+      List.map solutions ~f:(fun (lock_dir_path, lock_dir, files, summary) ->
+        (lock_dir_path, lock_dir, files), summary)
+      |> List.split
+    in
     List.iter summary_messages ~f:Console.print_user_message;
     (* All the file IO side effects happen here: *)
-    List.iter write_disk_list ~f:Lock_dir.Write_disk.commit
+    List.iter lock_dirs_with_summaries ~f:(fun (lock_dir_path, lock_dir, files) ->
+      match format with
+      | Lock_format.Single_file ->
+        let file = Lock_dir.File.of_lock lock_dir in
+        Lock_dir.File.write_to_disk ~lock_file_path:lock_dir_path file
+      | Lock_format.Directory ->
+        Lock_dir.Write_disk.prepare ~portable_lock_dir ~lock_dir_path ~files lock_dir
+        |> Lock_dir.Write_disk.commit)
 ;;
 
 let project_pins =
@@ -530,7 +560,7 @@ let project_pins =
     Pin.DB.combine_exn acc pins)
 ;;
 
-let lock ~version_preference ~lock_dirs_arg ~print_perf_stats ~portable_lock_dir =
+let lock ~version_preference ~lock_dirs_arg ~print_perf_stats ~portable_lock_dir ~format =
   let open Fiber.O in
   let* solver_env_from_current_system =
     poll_solver_env_from_current_system () >>| Option.some
@@ -556,6 +586,7 @@ let lock ~version_preference ~lock_dirs_arg ~print_perf_stats ~portable_lock_dir
     ~lock_dirs
     ~print_perf_stats
     ~portable_lock_dir
+    ~format
 ;;
 
 let term =
@@ -563,7 +594,8 @@ let term =
   and+ version_preference = Version_preference.term
   and+ lock_dirs_arg = Pkg_common.Lock_dirs_arg.term
   (* CR-someday Alizter: document this option *)
-  and+ print_perf_stats = Arg.(value & flag & info [ "print-perf-stats" ] ~doc:None) in
+  and+ print_perf_stats = Arg.(value & flag & info [ "print-perf-stats" ] ~doc:None)
+  and+ format = Lock_format.term in
   let builder = Common.Builder.forbid_builds builder in
   let common, config = Common.init builder in
   Scheduler.go_with_rpc_server ~common ~config (fun () ->
@@ -575,7 +607,12 @@ let term =
       | `Enabled -> true
       | `Disabled -> false
     in
-    lock ~version_preference ~lock_dirs_arg ~print_perf_stats ~portable_lock_dir)
+    let format =
+      match format with
+      | Some f -> f
+      | None -> Lock_format.Directory (* Default to directory format *)
+    in
+    lock ~version_preference ~lock_dirs_arg ~print_perf_stats ~portable_lock_dir ~format)
 ;;
 
 let info =
