@@ -284,23 +284,30 @@ let summary_message
               ; pp_package_set packages
               ]))
     in
-    (Pp.tag
+    (let pkg_count = OpamPackage.Map.cardinal pkgs_by_opam_package in
+     Pp.tag
        User_message.Style.Success
        (Pp.textf
-          "Solution for %s"
-          (Path.to_string_maybe_quoted (user_lock_dir_path lock_dir_path)))
+          "Solution for %s (%d package%s)"
+          (Path.to_string_maybe_quoted (user_lock_dir_path lock_dir_path))
+          pkg_count
+          (if pkg_count = 1 then "" else "s"))
      :: Pp.nop
      :: Pp.text "Dependencies common to all supported platforms:"
      :: pp_package_set common_packages
      :: (maybe_uncommon_packages @ maybe_perf_stats))
     @ maybe_unsolved_platforms_message)
   else
-    (Pp.tag
+    (let packages = Lock_dir.Packages.to_pkg_list lock_dir.packages in
+     let pkg_count = List.length packages in
+     Pp.tag
        User_message.Style.Success
        (Pp.textf
-          "Solution for %s:"
-          (Path.to_string_maybe_quoted (user_lock_dir_path lock_dir_path)))
-     :: (match Lock_dir.Packages.to_pkg_list lock_dir.packages with
+          "Solution for %s (%d package%s)"
+          (Path.to_string_maybe_quoted (user_lock_dir_path lock_dir_path))
+          pkg_count
+          (if pkg_count = 1 then "" else "s"))
+     :: (match packages with
          | [] -> Pp.tag User_message.Style.Warning @@ Pp.text "(no dependencies to lock)"
          | packages -> pp_packages_by_target packages)
      :: maybe_perf_stats)

@@ -156,7 +156,7 @@ let pp results ~transitive ~lock_dir_path =
                  ; Pp.tag
                      (User_message.Style.Ansi_styles [ `Fg_bright_red ])
                      (Pp.verbatim (Package_version.to_string outdated_version))
-                 ; Pp.text " < "
+                 ; Pp.text " -> "
                  ; Pp.tag
                      (User_message.Style.Ansi_styles [ `Fg_bright_green ])
                      (Pp.verbatim (Package_version.to_string newer_version))

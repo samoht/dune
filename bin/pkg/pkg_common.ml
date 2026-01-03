@@ -148,7 +148,7 @@ let pp_packages_by_target packages =
       | Duniverse.Opam_sandbox -> false)
   in
   let sections =
-    [ "duniverse (dune-built)", duniverse_pkgs; "opam sandbox", opam_pkgs ]
+    [ "dune", duniverse_pkgs; "opam", opam_pkgs ]
     |> List.filter ~f:(fun (_, pkgs) -> not (List.is_empty pkgs))
   in
   match sections with

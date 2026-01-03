@@ -95,9 +95,9 @@ let info =
     ; `Noblank
     ; `Pre "    1/2 packages in dune.lock are outdated."
     ; `Noblank
-    ; `Pre "    - ocaml 4.14.1 < 5.1.0"
+    ; `Pre "    - ocaml 4.14.1 -> 5.1.0"
     ; `Noblank
-    ; `Pre "    - dune 3.7.1 < 3.11.0"
+    ; `Pre "    - dune 3.7.1 -> 3.11.0"
     ]
   in
   Cmd.info "outdated" ~doc ~man
