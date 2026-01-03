@@ -141,6 +141,95 @@ module Metadata : Dune_sexp.Versioned_file.S with type data := unit
 
 val metadata_filename : Filename.t
 
+(** Single-file lock format (as opposed to the dune.lock/ directory format).
+
+    This format stores only repo URLs, commit hashes, and package versions.
+    The full package specs must be re-derived from the opam repo on read.
+
+    Example:
+    {v
+    (lang package 0.2)
+    (repos
+     (https://github.com/ocaml/opam-repository.git abc123def))
+    (packages
+     fmt.0.9.0
+     cmdliner.1.3.0)
+    (patches
+     (fmt patches/fmt@0.9.0.patch))
+    v} *)
+module File : sig
+  type lock := t
+
+  module Repo : sig
+    type t =
+      { source : string (** Repository URL *)
+      ; hash : string (** Git commit hash *)
+      }
+
+    val encode : t -> Dune_lang.t
+    val decode : t Decoder.t
+    val to_dyn : t -> Dyn.t
+    val equal : t -> t -> bool
+  end
+
+  module Package_entry : sig
+    type t =
+      { name : Package_name.t
+      ; version : Package_version.t
+      }
+
+    val encode : t -> Dune_lang.t
+    val decode : t Decoder.t
+    val to_dyn : t -> Dyn.t
+    val equal : t -> t -> bool
+  end
+
+  module Patch_entry : sig
+    type t =
+      { package : Package_name.t
+      ; path : Path.Local.t
+      }
+
+    val encode : t -> Dune_lang.t
+    val decode : t Decoder.t
+    val to_dyn : t -> Dyn.t
+    val equal : t -> t -> bool
+  end
+
+  type t =
+    { repos : Repo.t list
+    ; packages : Package_entry.t list
+    ; patches : Patch_entry.t list
+    }
+
+  val to_dyn : t -> Dyn.t
+  val equal : t -> t -> bool
+
+  (** Encode minimal format to sexp list *)
+  val encode : t -> Dune_lang.t list
+
+  (** Decode minimal format from sexp *)
+  val decode : t Decoder.t
+
+  (** [derive ~loc file] loads the repos at their pinned hashes and
+      looks up each package. Returns the repos and list of resolved packages.
+      Raises User_error if a package is not found in any repo. *)
+  val derive
+    :  loc:Loc.t
+    -> t
+    -> (Opam_repo.t list * (Package_name.t * Package_version.t * Resolved_package.t) list)
+         Fiber.t
+
+  (** [of_lock lock] extracts the minimal information from a full lock
+      (repos and package versions) to create a single-file format representation.
+      Note: patches are not stored in Lock.t and will be empty in the result. *)
+  val of_lock : lock -> t
+
+  (** [write_to_disk ~lock_file_path file] writes the single-file lock format
+      to the specified path. *)
+  val write_to_disk : lock_file_path:Path.t -> t -> unit
+end
+
 module Write_disk : sig
   type lock_dir := t
   type t

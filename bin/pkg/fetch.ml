@@ -1,5 +1,5 @@
 open Import
-module Lock_dir = Dune_pkg.Lock_dir
+module Lock_dir = Dune_pkg.Lock
 module Source = Dune_pkg.Source
 module Duniverse = Dune_pkg.Duniverse
 module Rev_store = Dune_pkg.Rev_store

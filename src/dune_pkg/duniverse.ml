@@ -62,13 +62,13 @@ let rec action_uses_dune (action : Action.t) =
   | Format_dune_file _ -> false
 ;;
 
-let classify (pkg : Lock_dir.Pkg.t) =
+let classify (pkg : Lock.Pkg.t) =
   (* A package goes to duniverse if it uses dune as its build system.
      We check if the build command is [Dune] or contains a dune action for any platform. *)
   let uses_dune =
-    Lock_dir.Conditional_choice.exists pkg.build_command ~f:(function
-      | Lock_dir.Build_command.Dune -> true
-      | Lock_dir.Build_command.Action action -> action_uses_dune action)
+    Lock.Conditional_choice.exists pkg.build_command ~f:(function
+      | Lock.Build_command.Dune -> true
+      | Lock.Build_command.Action action -> action_uses_dune action)
   in
   if uses_dune then Duniverse else Opam_sandbox
 ;;
@@ -109,9 +109,9 @@ let rec extract_patches_from_action (action : Action.t) =
 ;;
 
 (* Get patches from a package's build command for the current platform *)
-let get_patches (pkg : Lock_dir.Pkg.t) ~platform =
-  match Lock_dir.Conditional_choice.choose_for_platform pkg.build_command ~platform with
+let get_patches (pkg : Lock.Pkg.t) ~platform =
+  match Lock.Conditional_choice.choose_for_platform pkg.build_command ~platform with
   | None -> []
-  | Some Lock_dir.Build_command.Dune -> []
-  | Some (Lock_dir.Build_command.Action action) -> extract_patches_from_action action
+  | Some Lock.Build_command.Dune -> []
+  | Some (Lock.Build_command.Action action) -> extract_patches_from_action action
 ;;

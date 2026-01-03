@@ -18,7 +18,7 @@ let base_dir () =
   base_dir
 ;;
 
-let pkg_dir (pkg : Dune_pkg.Lock_dir.Pkg.t) =
+let pkg_dir (pkg : Dune_pkg.Lock.Pkg.t) =
   (* The name of this package's directory within the toolchains
      directory. Includes a hash of some of the package's fields so that
      if a user modifies a package's lockfile in one project, then the

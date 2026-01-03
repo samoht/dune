@@ -9,6 +9,10 @@ module Serializable : sig
   val decode : t Decoder.t
   val equal : t -> t -> bool
   val to_dyn : t -> Dyn.t
+
+  (** [to_url_and_hash t] parses the serializable format "url#hash" and returns
+      the source URL and git commit hash. Returns empty hash if no '#' found. *)
+  val to_url_and_hash : t -> string * string
 end
 
 val to_dyn : t -> Dyn.t
@@ -22,6 +26,11 @@ val of_opam_repo_dir_path : Loc.t -> Path.t -> t
     at [source] from git. [source] can be any URL that [git remote add]
     supports. *)
 val of_git_repo : Loc.t -> OpamUrl.t -> t Fiber.t
+
+(** [of_git_repo_at_hash loc ~source ~hash] loads the opam repository at
+    a specific git commit hash. Used when reconstructing lock state from
+    a single-file lock format. *)
+val of_git_repo_at_hash : Loc.t -> source:string -> hash:string -> t Fiber.t
 
 (** [resolve_repositories ~available_repos ~repositories] resolves a list of
     repository references by looking them up in [available_repos] and creating
@@ -67,6 +76,13 @@ val load_all_versions
   :  t list
   -> OpamPackage.Name.t
   -> Resolved_package.t OpamPackage.Version.Map.t Fiber.t
+
+(** Load a specific package at a specific version from a repo *)
+val load_package
+  :  t
+  -> name:Package_name.t
+  -> version:Package_version.t
+  -> Resolved_package.t option Fiber.t
 
 module Private : sig
   val create : source:string option -> t

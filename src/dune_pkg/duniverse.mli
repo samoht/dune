@@ -30,14 +30,14 @@ val package_dir : Package_name.t -> Package_version.t -> Path.Source.t
 
 (** [classify pkg] determines whether a package should go to duniverse or
     opam sandbox based on whether it uses dune as its build system. *)
-val classify : Lock_dir.Pkg.t -> package_target
+val classify : Lock.Pkg.t -> package_target
 
 (** [classify_all pkgs] classifies all packages, returning a map from
     package name to target. Packages that use dune go to duniverse,
     others go to opam sandbox. *)
-val classify_all : Lock_dir.Pkg.t Package_name.Map.t -> package_target Package_name.Map.t
+val classify_all : Lock.Pkg.t Package_name.Map.t -> package_target Package_name.Map.t
 
 (** [get_patches pkg ~platform] extracts patch file paths from the package's
     build command for the given platform. Patches are returned in the order
     they should be applied. *)
-val get_patches : Lock_dir.Pkg.t -> platform:Solver_env.t -> String_with_vars.t list
+val get_patches : Lock.Pkg.t -> platform:Solver_env.t -> String_with_vars.t list

@@ -65,7 +65,7 @@ module Context = struct
         }
 
   let local_package_default_version =
-    Package_version.to_opam_package_version Lock_dir.Pkg_info.default_version
+    Package_version.to_opam_package_version Lock.Pkg_info.default_version
   ;;
 
   type candidates =
@@ -1542,14 +1542,14 @@ let solve_package_list packages ~context =
 
 module Solver_result = struct
   type t =
-    { lock_dir : Lock_dir.t
+    { lock_dir : Lock.t
     ; files : File_entry.t Package_version.Map.Multi.t Package_name.Map.t
     ; pinned_packages : Package_name.Set.t
     ; num_expanded_packages : int
     }
 
   let merge a b =
-    let lock_dir = Lock_dir.merge_conditionals a.lock_dir b.lock_dir in
+    let lock_dir = Lock.merge_conditionals a.lock_dir b.lock_dir in
     let files =
       Package_name.Map.union a.files b.files ~f:(fun _ a b ->
         Some
@@ -1601,7 +1601,7 @@ let reject_unreachable_packages =
           Code_error.raise
             "package is both local and returned by solver"
             [ "name", Package_name.to_dyn name ]
-        | Some (lock_dir_pkg : Lock_dir.Pkg.t), None -> Some lock_dir_pkg.info.version
+        | Some (lock_dir_pkg : Lock.Pkg.t), None -> Some lock_dir_pkg.info.version
         | None, Some (pkg : Local_package.For_solver.t) -> Some pkg.version)
     in
     let pkgs_by_name =
@@ -1612,13 +1612,11 @@ let reject_unreachable_packages =
           Code_error.raise
             "package is both local and returned by solver"
             [ "name", Package_name.to_dyn name ]
-        | Some (pkg : Lock_dir.Pkg.t), None ->
+        | Some (pkg : Lock.Pkg.t), None ->
           Some
-            (Lock_dir.Conditional_choice.choose_for_platform
-               pkg.depends
-               ~platform:solver_env
+            (Lock.Conditional_choice.choose_for_platform pkg.depends ~platform:solver_env
              |> Option.value ~default:[]
-             |> List.map ~f:(fun (depend : Lock_dir.Dependency.t) -> depend.name))
+             |> List.map ~f:(fun (depend : Lock.Dependency.t) -> depend.name))
         | None, Some (pkg : Local_package.For_solver.t) ->
           let deps =
             match
@@ -1851,7 +1849,7 @@ let solve_lock_dir
          (* This doesn't allow the compiler to live in the source tree. Oh
          well, it's not possible now anyway. *)
          match
-           Package_name.Map.filter_map pkgs_by_name ~f:(fun (pkg : Lock_dir.Pkg.t) ->
+           Package_name.Map.filter_map pkgs_by_name ~f:(fun (pkg : Lock.Pkg.t) ->
              match
                let version = Package_version.to_opam_package_version pkg.info.version in
                resolve_package pkg.info.name version |> package_kind
@@ -1875,34 +1873,30 @@ let solve_lock_dir
          and* ocaml = ocaml in
          let+ () =
            Package_name.Map.values pkgs_by_name
-           |> Result.List.map ~f:(fun { Lock_dir.Pkg.depends; info = { name; _ }; _ } ->
+           |> Result.List.map ~f:(fun { Lock.Pkg.depends; info = { name; _ }; _ } ->
              match
-               Lock_dir.Conditional_choice.choose_for_platform
-                 depends
-                 ~platform:solver_env
+               Lock.Conditional_choice.choose_for_platform depends ~platform:solver_env
              with
              | None -> Ok ()
              | Some depends ->
-               Result.List.map
-                 depends
-                 ~f:(fun { Lock_dir.Dependency.name = dep_name; loc } ->
-                   match
-                     (not (is_dune dep_name))
-                     && Package_name.Map.mem local_packages dep_name
-                   with
-                   | false -> Ok ()
-                   | true ->
-                     Error
-                       (User_error.make
-                          ~loc
-                          [ Pp.textf
-                              "Dune does not support packages outside the workspace \
-                               depending on packages in the workspace. The package %S is \
-                               not in the workspace but it depends on the package %S \
-                               which is in the workspace."
-                              (Package_name.to_string name)
-                              (Package_name.to_string dep_name)
-                          ]))
+               Result.List.map depends ~f:(fun { Lock.Dependency.name = dep_name; loc } ->
+                 match
+                   (not (is_dune dep_name))
+                   && Package_name.Map.mem local_packages dep_name
+                 with
+                 | false -> Ok ()
+                 | true ->
+                   Error
+                     (User_error.make
+                        ~loc
+                        [ Pp.textf
+                            "Dune does not support packages outside the workspace \
+                             depending on packages in the workspace. The package %S is \
+                             not in the workspace but it depends on the package %S which \
+                             is in the workspace."
+                            (Package_name.to_string name)
+                            (Package_name.to_string dep_name)
+                        ]))
                |> Result.map ~f:(fun (_ : unit list) -> ()))
            |> Result.map ~f:(fun (_ : unit list) -> ())
          in
@@ -1912,7 +1906,7 @@ let solve_lock_dir
              stats.expanded_variables
              solver_env
          in
-         Lock_dir.create_latest_version
+         Lock.create_latest_version
            pkgs_by_name
            ~local_packages:(Package_name.Map.values local_packages)
            ~ocaml
@@ -1928,7 +1922,7 @@ let solve_lock_dir
            let+ files =
              Package_name.Map.to_list_map
                pkgs_by_name
-               ~f:(fun name (package : Lock_dir.Pkg.t) ->
+               ~f:(fun name (package : Lock.Pkg.t) ->
                  Package_version.to_opam_package_version package.info.version
                  |> resolve_package name)
              |> files

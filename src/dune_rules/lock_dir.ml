@@ -1,7 +1,7 @@
 open Import
 open Memo.O
 open Dune_pkg
-include Dune_pkg.Lock_dir
+include Dune_pkg.Lock
 
 module Sys_vars = struct
   type t =

@@ -139,7 +139,7 @@ module Spec = struct
            ~loc:loc_url
            [ Pp.text "No checksum provided. It should be:"; Checksum.pp actual_checksum ]
        | Some (loc, _) ->
-         let loc = Dune_pkg.Lock_dir.loc_in_source_tree loc in
+         let loc = Dune_pkg.Lock.loc_in_source_tree loc in
          User_error.raise
            ~loc
            [ Pp.text "Invalid checksum, got"; Dune_pkg.Checksum.pp actual_checksum ])
@@ -155,8 +155,8 @@ module A = Action_ext.Make (Spec)
 
 let action ~url ~checksum ~target ~kind = A.action { Spec.target; checksum; url; kind }
 
-let extract_checksums_and_urls (lockdir : Dune_pkg.Lock_dir.t) =
-  Dune_pkg.Lock_dir.Packages.to_pkg_list lockdir.packages
+let extract_checksums_and_urls (lockdir : Dune_pkg.Lock.t) =
+  Dune_pkg.Lock.Packages.to_pkg_list lockdir.packages
   |> List.fold_left
        ~init:(Checksum.Map.empty, Dune_digest.Map.empty)
        ~f:(fun acc (package : Lock_dir.Pkg.t) ->
@@ -232,7 +232,7 @@ let find_checksum, find_url =
 ;;
 
 let gen_rules_for_checksum_or_url (loc_url, (url : OpamUrl.t)) checksum =
-  let loc_url = Dune_pkg.Lock_dir.loc_in_source_tree loc_url in
+  let loc_url = Dune_pkg.Lock.loc_in_source_tree loc_url in
   let checksum_or_url =
     match checksum with
     | Some (_, checksum) -> `Checksum checksum

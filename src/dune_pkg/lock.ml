@@ -1322,6 +1322,240 @@ module Package_filename = struct
   ;;
 end
 
+(* Single-file lock format (as opposed to the dune.lock/ directory format).
+
+   Stores:
+   - repo URL + commit hash for reproducibility
+   - package name.version list
+   - user patches (optional)
+
+   Example:
+   {v
+   (lang package 0.2)
+   (repos
+    (https://github.com/ocaml/opam-repository.git abc123def))
+   (packages
+    fmt.0.9.0
+    cmdliner.1.3.0
+    base.v0.17.0)
+   (patches
+    (fmt patches/fmt@0.9.0.patch))
+   v}
+*)
+module File = struct
+  type lock = t
+
+  module Repo = struct
+    (* Repository source URL and git commit hash *)
+    type t =
+      { source : string (* e.g., https://github.com/ocaml/opam-repository.git *)
+      ; hash : string (* git commit hash *)
+      }
+
+    let encode { source; hash } =
+      let open Encoder in
+      list sexp [ string source; string hash ]
+    ;;
+
+    let decode =
+      let open Decoder in
+      enter
+        (let+ source = string
+         and+ hash = string in
+         { source; hash })
+    ;;
+
+    let to_dyn { source; hash } =
+      Dyn.record [ "source", Dyn.string source; "hash", Dyn.string hash ]
+    ;;
+
+    let equal a b = String.equal a.source b.source && String.equal a.hash b.hash
+  end
+
+  module Package_entry = struct
+    type t =
+      { name : Package_name.t
+      ; version : Package_version.t
+      }
+
+    (* Encode as "name.version" atom *)
+    let encode { name; version } =
+      let s = Package_name.to_string name ^ "." ^ Package_version.to_string version in
+      Dune_lang.atom_or_quoted_string s
+    ;;
+
+    (* Decode from "name.version" atom *)
+    let decode =
+      let open Decoder in
+      let+ loc, s = located string in
+      match String.lsplit2 s ~on:'.' with
+      | None ->
+        User_error.raise
+          ~loc
+          [ Pp.textf "Invalid package entry %S: expected name.version format" s ]
+      | Some (name_str, version_str) ->
+        let name = Package_name.of_string name_str in
+        let version = Package_version.of_string version_str in
+        { name; version }
+    ;;
+
+    let to_dyn { name; version } =
+      Dyn.record
+        [ "name", Package_name.to_dyn name; "version", Package_version.to_dyn version ]
+    ;;
+
+    let equal a b =
+      Package_name.equal a.name b.name && Package_version.equal a.version b.version
+    ;;
+  end
+
+  module Patch_entry = struct
+    type t =
+      { package : Package_name.t
+      ; path : Path.Local.t
+      }
+
+    let encode { package; path } =
+      let open Encoder in
+      list sexp [ Package_name.encode package; string (Path.Local.to_string path) ]
+    ;;
+
+    let decode =
+      let open Decoder in
+      enter
+        (let+ package = Package_name.decode
+         and+ path_str = string in
+         { package; path = Path.Local.of_string path_str })
+    ;;
+
+    let to_dyn { package; path } =
+      Dyn.record
+        [ "package", Package_name.to_dyn package; "path", Path.Local.to_dyn path ]
+    ;;
+
+    let equal a b =
+      Package_name.equal a.package b.package && Path.Local.equal a.path b.path
+    ;;
+  end
+
+  type t =
+    { repos : Repo.t list
+    ; packages : Package_entry.t list
+    ; patches : Patch_entry.t list
+    }
+
+  let to_dyn { repos; packages; patches } =
+    Dyn.record
+      [ "repos", Dyn.list Repo.to_dyn repos
+      ; "packages", Dyn.list Package_entry.to_dyn packages
+      ; "patches", Dyn.list Patch_entry.to_dyn patches
+      ]
+  ;;
+
+  let equal a b =
+    List.equal Repo.equal a.repos b.repos
+    && List.equal Package_entry.equal a.packages b.packages
+    && List.equal Patch_entry.equal a.patches b.patches
+  ;;
+
+  let encode { repos; packages; patches } =
+    let open Encoder in
+    let version = Syntax.greatest_supported_version_exn Dune_lang.Pkg.syntax in
+    let lang =
+      list
+        sexp
+        [ string "lang"
+        ; string (Syntax.name Dune_lang.Pkg.syntax)
+        ; Syntax.Version.encode version
+        ]
+    in
+    let repos_sexp = list sexp (string "repos" :: List.map repos ~f:Repo.encode) in
+    let packages_sexp =
+      list sexp (string "packages" :: List.map packages ~f:Package_entry.encode)
+    in
+    let patches_sexp =
+      if List.is_empty patches
+      then []
+      else [ list sexp (string "patches" :: List.map patches ~f:Patch_entry.encode) ]
+    in
+    [ lang; repos_sexp; packages_sexp ] @ patches_sexp
+  ;;
+
+  let decode =
+    let open Decoder in
+    fields
+      (let+ repos = field "repos" ~default:[] (repeat Repo.decode)
+       and+ packages = field "packages" ~default:[] (repeat Package_entry.decode)
+       and+ patches = field "patches" ~default:[] (repeat Patch_entry.decode) in
+       { repos; packages; patches })
+  ;;
+
+  let derive ~loc (file : t) =
+    let open Fiber.O in
+    (* Load repos at their pinned hashes *)
+    let* repos =
+      Fiber.parallel_map file.repos ~f:(fun { Repo.source; hash } ->
+        Opam_repo.of_git_repo_at_hash loc ~source ~hash)
+    in
+    (* Helper to find package in repos *)
+    let rec find_in_repos repos ~name ~version =
+      match repos with
+      | [] -> Fiber.return None
+      | repo :: rest ->
+        let* result = Opam_repo.load_package repo ~name ~version in
+        (match result with
+         | Some _ as found -> Fiber.return found
+         | None -> find_in_repos rest ~name ~version)
+    in
+    (* Load each package from the repos *)
+    let+ packages =
+      Fiber.parallel_map file.packages ~f:(fun { Package_entry.name; version } ->
+        let+ resolved_opt = find_in_repos repos ~name ~version in
+        match resolved_opt with
+        | None ->
+          User_error.raise
+            ~loc
+            [ Pp.textf
+                "Package %s.%s not found in any repository"
+                (Package_name.to_string name)
+                (Package_version.to_string version)
+            ]
+        | Some resolved -> name, version, resolved)
+    in
+    repos, packages
+  ;;
+
+  let of_lock (lck : lock) : t =
+    let repos =
+      match lck.repos.used with
+      | None -> []
+      | Some serializable_list ->
+        List.map serializable_list ~f:(fun s ->
+          let source, hash = Opam_repo.Serializable.to_url_and_hash s in
+          { Repo.source; hash })
+    in
+    let packages =
+      Packages.to_pkg_list lck.packages
+      |> List.map ~f:(fun (pkg : Pkg.t) ->
+        { Package_entry.name = pkg.info.name; version = pkg.info.version })
+    in
+    (* Patches are not stored in Lock.t - would need to be provided separately *)
+    let patches = [] in
+    { repos; packages; patches }
+  ;;
+
+  let write_to_disk ~lock_file_path file =
+    let sexps = encode file in
+    let cst =
+      List.map sexps ~f:(fun sexp ->
+        Dune_sexp.Ast.add_loc ~loc:Loc.none sexp |> Dune_sexp.Cst.concrete)
+    in
+    let pp = Dune_lang.Format.pp_top_sexps ~version:(3, 11) cst in
+    let contents = Format.asprintf "%a" Pp.to_fmt pp in
+    Io.write_file lock_file_path contents
+  ;;
+end
+
 let file_contents_by_path ~portable_lock_dir t =
   (metadata_filename, encode_metadata ~portable_lock_dir t)
   :: (Packages.to_pkg_list t.packages

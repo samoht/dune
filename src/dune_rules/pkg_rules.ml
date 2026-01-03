@@ -181,7 +181,7 @@ module Pkg_digest = struct
     let lockfile_and_dependency_digest =
       Digest_feed.compute_digest
         (Digest_feed.tuple2 Lock_dir.Pkg.digest_feed (Digest_feed.list digest_feed))
-        (Dune_pkg.Lock_dir.Pkg.remove_locs lockfile_pkg, depends_pkg_digests)
+        (Dune_pkg.Lock.Pkg.remove_locs lockfile_pkg, depends_pkg_digests)
     in
     let name = lockfile_pkg.info.name in
     let version = lockfile_pkg.info.version in
@@ -890,7 +890,7 @@ module Action_expander = struct
     let eval_slangs_located t slangs =
       let slangs =
         List.map slangs ~f:(fun slang ->
-          Slang.map_loc slang ~f:Dune_pkg.Lock_dir.loc_in_source_tree)
+          Slang.map_loc slang ~f:Dune_pkg.Lock.loc_in_source_tree)
       in
       Slang_expand.eval_multi_located slangs ~dir:t.paths.source_dir ~f:(slang_expander t)
     ;;
@@ -1216,11 +1216,11 @@ module DB = struct
       }
 
     let entries_by_name_of_lock_dir
-          (lock_dir : Dune_pkg.Lock_dir.t)
+          (lock_dir : Dune_pkg.Lock.t)
           ~platform
           ~system_provided
       =
-      let pkgs_by_name = Dune_pkg.Lock_dir.packages_on_platform lock_dir ~platform in
+      let pkgs_by_name = Dune_pkg.Lock.packages_on_platform lock_dir ~platform in
       let cache =
         (* Cache so that the digest of each package is only computed once *)
         Package.Name.Table.create 10
@@ -1242,13 +1242,13 @@ module DB = struct
           let seen_set = Package.Name.Set.add seen_set name in
           let seen_list = pkg :: seen_list in
           let has_dune_dep, deps =
-            Dune_pkg.Lock_dir.Conditional_choice.choose_for_platform pkg.depends ~platform
+            Dune_pkg.Lock.Conditional_choice.choose_for_platform pkg.depends ~platform
             |> Option.value ~default:[]
             |> List.fold_right
                  ~init:(false, [])
                  ~f:
                    (fun
-                     { Dune_pkg.Lock_dir.Dependency.name; loc = dep_loc }
+                     { Dune_pkg.Lock.Dependency.name; loc = dep_loc }
                      (has_dune_dep, acc)
                    ->
                    match
@@ -1468,11 +1468,9 @@ end = struct
   end
 
   let relocate action =
-    let string_with_vars =
-      String_with_vars.map_loc ~f:Dune_pkg.Lock_dir.loc_in_source_tree
-    in
-    let slang = Slang.map_loc ~f:Dune_pkg.Lock_dir.loc_in_source_tree in
-    let blang = Slang.Blang.map_loc ~f:Dune_pkg.Lock_dir.loc_in_source_tree in
+    let string_with_vars = String_with_vars.map_loc ~f:Dune_pkg.Lock.loc_in_source_tree in
+    let slang = Slang.map_loc ~f:Dune_pkg.Lock.loc_in_source_tree in
+    let blang = Slang.Blang.map_loc ~f:Dune_pkg.Lock.loc_in_source_tree in
     Dune_lang.Action.map action ~string_with_vars ~slang ~blang
   ;;
 
@@ -1502,7 +1500,7 @@ end = struct
       assert (Package.Name.equal pkg_digest.name info.name);
       let* platform = Lock_dir.Sys_vars.solver_env in
       let choose_for_current_platform field =
-        Dune_pkg.Lock_dir.Conditional_choice.choose_for_platform field ~platform
+        Dune_pkg.Lock.Conditional_choice.choose_for_platform field ~platform
       in
       let* depends =
         Memo.parallel_map
@@ -1523,7 +1521,7 @@ end = struct
           Package_universe.lock_dir_path package_universe >>| Option.value_exn
         in
         let+ files_dir =
-          let module Pkg = Dune_pkg.Lock_dir.Pkg in
+          let module Pkg = Dune_pkg.Lock.Pkg in
           (* TODO(steve): simplify this once portable lockdirs become the
              default. This logic currently handles both the cases where
              lockdirs are non-portable (the files dir won't have a version

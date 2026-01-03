@@ -1,7 +1,12 @@
 open Import
-module Pkg = Dune_pkg.Lock_dir.Pkg
+module Pkg = Dune_pkg.Lock.Pkg
+module Pkg_info = Dune_pkg.Lock.Pkg_info
+module Build_command = Dune_pkg.Lock.Build_command
+module Depexts = Dune_pkg.Lock.Depexts
+module Conditional_choice = Dune_pkg.Lock.Conditional_choice
+module Dependency = Dune_pkg.Lock.Dependency
 
-type t := Dune_pkg.Lock_dir.t
+type t := Dune_pkg.Lock.t
 
 val get_with_path : Context_name.t -> (Path.t * t, User_message.t) result Memo.t
 val get : Context_name.t -> (t, User_message.t) result Memo.t

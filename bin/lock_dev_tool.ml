@@ -1,6 +1,6 @@
 open Dune_config
 open Import
-module Lock_dir = Dune_pkg.Lock_dir
+module Lock_dir = Dune_pkg.Lock
 module Pin = Dune_pkg.Pin
 
 let is_enabled =
@@ -54,7 +54,7 @@ let make_local_package_wrapping_dev_tool ~dev_tool ~dev_tool_version ~extra_depe
     Package_name.of_string (Package_name.to_string dev_tool_pkg_name ^ "_dev_tool_wrapper")
   in
   { Dune_pkg.Local_package.name = local_package_name
-  ; version = Dune_pkg.Lock_dir.Pkg_info.default_version
+  ; version = Dune_pkg.Lock.Pkg_info.default_version
   ; dependencies =
       Dune_pkg.Dependency_formula.of_dependencies (dependency :: extra_dependencies)
   ; conflicts = []
@@ -231,7 +231,7 @@ let lock_dev_tool_at_version dev_tool version =
   let* need_to_solve =
     lockdir_status dev_tool
     >>| function
-    | `Lockdir_ok_with_tool_pkg (pkg : Dune_pkg.Lock_dir.Pkg.t) ->
+    | `Lockdir_ok_with_tool_pkg (pkg : Dune_pkg.Lock.Pkg.t) ->
       (match version with
        | None -> false
        | Some version ->

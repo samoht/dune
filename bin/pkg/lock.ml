@@ -3,7 +3,7 @@ open Import
 open Pkg_common
 module Package_version = Dune_pkg.Package_version
 module Opam_repo = Dune_pkg.Opam_repo
-module Lock_dir = Dune_pkg.Lock_dir
+module Lock_dir = Dune_pkg.Lock
 module Pin_stanza = Dune_lang.Pin_stanza
 module Pin = Dune_pkg.Pin
 module Solver_env = Dune_pkg.Solver_env

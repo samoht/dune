@@ -1,7 +1,7 @@
 open Import
 open Pkg_common
 module Package_universe = Dune_pkg.Package_universe
-module Lock_dir = Dune_pkg.Lock_dir
+module Lock_dir = Dune_pkg.Lock
 module Opam_repo = Dune_pkg.Opam_repo
 module Package_version = Dune_pkg.Package_version
 module Opam_solver = Dune_pkg.Opam_solver

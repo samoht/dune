@@ -211,15 +211,9 @@ module Spec = struct
     | Error (`Solve_error diagnostic) -> User_error.raise [ diagnostic ]
     | Ok { pinned_packages; files; lock_dir; _ } ->
       let lock_dir_path = Path.build target in
-      let+ lock_dir =
-        Dune_pkg.Lock_dir.compute_missing_checksums ~pinned_packages lock_dir
-      in
-      Dune_pkg.Lock_dir.Write_disk.prepare
-        ~portable_lock_dir
-        ~lock_dir_path
-        ~files
-        lock_dir
-      |> Dune_pkg.Lock_dir.Write_disk.commit
+      let+ lock_dir = Dune_pkg.Lock.compute_missing_checksums ~pinned_packages lock_dir in
+      Dune_pkg.Lock.Write_disk.prepare ~portable_lock_dir ~lock_dir_path ~files lock_dir
+      |> Dune_pkg.Lock.Write_disk.commit
   ;;
 end
 

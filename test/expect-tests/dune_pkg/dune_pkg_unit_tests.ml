@@ -1,7 +1,7 @@
 open Stdune
 module Checksum = Dune_pkg.Checksum
-module Lock_dir = Dune_pkg.Lock_dir
-module Dependency = Dune_pkg.Lock_dir.Dependency
+module Lock_dir = Dune_pkg.Lock
+module Dependency = Dune_pkg.Lock.Dependency
 module Opam_repo = Dune_pkg.Opam_repo
 module Expanded_variable_bindings = Dune_pkg.Solver_stats.Expanded_variable_bindings
 module Package_variable_name = Dune_lang.Package_variable_name

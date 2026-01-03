@@ -17,4 +17,10 @@ val opam_package_to_lock_file_pkg
   -> pinned:bool
   -> Resolved_package.t
   -> portable_lock_dir:bool
-  -> (Lock_dir.Pkg.t, User_message.t) result
+  -> (Lock.Pkg.t, User_message.t) result
+
+(** [file_to_lock ~loc ~solver_env file] loads the repos at their pinned hashes,
+    looks up each package from the single-file lock format, and converts them
+    to a full [Lock.t] using the provided solver environment for evaluating
+    platform-specific formulas. *)
+val file_to_lock : loc:Loc.t -> solver_env:Solver_env.t -> Lock.File.t -> Lock.t Fiber.t

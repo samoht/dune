@@ -372,7 +372,7 @@ let depexts_to_conditional_external_dependencies package depexts =
       then `Always
       else `Conditional condition
     in
-    { Lock_dir.Depexts.external_package_names; enabled_if })
+    { Lock.Depexts.external_package_names; enabled_if })
   |> Result.List.all
 ;;
 
@@ -424,7 +424,7 @@ let opam_package_to_lock_file_pkg
       | Some url -> List.is_empty (OpamFile.URL.checksum url)
     in
     let avoid = List.mem opam_file.flags Pkgflag_AvoidVersion ~equal:Poly.equal in
-    { Lock_dir.Pkg_info.name; version; dev; avoid; source; extra_sources }
+    { Lock.Pkg_info.name; version; dev; avoid; source; extra_sources }
   in
   let depends =
     let resolve what =
@@ -454,7 +454,7 @@ let opam_package_to_lock_file_pkg
         not (List.mem depends package_name ~equal:Package_name.equal))
     in
     depends @ depopts
-    |> List.map ~f:(fun name -> { Lock_dir.Dependency.loc = Loc.none; name })
+    |> List.map ~f:(fun name -> { Lock.Dependency.loc = Loc.none; name })
   in
   let build_env action =
     let env_update =
@@ -470,7 +470,7 @@ let opam_package_to_lock_file_pkg
   in
   let* build_command =
     if Resolved_package.dune_build resolved_package
-    then Ok (Some Lock_dir.Build_command.Dune)
+    then Ok (Some Lock.Build_command.Dune)
     else (
       let subst_step =
         OpamFile.OPAM.substs opam_file
@@ -506,7 +506,7 @@ let opam_package_to_lock_file_pkg
       List.concat [ subst_step; patch_step; build_step ]
       |> make_action
       |> Option.map ~f:build_env
-      |> Option.map ~f:(fun action -> Lock_dir.Build_command.Action action))
+      |> Option.map ~f:(fun action -> Lock.Build_command.Action action))
   in
   (* Some lockfile fields contain a choice of values predicated on a set of
      platform variables to allow lockfiles to be portable across different
@@ -517,12 +517,10 @@ let opam_package_to_lock_file_pkg
      solver may be run multiple times, and the choice fields of lockfiles
      will be merged such that different values can be chosen on different
      platforms. *)
-  let lockfile_field_choice value =
-    Lock_dir.Conditional_choice.singleton solver_env value
-  in
+  let lockfile_field_choice value = Lock.Conditional_choice.singleton solver_env value in
   let build_command =
     Option.map build_command ~f:lockfile_field_choice
-    |> Option.value ~default:Lock_dir.Conditional_choice.empty
+    |> Option.value ~default:Lock.Conditional_choice.empty
   in
   let* depexts =
     if portable_lock_dir
@@ -543,7 +541,7 @@ let opam_package_to_lock_file_pkg
       let depexts =
         if List.is_empty external_package_names
         then []
-        else [ { Lock_dir.Depexts.external_package_names; enabled_if = `Always } ]
+        else [ { Lock.Depexts.external_package_names; enabled_if = `Always } ]
       in
       Ok depexts)
   in
@@ -552,7 +550,7 @@ let opam_package_to_lock_file_pkg
     |> opam_commands_to_actions get_solver_var loc opam_package
     >>| make_action
     >>| Option.map ~f:(fun action -> lockfile_field_choice (build_env action))
-    >>| Option.value ~default:Lock_dir.Conditional_choice.empty
+    >>| Option.value ~default:Lock.Conditional_choice.empty
   in
   let exported_env =
     OpamFile.OPAM.env opam_file |> List.map ~f:opam_env_update_to_env_update
@@ -561,7 +559,7 @@ let opam_package_to_lock_file_pkg
   let enabled_on_platforms =
     [ Solver_env.remove_all_except_platform_specific solver_env ]
   in
-  { Lock_dir.Pkg.build_command
+  { Lock.Pkg.build_command
   ; install_command
   ; depends
   ; depexts
@@ -569,4 +567,58 @@ let opam_package_to_lock_file_pkg
   ; exported_env
   ; enabled_on_platforms
   }
+;;
+
+let file_to_lock ~loc ~solver_env (file : Lock.File.t) =
+  let open Fiber.O in
+  let* repos, resolved_packages = Lock.File.derive ~loc file in
+  (* Build version map from the package list *)
+  let version_by_package_name =
+    List.fold_left
+      file.packages
+      ~init:Package_name.Map.empty
+      ~f:(fun acc { Lock.File.Package_entry.name; version } ->
+        Package_name.Map.add_exn acc name version)
+  in
+  (* Create stats updater for tracking expanded variables *)
+  let stats_updater = Solver_stats.Updater.init () in
+  (* Convert each resolved package to Lock.Pkg.t *)
+  let+ pkgs =
+    Fiber.parallel_map resolved_packages ~f:(fun (name, version, resolved_package) ->
+      let opam_package =
+        OpamPackage.create
+          (Package_name.to_opam_package_name name)
+          (Package_version.to_opam_package_version version)
+      in
+      match
+        opam_package_to_lock_file_pkg
+          solver_env
+          stats_updater
+          version_by_package_name
+          opam_package
+          ~pinned:false
+          resolved_package
+          ~portable_lock_dir:false
+      with
+      | Ok pkg -> Fiber.return pkg
+      | Error msg -> User_error.raise [ User_message.pp msg ])
+  in
+  let packages =
+    List.fold_left pkgs ~init:Package_name.Map.empty ~f:(fun acc (pkg : Lock.Pkg.t) ->
+      Package_name.Map.add_exn acc pkg.info.name pkg)
+  in
+  let stats = Solver_stats.Updater.snapshot stats_updater in
+  let expanded_solver_variable_bindings =
+    Solver_stats.Expanded_variable_bindings.of_variable_set
+      stats.expanded_variables
+      solver_env
+  in
+  Lock.create_latest_version
+    packages
+    ~local_packages:[]
+    ~ocaml:None
+    ~repos:(Some repos)
+    ~expanded_solver_variable_bindings
+    ~solved_for_platform:(Some solver_env)
+    ~portable_lock_dir:false
 ;;

@@ -2,7 +2,7 @@ open Import
 
 module Solver_result : sig
   type t =
-    { lock_dir : Lock_dir.t
+    { lock_dir : Lock.t
     ; files : File_entry.t Package_version.Map.Multi.t Package_name.Map.t
     ; pinned_packages : Package_name.Set.t
     ; num_expanded_packages : int

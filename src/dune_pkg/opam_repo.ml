@@ -39,6 +39,12 @@ module Serializable = struct
       (let+ source = field "source" string in
        source)
   ;;
+
+  let to_url_and_hash s =
+    match String.rsplit2 s ~on:'#' with
+    | None -> s, ""
+    | Some (url, hash) -> url, hash
+  ;;
 end
 
 type t =
@@ -120,6 +126,20 @@ let of_git_repo loc url =
        |> OpamUrl.to_string)
   in
   { source = Repo at_rev; serializable; loc }
+;;
+
+let of_git_repo_at_hash loc ~source ~hash =
+  let url = OpamUrl.of_string source in
+  match Rev_store.Object.of_sha1 hash with
+  | None -> User_error.raise ~loc [ Pp.textf "Invalid git hash: %s" hash ]
+  | Some revision ->
+    let+ at_rev =
+      let* rev_store = Rev_store.get in
+      let resolve = OpamUrl0.Unresolved revision in
+      OpamUrl.fetch_revision url ~loc resolve rev_store >>| User_error.ok_exn
+    in
+    let serializable = Some (sprintf "%s#%s" source hash) in
+    { source = Repo at_rev; serializable; loc }
 ;;
 
 let resolve_repositories ~available_repos ~repositories =
@@ -303,6 +323,13 @@ let load_all_versions_by_keys ts =
 
 let load_all_versions ts opam_package_name =
   all_packages_versions_map ts opam_package_name |> load_all_versions_by_keys
+;;
+
+let load_package t ~name ~version =
+  let opam_package_name = OpamPackage.Name.of_string (Package_name.to_string name) in
+  let opam_version = OpamPackage.Version.of_string (Package_version.to_string version) in
+  let+ all_versions = load_all_versions [ t ] opam_package_name in
+  OpamPackage.Version.Map.find_opt opam_version all_versions
 ;;
 
 let packages_in_repo repo =

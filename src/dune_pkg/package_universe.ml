@@ -2,7 +2,7 @@ open Import
 
 type t =
   { local_packages : Local_package.t Package_name.Map.t
-  ; lock_dir : Lock_dir.t
+  ; lock_dir : Lock.t
   ; platform : Solver_env.t
   ; version_by_package_name : Package_version.t Package_name.Map.t
   }
@@ -18,14 +18,14 @@ let lockdir_regenerate_hints =
   ]
 ;;
 
-let version_by_package_name ~platform local_packages (lock_dir : Lock_dir.t) =
+let version_by_package_name ~platform local_packages (lock_dir : Lock.t) =
   let from_local_packages =
     Package_name.Map.map local_packages ~f:(fun (local_package : Local_package.t) ->
       local_package.version)
   in
   let from_lock_dir =
-    Lock_dir.Packages.pkgs_on_platform_by_name ~platform lock_dir.packages
-    |> Package_name.Map.map ~f:(fun (pkg : Lock_dir.Pkg.t) -> pkg.info.version)
+    Lock.Packages.pkgs_on_platform_by_name ~platform lock_dir.packages
+    |> Package_name.Map.map ~f:(fun (pkg : Lock.Pkg.t) -> pkg.info.version)
   in
   let exception Duplicate_package of Package_name.t in
   try
@@ -90,14 +90,14 @@ let all_non_local_dependencies_of_local_packages t =
 
 let check_for_unnecessary_packges_in_lock_dir
       ~platform
-      (lock_dir : Lock_dir.t)
+      (lock_dir : Lock.t)
       all_non_local_dependencies_of_local_packages
   =
-  let packages = Lock_dir.Packages.pkgs_on_platform_by_name lock_dir.packages ~platform in
+  let packages = Lock.Packages.pkgs_on_platform_by_name lock_dir.packages ~platform in
   let unneeded_packages_in_lock_dir =
     let locked_transitive_closure_of_local_package_dependencies =
       match
-        Lock_dir.transitive_dependency_closure
+        Lock.transitive_dependency_closure
           lock_dir
           ~platform
           all_non_local_dependencies_of_local_packages
@@ -126,7 +126,7 @@ let check_for_unnecessary_packges_in_lock_dir
       [ Pp.text
           "The lockdir contains packages which are not among the transitive dependencies \
            of any local package:"
-      ; Pp.enumerate packages ~f:(fun (package : Lock_dir.Pkg.t) ->
+      ; Pp.enumerate packages ~f:(fun (package : Lock.Pkg.t) ->
           Pp.textf
             "%s.%s"
             (Package_name.to_string package.info.name)
@@ -278,7 +278,7 @@ let transitive_dependency_closure_without_test t start =
         Package_name.Set.diff all_deps local_package_names)
     in
     match
-      Lock_dir.transitive_dependency_closure
+      Lock.transitive_dependency_closure
         t.lock_dir
         ~platform:t.platform
         Package_name.Set.(
@@ -302,7 +302,7 @@ let transitive_dependency_closure_without_test t start =
 let contains_package t package_name =
   let in_local_packages = Package_name.Map.mem t.local_packages package_name in
   let lock_dir_packages =
-    Lock_dir.Packages.pkgs_on_platform_by_name ~platform:t.platform t.lock_dir.packages
+    Lock.Packages.pkgs_on_platform_by_name ~platform:t.platform t.lock_dir.packages
   in
   let in_lock_dir = Package_name.Map.mem lock_dir_packages package_name in
   in_local_packages || in_lock_dir

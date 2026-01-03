@@ -11,7 +11,7 @@ type t
 val create
   :  platform:Solver_env.t
   -> Local_package.t Package_name.Map.t
-  -> Lock_dir.t
+  -> Lock.t
   -> (t, User_message.t) result
 
 val dependency_digest

@@ -80,7 +80,6 @@ end
 include struct
   open Dune_pkg
   module Opam_repo = Opam_repo
-  module Lock_dir = Lock_dir
   module Rev_store = Rev_store
   module Resolved_package = Resolved_package
 end

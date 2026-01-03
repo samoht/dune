@@ -132,25 +132,33 @@ encode_minimal()  ──→  Io.write_file()  ──→  dune.lock
 
 ### Changes Required
 
-**src/dune_pkg/lock_dir.ml:**
+**src/dune_pkg/lock.ml:** (renamed from lock_dir.ml)
 ```ocaml
-(* New: minimal single-file format *)
-module Minimal_format : sig
+(* Single-file lock format *)
+module File : sig
+  module Repo : sig
+    type t = { source : string; hash : string }
+  end
+  module Package_entry : sig
+    type t = { name : Package_name.t; version : Package_version.t }
+  end
+  module Patch_entry : sig
+    type t = { package : Package_name.t; path : Path.Local.t }
+  end
   type t = {
-    repo_hash : string;
-    packages : (Package_name.t * Package_version.t) list;
-    patches : (Package_name.t * Path.t) list;
+    repos : Repo.t list;
+    packages : Package_entry.t list;
+    patches : Patch_entry.t list;
   }
-
   val encode : t -> Dune_sexp.t list
-  val decode : Dune_sexp.Ast.t list -> t
+  val decode : t Decoder.t
 end
 
-(* New: derive full Lock_dir.t from minimal + repo *)
-val derive_from_minimal
-  :  Minimal_format.t
+(* Derive full Lock.t from File.t + repo *)
+val derive_from_file
+  :  File.t
   -> repos:Opam_repo.t list
-  -> Lock_dir.t Fiber.t
+  -> Lock.t Fiber.t
 ```
 
 **src/dune_pkg/opam_repo.ml:**
@@ -164,21 +172,19 @@ val load_package_at_hash
   -> Resolved_package.t option Fiber.t
 ```
 
-### Phase 1: Add Minimal Encoder/Decoder
-- Add `Minimal_format` module to lock_dir.ml
-- Add `encode_minimal` function
-- Add `decode_minimal` function
-- Test with round-trip: encode → decode → encode
+### Phase 1: Add File Encoder/Decoder ✓
+- Added `Lock.File` module with encoder/decoder
+- Renamed `Lock_dir` to `Lock` for cleaner naming
 
 ### Phase 2: Add Derivation from Repo
 - Modify `Opam_repo` to support lookup by hash
-- Add `derive_from_minimal` function
-- Cache derived Lock_dir.t in `_build/.pkg/lock-cache/`
+- Add `derive_from_file` function
+- Cache derived Lock.t in `_build/.pkg/lock-cache/`
 
 ### Phase 3: Integration
-- Modify `Write_disk.prepare` to use minimal format
-- Modify `Make_load` to detect and read minimal format
-- Add migration path: read directory → write minimal
+- Modify `Write_disk.prepare` to use file format
+- Modify `Make_load` to detect and read both formats
+- Add migration path: read directory → write file
 
 ### Phase 4: Cleanup
 - Deprecation warning for directory format
