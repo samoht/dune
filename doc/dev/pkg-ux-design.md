@@ -1,9 +1,36 @@
 # Dune Package Management UX Design Document
 
-A UX review and improvement roadmap for `dune pkg` CLI, informed by modern package managers (Cargo, Bun, uv).
+A UX review and improvement roadmap for `dune pkg` CLI, informed by modern package managers (Cargo, Bun, uv) but grounded in principled CLI design.
 
 **Status:** In Progress
 **Date:** 2026-01-03
+
+---
+
+## Design Principles
+
+Before proposing changes, we apply these principles:
+
+1. **Economy of commands** — Don't add commands unless they enable operations that cannot be composed from existing commands.
+
+2. **Composability** — Output should be greppable, pipeable, and scriptable. Don't break Unix composition for aesthetics.
+
+3. **Structure over colour** — If output needs colours to be scannable, fix the structure first. Colour is reinforcement, not information.
+
+4. **Stay in lane** — Dune is a build system, not a package manager GUI. Avoid reimplementing functionality that belongs to other tools.
+
+5. **Lean defaults** — Show what users need by default. Use flags to *reduce* output, not reveal hidden features.
+
+---
+
+## Success Criteria
+
+How do we know if the UX is good?
+
+1. **Actionable output** — User can act on command output without consulting documentation
+2. **Composable** — Output can be piped to standard Unix tools (`grep`, `awk`, `wc`)
+3. **Predictable** — Same command structure across all `dune pkg` subcommands
+4. **Self-documenting** — `--help` provides examples for common workflows
 
 ---
 
@@ -51,23 +78,31 @@ Overall, Dune's package management UX is functional but lacks some polish and di
 
 ## Detailed Observations
 
-### 1. Missing Essential Commands
+### 1. Command Economy: Do We Need More Commands?
 
-**Modern PM standard:**
+**Modern PM pattern:**
 ```bash
 cargo add serde           # Add dependency
 cargo remove serde        # Remove dependency
 cargo update              # Update lock file
-cargo init                # Initialize new project
 ```
 
 **Dune currently:**
-- No `dune pkg add <package>` - users must manually edit `dune-project`
-- No `dune pkg remove <package>`
-- No `dune pkg update` (have to re-run `lock`)
-- No `dune pkg init`
+- No `dune pkg add <package>` — users edit `dune-project` then run `dune pkg lock`
+- No `dune pkg remove <package>` — users edit `dune-project` then run `dune pkg lock`
+- No `dune pkg update` — users run `dune pkg lock` again
 
-**Recommendation:** Add `dune pkg add` and `dune pkg remove` at minimum.
+**Critical question:** What operation cannot be composed from existing commands?
+
+| Command | Equivalent composition |
+|---------|----------------------|
+| `dune pkg add foo` | Edit `dune-project`, run `dune pkg lock` |
+| `dune pkg remove foo` | Edit `dune-project`, run `dune pkg lock` |
+| `dune pkg update` | Run `dune pkg lock` |
+
+**Assessment:** These commands are conveniences, not necessities. The declarative model (edit manifest, regenerate lock) is explicit and teachable. Adding imperative commands hides this model.
+
+**Recommendation:** Document the workflow clearly rather than adding commands. Consider `dune pkg add` only if user research shows the edit-lock workflow is a significant friction point.
 
 ---
 
@@ -106,10 +141,12 @@ installed serde@1.0.152
 ```
 
 **Recommendations:**
-- Show "Added:", "Updated:", "Unchanged:" sections
-- Add timing information
+- ✅ Replace "opam sandbox" with clearer terminology (done)
+- ✅ Add package count (done)
 - Consider showing direct vs transitive deps separately
-- Replace "opam sandbox" with clearer terminology
+- Show "Added:", "Updated:" sections only when re-locking (not first lock)
+
+**Deferred:** Timing information adds noise for normal operation. If needed, use `time dune pkg lock` or add `--timing` flag for benchmarking.
 
 ---
 
@@ -173,9 +210,11 @@ serde_json    1.0.89   1.0.91
 ```
 
 **Recommendations:**
-- Use tabular format for readability
-- Add semver-aware coloring
-- Change `<` to `->` or use columns
+- ✅ Change `<` to `->` (done)
+- Keep simple line format — it's greppable and composable
+- Consider optional `--table` flag, but note: tables are harder to parse in scripts than simple lines
+
+**Deferred:** Semver-aware colouring is enhancement, not necessity. The `->` format is already clear without colour.
 
 ---
 
@@ -187,27 +226,23 @@ serde_json    1.0.89   1.0.91
 ```
 
 **Issues:**
-- No progress bar
-- No ETA or timing
-- No parallel build indicator (5/12 packages)
+- No indication of how many packages remain
 - Leading whitespace without context
 
 **Cargo equivalent:**
 ```
-   Compiling serde v1.0.152
-   Compiling serde_json v1.0.91
-    Finished dev [unoptimized + debuginfo] target(s) in 2.45s
+   Compiling serde v1.0.152 (1/12)
+   Compiling serde_json v1.0.91 (2/12)
+    Finished dev target(s) in 2.45s
 ```
 
-**Bun equivalent:**
-```
-[#################-----------] 58% building...
-```
-
-**Recommendations:**
+**Recommendation:**
 - Add package count: `Building foo.0.0.1 (1/5)`
-- Show timing on completion
-- Consider progress bar for longer builds
+
+**Explicitly rejected:**
+- **Progress bars** — Package builds have unpredictable duration. A progress bar that jumps from 10% to 90% is worse than no progress bar. What users need is: which package is building and how many remain.
+- **ETA** — Cannot be reliably estimated for heterogeneous packages.
+- **Timing on every build** — Noise for normal operation. Use `time dune build` if needed.
 
 ---
 
@@ -258,7 +293,7 @@ but `foo` does not have these features.
 
 ---
 
-### 7. Missing Dependency Tree View
+### 7. Dependency Introspection
 
 **Modern PMs have:**
 ```bash
@@ -269,7 +304,18 @@ npm why lodash                # Why is this installed?
 
 **Dune currently:** No equivalent command.
 
-**Recommendation:** Add `dune pkg tree` and `dune pkg why <package>`.
+**Assessment:** Dependency trees are useful for debugging, but consider:
+- The lock directory already contains dependency information in machine-readable format
+- A "why" query could be implemented as a one-off script reading the lock dir
+
+**Recommendation:** If adding, use a single command with flags rather than multiple commands:
+```bash
+dune pkg deps                 # List all dependencies (flat)
+dune pkg deps --tree          # Show as tree
+dune pkg deps --why foo       # Why is foo needed?
+```
+
+This follows economy of commands — one command, orthogonal flags.
 
 ---
 
@@ -278,7 +324,7 @@ npm why lodash                # Why is this installed?
 **Updated behavior:**
 ```
 $ dune pkg patch
-dune: required COMMAND name is missing, must be one of 'commit', 'create', 'list' or 'remove'.
+dune: required COMMAND name is missing, must be one of 'commit', 'diff', 'list' or 'remove'.
 Usage: dune pkg patch COMMAND …
 Try 'dune pkg patch --help' for more information.
 ```
@@ -286,10 +332,12 @@ Try 'dune pkg patch --help' for more information.
 Now uses subcommands for consistency:
 ```
 dune pkg patch list           # List all patches and their status
-dune pkg patch create <PKG>   # Prepare a package for patching
+dune pkg patch diff <PKG>     # Show local changes to a package
 dune pkg patch commit <PKG>   # Generate patch from local modifications
 dune pkg patch remove <PKG>   # Remove a patch
 ```
+
+**Workflow:** Just edit files in `duniverse/<pkg>/` directly, use `diff` to preview changes, and `commit` to save as a patch.
 
 ---
 
@@ -311,18 +359,20 @@ Fetched 1 duniverse package(s) to duniverse/
 
 ---
 
-### 10. Colors and Formatting
+### 10. Colours and Formatting
 
-**Observation:** All output appears to be plain text without ANSI colors.
+**Observation:** All output appears to be plain text without ANSI colours.
 
-**Modern PMs use colors extensively:**
-- Green for success/added
-- Red for errors/removed
-- Yellow for warnings/outdated
-- Bold for package names
-- Dim for transitive deps
+**Principle:** If output needs colours to be scannable, fix the structure first. Colour is reinforcement, not information.
 
-**Recommendation:** Add color support with `--color=auto|always|never` flag.
+Cargo's coloured output is scannable *without* colours because it uses consistent prefixes (`Compiling`, `Finished`, `warning:`). The colour reinforces the structure but doesn't carry it.
+
+**Recommendation:**
+1. Ensure output is scannable in plain text first
+2. Add `--color=auto|always|never` flag as enhancement
+3. Use colour sparingly: errors (red), warnings (yellow), success (green)
+
+**Anti-pattern to avoid:** Using colour to distinguish information that should be structurally distinct.
 
 ---
 
@@ -426,17 +476,25 @@ Pp.textf "Solution for %s (%d package%s)" ... pkg_count (if pkg_count = 1 then "
 
 ## Medium Effort Improvements (Future Work)
 
-1. **Add `dune pkg add <package>`** command
-2. **Add `dune pkg tree`** dependency visualization
-3. **Add color output with `--color` flag**
-4. **Tabular format for outdated command**
+1. **Add `dune pkg deps`** — unified dependency introspection with `--tree` and `--why` flags
+2. **Add `--color` flag** — colour as enhancement after structure is solid
+3. **Improve conflict error messages** — show dependency chain, suggest specific actions
 
-## Larger Initiatives (Future Work)
+## Larger Initiatives (Needs Justification)
 
-1. **Add `dune pkg why <package>`** for dependency explanation
-2. **Improve conflict error messages** with resolution suggestions
-3. **Add interactive mode** for resolving version conflicts
-4. **Add package info command** (`dune pkg info <package>`)
+These require user research to justify the added complexity:
+
+1. **`dune pkg add <package>`** — convenience vs. hiding the declarative model. Only if user research shows significant friction.
+2. **Interactive conflict resolution** — complex feature, unclear if needed vs. better error messages.
+3. **Tabular output modes** — breaks composability, needs strong justification.
+
+## Explicitly Rejected
+
+These don't fit Dune's scope or principles:
+
+1. **Progress bars** — unpredictable build times make them misleading
+2. **Timing on every operation** — noise; use `time` if needed
+3. **Download metrics/popularity** — requires external service, maintenance burden
 
 ---
 
