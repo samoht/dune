@@ -29,6 +29,10 @@ val find_package : Context_name.t -> Package.Name.t -> unit Action_builder.t opt
 val dev_tool_env : Dune_pkg.Dev_tool.t -> Env.t Memo.t
 val all_filtered_depexts : Context_name.t -> string list Memo.t
 
+val all_filtered_depexts_with_origins
+  :  Context_name.t
+  -> (string * Package.Name.t * Dune_pkg.Package_version.t) list Memo.t
+
 val setup_pkg_install_alias
   :  dir:Path.Build.t
   -> Context_name.t

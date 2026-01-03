@@ -2575,6 +2575,19 @@ let all_filtered_depexts context =
   >>| List.sort_uniq ~compare:String.compare
 ;;
 
+(* Returns depexts with their source package info *)
+let all_filtered_depexts_with_origins context =
+  let* all_project_deps = all_project_deps context in
+  Memo.List.map all_project_deps ~f:(fun (pkg : Pkg.t) ->
+    let expander = Action_expander.expander context pkg in
+    let+ depexts = Action_expander.Expander.filtered_depexts expander in
+    let pkg_name = pkg.info.name in
+    let pkg_version = pkg.info.version in
+    List.map depexts ~f:(fun depext -> depext, pkg_name, pkg_version))
+  >>| List.concat
+  >>| List.sort ~compare:(fun (d1, _, _) (d2, _, _) -> String.compare d1 d2)
+;;
+
 let pkg_digest_of_project_dependency ctx package_name =
   let+ db = DB.of_ctx ctx ~allow_sharing:false in
   Pkg_digest.Map.keys db.pkg_digest_table
