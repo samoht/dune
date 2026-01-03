@@ -15,7 +15,7 @@ enabling local modifications to dependencies and easier upstream contribution.
 | Single-file conversion | ✅ Done | `Lock.File.of_lock`, `Lock_pkg.file_to_lock` |
 | Format detection | ✅ Done | `Lock.detect_format` |
 | CLI integration (write) | ✅ Done | `dune pkg lock --format=single-file` |
-| CLI integration (read) | ⏸️ Blocked | Needs async loading architecture |
+| CLI integration (read) | ✅ Done | `Lock_pkg.read_disk_fiber` handles both formats |
 | Single-file as default | ❌ Pending | Needs read support first |
 | Tests for single-file | ✅ Done | `test/blackbox-tests/test-cases/pkg/single-file-lock.t` |
 | `dune pkg patch` command | ✅ Done | `bin/pkg/patch.ml`, tests in `test/blackbox-tests/test-cases/pkg/patch-command.t` |

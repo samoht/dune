@@ -622,3 +622,25 @@ let file_to_lock ~loc ~solver_env (file : Lock.File.t) =
     ~solved_for_platform:(Some solver_env)
     ~portable_lock_dir:false
 ;;
+
+let read_disk_fiber ~solver_env path =
+  match Lock.detect_format path with
+  | None ->
+    User_error.raise
+      [ Pp.textf
+          "%s is not a valid lock directory or lock file"
+          (Path.to_string_maybe_quoted path)
+      ]
+  | Some Lock.Directory ->
+    (* Directory format - use sync reader wrapped in Fiber *)
+    Fiber.return (Lock.read_disk_exn path)
+  | Some Lock.Single_file ->
+    (* Single-file format - parse and derive *)
+    let file =
+      Io.with_lexbuf_from_file path ~f:(fun lexbuf ->
+        let sexps = Dune_sexp.Parser.parse ~mode:Many lexbuf in
+        Dune_sexp.Decoder.parse Lock.File.decode Univ_map.empty (List (Loc.none, sexps)))
+    in
+    let loc = Loc.in_file path in
+    file_to_lock ~loc ~solver_env file
+;;

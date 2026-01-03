@@ -24,3 +24,12 @@ val opam_package_to_lock_file_pkg
     to a full [Lock.t] using the provided solver environment for evaluating
     platform-specific formulas. *)
 val file_to_lock : loc:Loc.t -> solver_env:Solver_env.t -> Lock.File.t -> Lock.t Fiber.t
+
+(** [read_disk_fiber ~solver_env path] reads a lock from either directory or
+    single-file format. For directory format, it uses the synchronous reader.
+    For single-file format, it parses the file and derives full package metadata
+    from the opam repos specified in the file.
+
+    @param solver_env Used for platform-specific dependency evaluation
+    @param path Path to either dune.lock directory or dune.lock file *)
+val read_disk_fiber : solver_env:Solver_env.t -> Path.t -> Lock.t Fiber.t

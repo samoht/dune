@@ -257,9 +257,8 @@ end
 val read_disk : Path.t -> (t, User_message.t) result
 val read_disk_exn : Path.t -> t
 
-(** To read a single-file lock format, use:
-    1. Parse with [Io.with_lexbuf_from_file] and [File.decode]
-    2. Convert to [t] with [Lock_pkg.file_to_lock] *)
+(** To read either format (directory or single-file), use [Lock_pkg.read_disk_fiber]
+    which handles format detection and derivation for single-file format. *)
 
 module Make_load (Io : sig
     include Monad.S
