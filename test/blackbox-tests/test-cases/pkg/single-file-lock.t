@@ -18,10 +18,10 @@ Create a project that depends on foo:
 
 Lock with single-file format:
   $ dune pkg lock --format=single-file 2>&1 | head -5
-  Solution for dune.lock
+  Solution for dune.lock (1 package)
   
   Dependencies common to all supported platforms:
-  opam sandbox:
+  opam:
   - foo.0.0.1
 
 Check that dune.lock is a file (not a directory):
@@ -39,10 +39,10 @@ Check the contents of the single-file lock:
 Lock again with directory format (default):
   $ rm dune.lock
   $ dune pkg lock --format=directory 2>&1 | head -5
-  Solution for dune.lock
+  Solution for dune.lock (1 package)
   
   Dependencies common to all supported platforms:
-  opam sandbox:
+  opam:
   - foo.0.0.1
 
 Check that dune.lock is a directory:

@@ -17,10 +17,10 @@ Running the solver explicitely should write the solution into the build log:
 
   $ mkpkg foo 0.0.1
   $ dune pkg lock --trace-file trace.csexp
-  Solution for dune.lock
+  Solution for dune.lock (1 package)
   
   Dependencies common to all supported platforms:
-  opam sandbox:
+  opam:
   - foo.0.0.1
 
 We should be seeing that it has created a lock dir solution depending on foo.0.0.1:

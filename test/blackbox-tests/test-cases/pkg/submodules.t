@@ -68,7 +68,7 @@ We'll use the mock repository as source and depend on `bar`:
 We should be able to successfully solve the project with `foo` and `bar`:
 
   $ dune_pkg_lock_normalized
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (2 packages):
+  opam:
   - bar.0.0.1
   - foo.0.0.1

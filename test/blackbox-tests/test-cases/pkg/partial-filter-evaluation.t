@@ -24,8 +24,8 @@ Declare a package which refers to some variables:
 
 Solve the package using the default solver env:
   $ solve a
-  Solution for dune.lock:
-  duniverse (dune-built):
+  Solution for dune.lock (1 package):
+  dune:
   - a.0.0.1
   $ cat ${default_lock_dir}/a.0.0.1.pkg
   (version 0.0.1)
@@ -67,8 +67,8 @@ Make a custom solver env:
 
 Run the solver using the new env:
   $ solve a
-  Solution for dune.lock:
-  duniverse (dune-built):
+  Solution for dune.lock (1 package):
+  dune:
   - a.0.0.1
   $ cat ${default_lock_dir}/a.0.0.1.pkg
   (version 0.0.1)

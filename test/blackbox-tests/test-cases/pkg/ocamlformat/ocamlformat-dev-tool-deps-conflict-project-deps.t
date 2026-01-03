@@ -83,8 +83,8 @@ Add ".ocamlformat" file.
 
 Lock the to trigger package management
   $ dune_pkg_lock_normalized
-  Solution for dune.lock:
-  duniverse (dune-built):
+  Solution for dune.lock (1 package):
+  dune:
   - printer.2.0
 
 It shows that the project uses printer.2.0
@@ -94,8 +94,8 @@ It shows that the project uses printer.2.0
 Format foo.ml, "dune fmt" uses printer.1.0 instead. There is no conflict with different
 versions of the same dependency.
   $ DUNE_CONFIG__LOCK_DEV_TOOL=enabled dune fmt --preview
-  Solution for _build/.dev-tools.locks/ocamlformat:
-  duniverse (dune-built):
+  Solution for _build/.dev-tools.locks/ocamlformat (2 packages)
+  dune:
   - ocamlformat.0.26.2
   - printer.1.0
   File "foo.ml", line 1, characters 0-0:
@@ -118,7 +118,7 @@ dependencies of the project are isolated from one another.
 
 Relock the project.
   $ dune_pkg_lock_normalized
-  Solution for dune.lock:
+  Solution for dune.lock (0 packages):
   (no dependencies to lock)
 
 There is no leak here. It is not taking the "printer" lib from dev-tools.

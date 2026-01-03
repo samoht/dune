@@ -21,8 +21,8 @@ Make a package with a patch behind a filter
   > EOF
 
   $ solve with-patch-filter
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - with-patch-filter.0.0.1
   $ append_to_lockpkg with-patch-filter.0.0.1 <<EOF
   > (source (copy $PWD/source))

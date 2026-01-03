@@ -31,8 +31,8 @@ Generate a `dune-project` file.
 Run the solver and generate a lock directory.
 
   $ dune_pkg_lock_normalized
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (3 packages):
+  opam:
   - bar.0.5.0
   - baz.0.1.0
   - foo.0.0.1
@@ -94,8 +94,8 @@ Print the contents of each file in the lockdir:
 
 Run the solver again preferring oldest versions of dependencies:
   $ dune_pkg_lock_normalized --version-preference=oldest
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (3 packages):
+  opam:
   - bar.0.4.0
   - baz.0.1.0
   - foo.0.0.1
@@ -198,8 +198,8 @@ After running this we expact a solution that has either `bar` or `baz` but not
 both.
 
   $ dune_pkg_lock_normalized
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (2 packages):
+  opam:
   - bar.0.5.0
   - bar-or-baz.0.0.1
 Top level or is simple, but does nested or work? nested-r defines nested or
@@ -223,8 +223,8 @@ After runninng we expect the solution to have quux and either baz or quz as
 well as bar or qux.
 
   $ dune_pkg_lock_normalized
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (4 packages):
+  opam:
   - bar.0.5.0
   - baz.0.1.0
   - nested-or.0.0.1
@@ -244,8 +244,8 @@ in between.
   > EOF
 
   $ dune_pkg_lock_normalized
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (3 packages):
+  opam:
   - bar.0.5.0
   - priorities.0.0.1
   - quux.0.0.1
@@ -272,7 +272,7 @@ With versions 1 and 3 negated and version 4 removed via version constraint,
 we'd expect version 2 to be chosen:
 
   $ dune_pkg_lock_normalized
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (2 packages):
+  opam:
   - negation.0.0.1
   - pkg.2

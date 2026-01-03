@@ -24,13 +24,13 @@ dependency.
       Rejected candidates:
         dune.3.XX: Incompatible with restriction: <= 2.0.0
   $ test "4.0.0"
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - foo.0.0.1
 
   $ test "4.0.0" 2>&1 | dune_cmd subst '3.[0-9]+' '3.XX'
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - foo.0.0.1
 
 Create a fake project and ensure `dune` can be used as a dependency:
@@ -42,5 +42,5 @@ Create a fake project and ensure `dune` can be used as a dependency:
   >  (depends dune))
   > EOF
   $ dune_pkg_lock_normalized
-  Solution for dune.lock:
+  Solution for dune.lock (0 packages):
   (no dependencies to lock)

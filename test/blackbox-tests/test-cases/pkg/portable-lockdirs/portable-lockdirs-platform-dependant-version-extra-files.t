@@ -68,28 +68,28 @@ Define a project with a package depending on bar:
 
 Solve the project. The solution will contain extra files for both versions of foo:
   $ dune pkg lock
-  Solution for dune.lock
+  Solution for dune.lock (3 packages)
   
   Dependencies common to all supported platforms:
-  opam sandbox:
+  opam:
   - bar.0.0.1
   
   Additionally, some packages will only be built on specific platforms.
   
   arch = arm64; os = linux:
-  opam sandbox:
+  opam:
   - foo.1
   
   arch = arm64; os = macos:
-  opam sandbox:
+  opam:
   - foo.2
   
   arch = x86_64; os = linux:
-  opam sandbox:
+  opam:
   - foo.1
   
   arch = x86_64; os = macos:
-  opam sandbox:
+  opam:
   - foo.2
 
 Verify the contents of the extra files for each version of foo:

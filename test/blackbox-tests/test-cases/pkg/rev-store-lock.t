@@ -31,6 +31,6 @@ Creating a lock should thus work.
 
   $ mkdir dune-workspace-cache
   $ XDG_CACHE_HOME=$(pwd)/fake-xdg-cache dune_pkg_lock_normalized
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - foo.1.0

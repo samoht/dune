@@ -38,15 +38,15 @@ Here is the output of solving for multiple contexts:
   >  (name x)
   >  (depends A B C))
   > EOF
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (5 packages):
+  opam:
   - A.1.2.0
   - B.2.1+rc1
   - C.81.0.4044.138
   - D.0.4.0.beta1
   - E.3.0~alpha1
-  Solution for foo.lock:
-  opam sandbox:
+  Solution for foo.lock (5 packages):
+  opam:
   - A.1.2.0
   - B.2.1+rc1
   - C.81.0.4044.138

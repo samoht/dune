@@ -20,8 +20,8 @@ We try to pull an opam package that isn't a dune project
   > EOF
 
   $ dune_pkg_lock_normalized
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - foo.dev
   $ pkg="${default_lock_dir}/foo.dev.pkg"
   $ grep version $pkg

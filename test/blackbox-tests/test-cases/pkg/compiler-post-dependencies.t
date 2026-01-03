@@ -43,8 +43,8 @@ lists to prevent circular dependencies at package build time.
   > EOF
 
   $ solve ocaml-base-compiler 
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - ocaml-base-compiler.0.0.1
 
 Ensure that packages can be resolved at build time. This checks that

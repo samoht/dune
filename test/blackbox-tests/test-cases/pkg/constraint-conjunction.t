@@ -12,8 +12,8 @@ constraints.
   > EOF
 
   $ solve foo
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (2 packages):
+  opam:
   - a.0.0.1
   - foo.0.0.1
 

@@ -36,14 +36,14 @@ Create a project that depends on the dune package:
 Lock the dependencies:
 
   $ dune pkg lock
-  Solution for dune.lock:
-  duniverse (dune-built):
+  Solution for dune.lock (1 package)
+  dune:
   - dune-pkg.1.0.0
 
 Check that fetch command shows message when duniverse packages have no sources:
 
   $ dune pkg fetch
-  1 duniverse package(s) have no source URL (likely local packages).
+  1 dune package(s) have no source URL (likely local packages).
 
 Now let's test with a package that has an actual source URL.
 

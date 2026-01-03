@@ -7,8 +7,8 @@ Exercise running the ocamlformat wrapper command.
   $ make_project_with_dev_tool_lockdir
 
   $ DUNE_CONFIG__LOCK_DEV_TOOL=enabled dune tools exec ocamlformat
-  Solution for _build/.dev-tools.locks/ocamlformat:
-  duniverse (dune-built):
+  Solution for _build/.dev-tools.locks/ocamlformat (1 package)
+  dune:
   - ocamlformat.0.26.2
        Running 'ocamlformat'
   formatted with version 0.26.2

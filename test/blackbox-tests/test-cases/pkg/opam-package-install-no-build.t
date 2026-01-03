@@ -10,8 +10,8 @@ Make a package with only an install step
   $ mkdir -p $mock_packages/install-no-build/install-no-build.0.0.1/
 
   $ solve install-no-build
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - install-no-build.0.0.1
 The lockfile should only contain an install step.
 

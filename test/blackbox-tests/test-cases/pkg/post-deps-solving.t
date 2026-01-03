@@ -18,8 +18,8 @@ Solving for post dependencies:
 We don't need bar, so we skip it
 
   $ solve foo
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - foo.0.0.1
 
   $ cat ${default_lock_dir}/foo.0.0.1.pkg
@@ -37,8 +37,8 @@ Self dependency
   > EOF
 
   $ solve foo
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - foo.0.0.1
 
   $ cat ${default_lock_dir}/foo.0.0.1.pkg
@@ -55,8 +55,8 @@ Using post to break cycle:
   > EOF
 
   $ solve bar
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (2 packages):
+  opam:
   - bar.0.0.1
   - foo.0.0.1
 
@@ -78,8 +78,8 @@ post "cycle":
   > EOF
 
   $ solve foo
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - foo.0.0.1
 
   $ cat ${default_lock_dir}/foo.0.0.1.pkg
@@ -94,6 +94,6 @@ In depopts:
   $ mkpkg bar
 
   $ solve foo
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - foo.0.0.1

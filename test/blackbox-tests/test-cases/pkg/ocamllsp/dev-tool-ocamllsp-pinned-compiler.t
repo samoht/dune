@@ -34,10 +34,10 @@ Set up the dune-project with a pin for the ocaml-base-compiler pointing to our c
 Lock the project first to establish the pinned compiler in the lockfile.
 
   $ dune pkg lock 2>&1 | head -20
-  Solution for dune.lock
+  Solution for dune.lock (1 package)
   
   Dependencies common to all supported platforms:
-  opam sandbox:
+  opam:
   - ocaml-base-compiler.dev
 
 
@@ -52,8 +52,8 @@ The key indicator is that we see "ocaml-base-compiler.dev" in the solution (from
 rather than "ocaml-base-compiler.5.2.0" from opam-repository.
 
   $ dune tools install ocamllsp 2>&1 | head -10
-  Solution for _build/.dev-tools.locks/ocaml-lsp-server:
-  opam sandbox:
+  Solution for _build/.dev-tools.locks/ocaml-lsp-server (2 packages)
+  opam:
   - ocaml-base-compiler.dev
   - ocaml-lsp-server.0.0.1
 
@@ -62,8 +62,8 @@ rather than "ocaml-base-compiler.5.2.0" from opam-repository.
   lockdir has changed to dev (formerly the compiler version was dev). The
   dev-tool "ocaml-lsp-server" will be re-locked and rebuilt with this version
   of the compiler.
-  Solution for _build/.dev-tools.locks/ocaml-lsp-server:
-  opam sandbox:
+  Solution for _build/.dev-tools.locks/ocaml-lsp-server (2 packages)
+  opam:
   - ocaml-base-compiler.dev
   - ocaml-lsp-server.0.0.1
        Running 'ocamllsp'

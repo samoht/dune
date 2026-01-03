@@ -52,28 +52,28 @@ Define a package bar which conditionally depends on different versions of foo:
   > EOF
 
   $ dune pkg lock
-  Solution for dune.lock
+  Solution for dune.lock (3 packages)
   
   Dependencies common to all supported platforms:
-  opam sandbox:
+  opam:
   - bar.0.0.1
   
   Additionally, some packages will only be built on specific platforms.
   
   arch = arm64; os = linux:
-  opam sandbox:
+  opam:
   - foo.1
   
   arch = arm64; os = macos:
-  opam sandbox:
+  opam:
   - foo.2
   
   arch = x86_64; os = linux:
-  opam sandbox:
+  opam:
   - foo.1
   
   arch = x86_64; os = macos:
-  opam sandbox:
+  opam:
   - foo.2
 
 Build the project as if we were on linux and confirm that version 1 of foo was built:

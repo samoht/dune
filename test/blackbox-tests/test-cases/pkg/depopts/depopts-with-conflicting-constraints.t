@@ -15,8 +15,8 @@ prefer if any:
 We don't currently support depopts so they are both omitted.
 
   $ solve bar baz
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (2 packages):
+  opam:
   - bar.0.0.1
   - baz.0.0.1
 

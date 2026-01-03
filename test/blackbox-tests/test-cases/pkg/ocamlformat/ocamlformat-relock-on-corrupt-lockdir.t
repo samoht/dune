@@ -11,8 +11,8 @@ Make a fake ocamlformat package
 
 Install ocamlformat once to generate the lockdir.
   $ dune tools install ocamlformat
-  Solution for _build/.dev-tools.locks/ocamlformat:
-  duniverse (dune-built):
+  Solution for _build/.dev-tools.locks/ocamlformat (1 package)
+  dune:
   - ocamlformat.0.26.0
 
 Delete ocamlformat's lockfile.
@@ -24,6 +24,6 @@ Reinstall ocamlformat.
   contain a lockfile for the package "ocamlformat". This may indicate that the
   lock directory has been tampered with. Please avoid making manual changes to
   tool lock directories. The tool will now be relocked.
-  Solution for _build/.dev-tools.locks/ocamlformat:
-  duniverse (dune-built):
+  Solution for _build/.dev-tools.locks/ocamlformat (1 package)
+  dune:
   - ocamlformat.0.26.0

@@ -38,6 +38,6 @@ Note that sources in the projects are overriden by the workspace
   > EOF
 
   $ dune_pkg_lock_normalized
-  Solution for dune.lock:
-  duniverse (dune-built):
+  Solution for dune.lock (1 package):
+  dune:
   - foo.dev

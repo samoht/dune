@@ -56,11 +56,11 @@ Create a workspace config that defines separate build contexts for macos and lin
 
 Now the os-specific dependencies are included on their respective systems.
   $ dune_pkg_lock_normalized --all
-  Solution for dune.linux.lock:
+  Solution for dune.linux.lock (0 packages):
   (no dependencies to lock)
-  Solution for dune.lock:
+  Solution for dune.lock (0 packages):
   (no dependencies to lock)
-  Solution for dune.macos.lock:
+  Solution for dune.macos.lock (0 packages):
   (no dependencies to lock)
-  Solution for dune.no-os.lock:
+  Solution for dune.no-os.lock (0 packages):
   (no dependencies to lock)

@@ -19,8 +19,8 @@ The version of foo that should be selected is 1.0.0
   >  (name x)
   >  (depends foo))
   > EOF
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (2 packages):
+  opam:
   - bar.1.0.0
   - foo.1.0.0
 
@@ -53,8 +53,8 @@ But specifying a version for the local package `x` yields a solution:
   >  (name x)
   >  (depends (foo (= :version))))
   > EOF
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (2 packages):
+  opam:
   - bar.1.0.0
   - foo.1.0.0
 
@@ -69,7 +69,7 @@ of the dune-project:
   $ solve_project <<EOF
   > (lang dune 3.11)
   > EOF
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (2 packages):
+  opam:
   - bar.1.0.0
   - foo.1.0.0

@@ -53,12 +53,12 @@ Demonstrate the build command we construct for different types of projects:
   > EOF
 
   $ dune_pkg_lock_normalized
-  Solution for dune.lock:
-  duniverse (dune-built):
+  Solution for dune.lock (4 packages):
+  dune:
   - dune-only.dev
   - template.dev
   
-  opam sandbox:
+  opam:
   - mixed.dev
   - opam-only.dev
   $ build_command() {

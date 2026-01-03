@@ -28,8 +28,8 @@ command is currently not respected when the package is pinned.
   > EOF
 
   $ dune_pkg_lock_normalized
-  Solution for dune.lock:
-  duniverse (dune-built):
+  Solution for dune.lock (1 package):
+  dune:
   - opam-template.dev
   $ build_pkg opam-template
 

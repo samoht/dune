@@ -45,8 +45,8 @@ file and the second patches two, one of the files is in a subdirectory.:w
   > EOF
 
   $ solve with-patch
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - with-patch.0.0.1
   $ append_to_lockpkg with-patch.0.0.1 <<EOF
   > (source (copy $PWD/source))

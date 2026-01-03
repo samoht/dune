@@ -27,8 +27,8 @@ should favor the dune metadata in such a case.
   > EOF
 
   $ dune_pkg_lock_normalized
-  Solution for dune.lock:
-  duniverse (dune-built):
+  Solution for dune.lock (2 packages):
+  dune:
   - bar.dev
   - foo.dev
 

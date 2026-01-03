@@ -37,7 +37,7 @@ Create a workspace with some typos in package variable names
            ^^^^^^^^^
   Warning: The package variable "os_family" looks like a typo. Did you mean
   "os-family"?
-  Solution for dune.lock
+  Solution for dune.lock (0 packages)
   
   Dependencies common to all supported platforms:
   (none)

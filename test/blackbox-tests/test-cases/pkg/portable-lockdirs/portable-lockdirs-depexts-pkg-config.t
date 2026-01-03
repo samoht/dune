@@ -51,10 +51,10 @@ correct depext names can be chosen for the current distro at build time.
   > EOF
 
   $ dune pkg lock
-  Solution for dune.lock
+  Solution for dune.lock (1 package)
   
   Dependencies common to all supported platforms:
-  opam sandbox:
+  opam:
   - conf-pkg-config.0.0.1
 
 Print the name of the depext on a variety of os/distro/versions:

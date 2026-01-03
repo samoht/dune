@@ -28,8 +28,8 @@ Locking should produce the newest package from the repo
 
   $ mkdir dune-cache
   $ XDG_CACHE_HOME=$PWD/dune-cache dune_pkg_lock_normalized
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - foo.1.0
 
 Now let's assume a new version of foo is released.
@@ -45,8 +45,8 @@ Locking should update the git repo in our cache folder and give us the newer
 version in the lock file
 
   $ XDG_CACHE_HOME=$PWD/dune-cache dune_pkg_lock_normalized
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - foo.1.1
 
 If the package selected has some additional files that are supposed to be
@@ -74,8 +74,8 @@ should also be included.
 Locking should be successful and it should include the additional file
 
   $ XDG_CACHE_HOME=$PWD/dune-cache dune_pkg_lock_normalized
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - foo.1.2
 
   $ find ${default_lock_dir} | sort

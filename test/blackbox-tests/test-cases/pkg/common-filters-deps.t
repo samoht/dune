@@ -22,7 +22,7 @@ documentation-only deps are omitted from the solution.
 Dune will also not include dependencies marked `post` in the lock directory.
 
   $ solve "(test :with-test) (doc :with-doc) (dev-setup :with-dev-setup) (dev :with-dev) (build :build) (post :post)"
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (2 packages):
+  opam:
   - build.0.0.1
   - test.0.0.1

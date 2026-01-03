@@ -14,8 +14,8 @@ build this package and check for sufficient error handling
 
   $ add_mock_repo_if_needed
   $ solve foo
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - foo.0.0.1
   $ build_pkg foo 2>&1 | dune_cmd print-from 'Error:' | dune_cmd print-until '^Reason' | dune_cmd subst "'[0-9]*'" X
   Error: failed to extract 'corrupted.tar'
@@ -33,8 +33,8 @@ captured
   > EOF
 
   $ solve foo
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - foo.0.0.1
 
   $ build_pkg foo 2>&1 | dune_cmd print-from 'Error:' | dune_cmd print-until '^Reason' | dune_cmd subst "'[0-9]*'" X
@@ -55,8 +55,8 @@ error message a bit less clear
 
   $ add_mock_repo_if_needed
   $ solve foo
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - foo.0.0.1
 
   $ build_pkg foo 2>&1 | dune_cmd print-from 'Error:' | dune_cmd print-until '^Reason' | dune_cmd subst "'[0-9]*'" X

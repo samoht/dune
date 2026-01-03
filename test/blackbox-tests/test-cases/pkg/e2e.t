@@ -72,8 +72,8 @@ Make a project that uses the library:
 Lock, build, and run the executable in the project:
 
   $ dune_pkg_lock_normalized
-  Solution for dune.lock:
-  duniverse (dune-built):
+  Solution for dune.lock (1 package):
+  dune:
   - foo.0.0.1
   $ dune exec bar
   Hello, World!

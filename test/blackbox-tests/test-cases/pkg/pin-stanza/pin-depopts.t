@@ -26,6 +26,6 @@ package with depopts.
   > EOF
 
   $ dune_pkg_lock_normalized
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - pkg-with-depopts.5.2.0

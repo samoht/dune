@@ -108,8 +108,8 @@ Addition of `foo2` to solve the last remaining conflict:
   $ solve_project <<EOF
   > (lang dune 3.11)
   > EOF
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (4 packages):
+  opam:
   - bar.0.0.1
   - bar2.0.0.1
   - foo.0.2
@@ -127,8 +127,8 @@ due to the version constraints conflicts:
   >  (conflicts (foo (>= 0.2)) (foo2 (>= 0.2)))
   >  (depends bar bar2))
   > EOF
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (4 packages):
+  opam:
   - bar.0.0.1
   - bar2.0.0.1
   - foo.0.0.1

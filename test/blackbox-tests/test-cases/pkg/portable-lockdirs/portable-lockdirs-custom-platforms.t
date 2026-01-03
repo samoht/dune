@@ -45,10 +45,10 @@ Create a custom dune-workspace to solve for openbsd.
   > EOF
 
   $ dune pkg lock
-  Solution for dune.lock
+  Solution for dune.lock (1 package)
   
   Dependencies common to all supported platforms:
-  opam sandbox:
+  opam:
   - foo.0.0.1
 
   $ cat ${default_lock_dir}/lock.dune

@@ -28,10 +28,10 @@ Define some local packages.
 
 Solve dependencies:
   $ dune pkg lock
-  Solution for dune.lock
+  Solution for dune.lock (5 packages)
   
   Dependencies common to all supported platforms:
-  opam sandbox:
+  opam:
   - a.0.0.1
   - b.0.0.2
   - c.0.0.1

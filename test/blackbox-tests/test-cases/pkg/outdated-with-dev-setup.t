@@ -10,8 +10,8 @@ Reproduce internal error with dune pkg outdated in #11188.
   >  (name foo)
   >  (depends a (b :with-dev-setup)))
   > EOF
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - a.0.0.1
 
 dune pkg outdated is able to handle :with-dev-setup correctly.

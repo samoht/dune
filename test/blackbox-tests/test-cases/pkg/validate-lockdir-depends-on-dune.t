@@ -13,8 +13,8 @@ Reproduce internal error with dune pkg validate-lockdir in #11188.
   >  (depends
   >   a))
   > EOF
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - a.0.0.1
 
 Dune is able to verify this lock directory correctly:

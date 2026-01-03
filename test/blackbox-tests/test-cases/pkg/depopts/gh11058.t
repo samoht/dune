@@ -19,27 +19,27 @@ Handling of more than one depopt:
   $ runtest <<'EOF'
   > depopts: [ "a" "b" "c" ]
   > EOF
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - bar.0.0.1
 
   $ runtest <<'EOF'
   > depopts: [ "a" "b" "c" "d" ]
   > EOF
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - bar.0.0.1
 
   $ runtest <<'EOF'
   > depopts: [ ("a" | "b") "c" "d" ]
   > EOF
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - bar.0.0.1
 
   $ runtest <<'EOF'
   > depopts: [ (("e" | "a") | ("d" | "f")) "b" "c" ]
   > EOF
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - bar.0.0.1

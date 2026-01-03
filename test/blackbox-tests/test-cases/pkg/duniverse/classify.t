@@ -44,11 +44,11 @@ Create a project that depends on both packages:
 Lock the dependencies and verify classification in output:
 
   $ dune pkg lock
-  Solution for dune.lock:
-  duniverse (dune-built):
+  Solution for dune.lock (2 packages)
+  dune:
   - dune-pkg.1.0.0
   
-  opam sandbox:
+  opam:
   - opam-pkg.1.0.0
 
 

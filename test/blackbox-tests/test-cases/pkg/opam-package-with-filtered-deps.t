@@ -24,8 +24,8 @@ Demonstrate the translation of filtered dependencies
   > EOF
 
   $ solve bar 2>/dev/null
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (2 packages):
+  opam:
   - bar.0.0.1
   - pkg-build.0.0.1
 

@@ -53,8 +53,8 @@ Helper function that creates a workspace file with a given solver env.
   >  (name foo)
   >  (depends bar))
   > EOF
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (2 packages)
+  opam:
   - b.0.0.1
   - bar.0.0.1
 

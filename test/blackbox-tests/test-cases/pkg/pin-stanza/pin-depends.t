@@ -29,7 +29,7 @@ respect the pin-depends
   > EOF
 
   $ dune_pkg_lock_normalized
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (2 packages):
+  opam:
   - bar.1.0.0
   - foo.dev

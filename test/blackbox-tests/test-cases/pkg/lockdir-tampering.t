@@ -32,8 +32,8 @@ Without a lockdir this command prints a hint but exits successfully.
 
 Make the lockdir.
   $ dune_pkg_lock_normalized
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (5 packages):
+  opam:
   - a.0.0.1
   - b.0.0.2
   - c.0.0.1
@@ -71,8 +71,8 @@ Remove the file but corrupt the lockdir metadata file.
 Regenerate the lockdir and validate the result.
   $ rm -r ${source_lock_dir}
   $ dune_pkg_lock_normalized
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (5 packages):
+  opam:
   - a.0.0.1
   - b.0.0.2
   - c.0.0.1
@@ -98,8 +98,8 @@ This results in an invalid lockdir due to the missing package.
 
 Regenerate the lockdir and validate the result.
   $ dune_pkg_lock_normalized
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (5 packages):
+  opam:
   - a.0.0.1
   - b.0.0.2
   - c.0.0.1
@@ -130,8 +130,8 @@ Now the lockdir is invalid as it doesn't contain the right version of "b".
 
 Regenerate the lockdir and validate the result.
   $ dune_pkg_lock_normalized
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (5 packages):
+  opam:
   - a.0.0.1
   - b.0.0.2
   - c.0.0.1
@@ -158,8 +158,8 @@ The lockdir is invalid as the package "b" is now defined both locally and in the
 
 Regenerate the lockdir and validate the result.
   $ dune_pkg_lock_normalized
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (5 packages):
+  opam:
   - a.0.0.1
   - b.0.0.2
   - c.0.0.1
@@ -186,8 +186,8 @@ The lockdir is invalid as it contains unnecessary packages.
 
 Regenerate the lockdir and validate the result.
   $ dune_pkg_lock_normalized
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (5 packages):
+  opam:
   - a.0.0.1
   - b.0.0.2
   - c.0.0.1

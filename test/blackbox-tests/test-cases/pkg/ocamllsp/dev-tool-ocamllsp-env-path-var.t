@@ -28,8 +28,8 @@ Make a fake ocamllsp package that prints out the PATH variable:
 
 Confirm that each dev tool's bin directory is now in PATH:
   $ dune tools exec ocamllsp | tr : '\n' | grep '_build/_private/default/.dev-tool'
-  Solution for _build/.dev-tools.locks/ocaml-lsp-server:
-  opam sandbox:
+  Solution for _build/.dev-tools.locks/ocaml-lsp-server (3 packages)
+  opam:
   - ocaml-base-compiler.5.2.0
   - ocaml-compiler.5.2.0
   - ocaml-lsp-server.0.0.1

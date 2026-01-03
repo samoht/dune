@@ -26,8 +26,8 @@ rather than "a.0.0.1".
   >  (name foo)
   >  (depends c d))
   > EOF
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (4 packages):
+  opam:
   - a.0.0.2
   - b.0.0.1
   - c.0.0.1

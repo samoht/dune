@@ -12,7 +12,7 @@ Demonstrate how depopts can be forced in the workspace
   >  (name x)
   >  (depopts foo bar))
   > EOF
-  Solution for dune.lock:
+  Solution for dune.lock (0 packages):
   (no dependencies to lock)
 
 Select just foo
@@ -28,8 +28,8 @@ Select just foo
   > EOF
 
   $ dune_pkg_lock_normalized
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - foo.0.0.1
 
 Select both foo and bar
@@ -45,8 +45,8 @@ Select both foo and bar
   > EOF
 
   $ dune_pkg_lock_normalized
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (2 packages):
+  opam:
   - bar.0.0.1
   - foo.0.0.1
 
@@ -63,7 +63,7 @@ Select a package that is not listed as depopt
   > EOF
 
   $ dune_pkg_lock_normalized
-  Solution for dune.lock:
+  Solution for dune.lock (0 packages):
   (no dependencies to lock)
 
 

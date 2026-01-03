@@ -43,8 +43,8 @@ With this project set up, lets depend on it.
   >  (name foo)
   >  (depends nondune))
   > EOF
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - nondune.dev
   $ cat > dune <<EOF
   > (executable

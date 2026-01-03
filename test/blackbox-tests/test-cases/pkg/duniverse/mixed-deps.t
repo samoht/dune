@@ -53,13 +53,13 @@ Create a project that depends on the top-level dune package:
 Lock the dependencies - packages should be classified correctly:
 
   $ dune pkg lock 2>&1 | grep -v "^Dependencies"
-  Solution for dune.lock
+  Solution for dune.lock (3 packages)
   
-  duniverse (dune-built):
+  dune:
   - dune-leaf.1.0.0
   - dune-top.1.0.0
   
-  opam sandbox:
+  opam:
   - make-middle.1.0.0
 
 
@@ -91,13 +91,13 @@ Now test a diamond dependency pattern where both paths have mixed packages:
 
   $ rm -rf dune.lock
   $ dune pkg lock 2>&1 | grep -v "^Dependencies"
-  Solution for dune.lock
+  Solution for dune.lock (3 packages)
   
-  duniverse (dune-built):
+  dune:
   - dune-a.1.0.0
   - shared-dune.1.0.0
   
-  opam sandbox:
+  opam:
   - make-b.1.0.0
 
 

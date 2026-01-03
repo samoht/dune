@@ -22,8 +22,8 @@ Regular dependencies
   > EOF
 
   $ solve testpkg
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (2 packages):
+  opam:
   - foo.0.0.1
   - testpkg.1
 
@@ -32,8 +32,8 @@ Regular dependencies
   > EOF
 
   $ solve testpkg
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - testpkg.2
 
 Depopts. We don't have proper support for depopts yet, so these don't work.
@@ -45,8 +45,8 @@ the same way as depends
   > EOF
 
   $ solve testpkg
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - testpkg.2
 
   $ mkpkg "testpkg" 2 <<'EOF' 
@@ -54,6 +54,6 @@ the same way as depends
   > EOF
 
   $ solve testpkg
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - testpkg.2

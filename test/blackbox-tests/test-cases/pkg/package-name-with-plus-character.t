@@ -20,6 +20,6 @@ This is based on the build command of mingw-w64-shims.0.2.0
   > EOF
 
   $ dune_pkg_lock_normalized
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - foo.0.0.1

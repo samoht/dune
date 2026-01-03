@@ -31,8 +31,8 @@ Make a package with an extra-source field and multiple checksums
   > EOF
 
   $ solve with-extra-source with-extra-source-md5 with-extra-source-multiple-checksums
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (3 packages):
+  opam:
   - with-extra-source.0.0.1
   - with-extra-source-md5.0.0.1
   - with-extra-source-multiple-checksums.0.0.1

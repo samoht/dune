@@ -9,8 +9,8 @@ Make a package with a substs field
   > EOF
 
   $ solve with-substs
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - with-substs.0.0.1
   $ append_to_lockpkg with-substs.0.0.1 <<EOF
   > (source (copy $PWD/source))

@@ -48,10 +48,10 @@ Set up a project that depends on the package:
 
 Solve the project:
   $ dune pkg lock
-  Solution for dune.lock
+  Solution for dune.lock (1 package)
   
   Dependencies common to all supported platforms:
-  opam sandbox:
+  opam:
   - foo.0.0.1
 
 Confirming that the build action creates the conditional file:

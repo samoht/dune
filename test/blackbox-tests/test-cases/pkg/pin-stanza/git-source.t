@@ -27,8 +27,8 @@ We create a repo with a fixed name for the default branch.
   > EOF
 
   $ dune_pkg_lock_normalized
-  Solution for dune.lock:
-  duniverse (dune-built):
+  Solution for dune.lock (1 package):
+  dune:
   - foo.dev
 
 We create a tag that clashes with the name of the branch (hence we needed to
@@ -39,8 +39,8 @@ fix the name of the branch eariler):
 This should work without issue, as we never reference the ambiguous reference:
 
   $ dune_pkg_lock_normalized
-  Solution for dune.lock:
-  duniverse (dune-built):
+  Solution for dune.lock (1 package):
+  dune:
   - foo.dev
 
 If we use the duplicate reference in the config
@@ -59,8 +59,8 @@ This will work as both references point at the same revision, thus aren't
 ambiguous:
 
   $ dune_pkg_lock_normalized
-  Solution for dune.lock:
-  duniverse (dune-built):
+  Solution for dune.lock (1 package):
+  dune:
   - foo.dev
 
 If we then change the reference of the branch to point to a different revision
@@ -92,8 +92,8 @@ Git also has unambibuous namespaces tags and branches, for tags it is `refs/tags
 Locking should work, as there are no ambiguous references.
 
   $ dune_pkg_lock_normalized
-  Solution for dune.lock:
-  duniverse (dune-built):
+  Solution for dune.lock (1 package):
+  dune:
   - foo.dev
 
 For branches the namespace is `refs/heads/`:
@@ -111,6 +111,6 @@ For branches the namespace is `refs/heads/`:
 Likewise locking a branch this way should work as well:
 
   $ dune_pkg_lock_normalized
-  Solution for dune.lock:
-  duniverse (dune-built):
+  Solution for dune.lock (1 package):
+  dune:
   - foo.dev

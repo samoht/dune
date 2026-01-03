@@ -13,7 +13,7 @@ Start with a project with a single package with no dependencies:
   > (package
   >  (name foo))
   > EOF
-  Solution for dune.lock:
+  Solution for dune.lock (0 packages):
   (no dependencies to lock)
   $ cat ${default_lock_dir}/lock.dune
   (lang package 0.1)
@@ -57,8 +57,8 @@ Add a non-local dependency to the package:
   >  (name foo)
   >  (depends a))
   > EOF
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - a.0.0.1
   $ cat ${default_lock_dir}/lock.dune
   (lang package 0.1)

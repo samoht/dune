@@ -24,8 +24,8 @@ Here the solver could pick "bar" and "foo", and perphaps pick "optional",
 however this is not required.
 
   $ solve bar
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (2 packages):
+  opam:
   - bar.0.0.1
   - foo.1
 
@@ -34,7 +34,7 @@ excluded from the build plan if the latest version of "foo" is picked.
 
   $ mkpkg foo 2
   $ solve bar
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (2 packages):
+  opam:
   - bar.0.0.1
   - foo.2

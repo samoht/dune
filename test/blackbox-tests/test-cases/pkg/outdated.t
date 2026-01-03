@@ -33,12 +33,12 @@
   >  (name baz)
   >  (depends bar))
   > EOF
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (2 packages):
+  opam:
   - bar.0.0.1
   - foo.0.0.1
-  Solution for dune.workspace.lock:
-  opam sandbox:
+  Solution for dune.workspace.lock (2 packages):
+  opam:
   - bar.0.0.1
   - foo.0.0.1
 
@@ -81,9 +81,9 @@ Dune should report the new version of bar as available.
 
   $ outdated --all
   - 1/2 packages in dune.lock are outdated.
-    - bar 0.0.1 < 0.0.2
+    - bar 0.0.1 -> 0.0.2
   - 1/2 packages in dune.workspace.lock are outdated.
-    - bar 0.0.1 < 0.0.2
+    - bar 0.0.1 -> 0.0.2
 
 Now we add a new version of the foo package to the repository.
 Dune should only report the bar package as it is an immediate dependency.
@@ -92,17 +92,17 @@ Dune should only report the bar package as it is an immediate dependency.
   $ outdated --all
   - 2/2 packages in dune.lock are outdated.
     Showing immediate dependencies, use --transitive to see them all.
-    - bar 0.0.1 < 0.0.2
+    - bar 0.0.1 -> 0.0.2
   - 2/2 packages in dune.workspace.lock are outdated.
     Showing immediate dependencies, use --transitive to see them all.
-    - bar 0.0.1 < 0.0.2
+    - bar 0.0.1 -> 0.0.2
 
 If --transitive is also passed then both should be reported.
 
   $ outdated --transitive dune.lock
   2/2 packages in dune.lock are outdated.
-  - bar 0.0.1 < 0.0.2
-  - foo 0.0.1 < 0.0.2
+  - bar 0.0.1 -> 0.0.2
+  - foo 0.0.1 -> 0.0.2
 
 If we remove packages from the repository then we should get a nice error.
 
@@ -121,7 +121,7 @@ When printing both successes and failures, any errors should appear afterwards.
 
   $ outdated dune.lock --transitive
   1/2 packages in dune.lock are outdated.
-  - foo 0.0.1 < 0.0.2
+  - foo 0.0.1 -> 0.0.2
   Error: Some packages could not be found.
   When checking dune.lock, the following packages:
   - bar
@@ -133,9 +133,9 @@ Similarly for multiple lock files.
 
   $ outdated --transitive --all
   - 1/2 packages in dune.lock are outdated.
-    - foo 0.0.1 < 0.0.2
+    - foo 0.0.1 -> 0.0.2
   - 1/2 packages in dune.workspace.lock are outdated.
-    - foo 0.0.1 < 0.0.2
+    - foo 0.0.1 -> 0.0.2
   Error: Some packages could not be found.
   When checking dune.lock, the following packages:
   - bar

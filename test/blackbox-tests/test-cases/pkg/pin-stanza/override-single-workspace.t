@@ -31,8 +31,8 @@ Here we demonstrate that projects override their sub projects:
   > (package (name bar))
   > EOF
   $ dune_pkg_lock_normalized
-  Solution for dune.lock:
-  duniverse (dune-built):
+  Solution for dune.lock (1 package):
+  dune:
   - bar.dev
 
   $ print_source "bar.dev"

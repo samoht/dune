@@ -55,10 +55,10 @@ Create a project that depends on foo:
 
 Lock and build with explicit dune pkg lock:
   $ dune pkg lock
-  Solution for dune.lock
+  Solution for dune.lock (1 package)
   
   Dependencies common to all supported platforms:
-  duniverse (dune-built):
+  dune:
   - foo.0.0.1
 
   $ dune exec --display short bar 2>&1 | grep "Building"

@@ -31,8 +31,8 @@ Local pinned source.
   > opam-version: "2.0"
   > EOF
   $ runtest "file://$PWD/$dir"
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - bar.1.0.0
   (version 1.0.0)
   (dev)
@@ -46,8 +46,8 @@ Local pinned source.
   > opam-version: "2.0"
   > EOF
   $ runtest "file://$PWD/$dir"
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - bar.1.0.0
   (version 1.0.0)
   (dev)
@@ -61,8 +61,8 @@ Local pinned source.
   > opam-version: "2.0"
   > EOF
   $ runtest "file://$PWD/$dir"
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - bar.1.0.0
   (version 1.0.0)
   (dev)
@@ -76,8 +76,8 @@ Local pinned source.
   > opam-version: "2.0"
   > EOF
   $ runtest "file://$PWD/$dir"
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - bar.1.0.0
   (version 1.0.0)
   (dev)
@@ -96,8 +96,8 @@ Git pinned source:
   $ git commit --quiet -m "Initial commit"
   $ cd ..
   $ runtest "git+file://$PWD/$dir"
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - bar.1.0.0
   (version 1.0.0)
   (dev)
@@ -116,8 +116,8 @@ Git pinned source with toplevel opam file:
   $ git commit --quiet -m "Initial commit"
   $ cd ..
   $ runtest "git+file://$PWD/$dir"
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - bar.1.0.0
   (version 1.0.0)
   (dev)
@@ -137,8 +137,8 @@ Git pinned source with toplevel opam dir 1
   $ git commit --quiet -m "Initial commit"
   $ cd ..
   $ runtest "git+file://$PWD/$dir"
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - bar.1.0.0
   (version 1.0.0)
   (dev)

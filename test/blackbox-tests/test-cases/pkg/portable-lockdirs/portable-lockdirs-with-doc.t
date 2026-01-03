@@ -26,10 +26,10 @@ dune-workspace.
   $ mkpkg foo
 
   $ DUNE_CONFIG__PORTABLE_LOCK_DIR=enabled dune pkg lock
-  Solution for dune.lock
+  Solution for dune.lock (1 package)
   
   Dependencies common to all supported platforms:
-  opam sandbox:
+  opam:
   - foo.0.0.1
 
 The list-locked-dependencies command does some validation that there are no

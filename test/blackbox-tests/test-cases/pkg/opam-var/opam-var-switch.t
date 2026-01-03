@@ -24,8 +24,8 @@ opam-var-unsupported.t
   > ]
   > EOF
   > solve testpkg
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - testpkg.0.0.1
   $ cat ${default_lock_dir}/testpkg.0.0.1.pkg
   (version 0.0.1)

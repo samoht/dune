@@ -16,6 +16,6 @@ the solver.
   >  (depopts bar)
   >  (conflicts bar))
   > EOF
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - foo.0.0.1

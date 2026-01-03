@@ -86,11 +86,11 @@ Package which has boolean where string was expected. This should be caught while
   > EOF
 
   $ solve standard-dune with-interpolation with-percent-sign variable-types
-  Solution for dune.lock:
-  duniverse (dune-built):
+  Solution for dune.lock (4 packages):
+  dune:
   - standard-dune.0.0.1
   
-  opam sandbox:
+  opam:
   - variable-types.0.0.1
   - with-interpolation.0.0.1
   - with-percent-sign.0.0.1
@@ -150,8 +150,8 @@ Package which has boolean where string was expected. This should be caught while
   [1]
 
   $ solve exercise-filters
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - exercise-filters.0.0.1
 
   $ cat ${default_lock_dir}/exercise-filters.0.0.1.pkg
@@ -196,8 +196,8 @@ Package which has boolean where string was expected. This should be caught while
 
 Test that if opam filter translation is disabled the output doesn't contain any translated filters:
   $ solve exercise-filters
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - exercise-filters.0.0.1
   $ cat ${default_lock_dir}/exercise-filters.0.0.1.pkg
   (version 0.0.1)
@@ -240,8 +240,8 @@ Test that if opam filter translation is disabled the output doesn't contain any 
         (run echo m)))))))
 
   $ solve exercise-term-filters
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - exercise-term-filters.0.0.1
   $ cat ${default_lock_dir}/exercise-term-filters.0.0.1.pkg
   (version 0.0.1)
@@ -288,8 +288,8 @@ Package with package conjunction and string selections inside variable interpola
   > (lang dune 3.8)
   > (package (name x) (depends package-conjunction-and-string-selection))
   > EOF
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - package-conjunction-and-string-selection.0.0.1
 Note that "enable" is not a true opam variable. Opam desugars occurrences of
 "pkg:enable" into "pkg:enable?enable:disable" but if the explicit package scope

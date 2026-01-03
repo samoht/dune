@@ -25,6 +25,6 @@ Reproduce the bug in #11698
   >  (name x)
   >  (depends dep))
   > EOF
-  Solution for dune.lock:
-  duniverse (dune-built):
+  Solution for dune.lock (1 package):
+  dune:
   - dep.1.0.0

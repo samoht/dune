@@ -102,8 +102,8 @@ create the lock file:
   $ enable_pkg
 
   $ dune_pkg_lock_normalized
-  Solution for dune.lock:
-  duniverse (dune-built):
+  Solution for dune.lock (1 package):
+  dune:
   - testlib.0.0.1
 
 Now disable pkg again:

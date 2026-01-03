@@ -19,8 +19,8 @@ Make a package with a patch
   > EOF
 
   $ solve with-patch
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - with-patch.0.0.1
 
 We expect that the files in the files directory of the opam repository get copied to the

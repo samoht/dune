@@ -14,8 +14,8 @@ Demonstrate the generation of the lock directory in the presence of "|"
   > EOF
 
   $ solve b
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (2 packages):
+  opam:
   - a1.0.0.1
   - b.0.0.1
 Only a1 or a2 should appear but not both.
@@ -35,8 +35,8 @@ packages, so comparing their version numbers is meaningless.
   > EOF
 
   $ solve b
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (2 packages):
+  opam:
   - a1.0.0.1
   - b.0.0.1
 
@@ -51,8 +51,8 @@ which is completely omitted from the solution).
   > EOF
 
   $ solve b
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (2 packages):
+  opam:
   - a2.0.0.2
   - b.0.0.2
 
@@ -63,8 +63,8 @@ Same solution if a1 only known version is excluded:
   > EOF
 
   $ solve b
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (2 packages):
+  opam:
   - a2.0.0.2
   - b.0.0.2
 
@@ -77,8 +77,8 @@ solver to try to find a solution which doesn't include it.
   > EOF
 
   $ solve b
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (2 packages):
+  opam:
   - a1.0.0.1
   - b.0.0.1
 
@@ -89,8 +89,8 @@ Update a1.0.0.1 to also be flagged as avoid-version:
   > EOF
 
   $ solve b
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (2 packages):
+  opam:
   - a2.0.0.1
   - b.0.0.1
 
@@ -102,8 +102,8 @@ avoid-version:
   > EOF
 
   $ solve b
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (2 packages):
+  opam:
   - a2.0.0.2 (this version should be avoided)
   - b.0.0.2
 
@@ -157,8 +157,8 @@ latest versions of packages a and d allow it to reduce the solution to 2
 avoid-version:
 
   $ solve a
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (3 packages):
+  opam:
   - a.0.1
   - d.0.1 (this version should be avoided)
   - f.0.1 (this version should be avoided)

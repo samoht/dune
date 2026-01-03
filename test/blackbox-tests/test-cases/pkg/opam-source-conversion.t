@@ -10,8 +10,8 @@ Test conversion of opam sources into lock dir package specifications
   > EOF
 
   $ solve testpkg
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - testpkg.0.0.1
 
   $ showpkg() {
@@ -38,8 +38,8 @@ Test conversion of opam sources into lock dir package specifications
   $ rm -rf ${default_lock_dir}
 
   $ solve testpkg
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - testpkg.0.0.1
 
   $ showpkg | dune_cmd subst "$PWD" '<pwd>'
@@ -64,8 +64,8 @@ Unsupported backends:
   > EOF
 
   $ solve testpkg 2>&1
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - testpkg.0.0.1
   $ showpkg
   (version 0.0.1)
@@ -86,8 +86,8 @@ git+http
   > EOF
 
   $ solve testpkg 2>&1
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - testpkg.0.0.1
   $ showpkg
   (version 0.0.1)
@@ -107,8 +107,8 @@ git+file
   > }
   > EOF
   $ solve testpkg 2>&1
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - testpkg.0.0.1
   $ showpkg
   (version 0.0.1)
@@ -128,8 +128,8 @@ git+foobar
   > }
   > EOF
   $ solve testpkg 2>&1
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - testpkg.0.0.1
   $ showpkg
   (version 0.0.1)
@@ -149,8 +149,8 @@ file+git
   > }
   > EOF
   $ solve testpkg 2>&1
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - testpkg.0.0.1
   $ showpkg
   (version 0.0.1)

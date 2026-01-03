@@ -15,20 +15,20 @@ Testing how the solver handles cycles in an opam repository.
 Solver doesn't complain about cycles.
 
   $ solve a
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (3 packages):
+  opam:
   - a.0.0.1
   - b.0.0.1
   - c.0.0.1
   $ solve b
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (3 packages):
+  opam:
   - a.0.0.1
   - b.0.0.1
   - c.0.0.1
   $ solve c
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (3 packages):
+  opam:
   - a.0.0.1
   - b.0.0.1
   - c.0.0.1

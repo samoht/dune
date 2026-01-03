@@ -21,8 +21,8 @@ Create a fake project and lock it:
   > EOF
   $ add_mock_repo_if_needed
   $ dune_pkg_lock_normalized
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - foo.0.0.1
 
 As the lock file is syncronised with `dune-pkg`, the build succeeds:
@@ -47,8 +47,8 @@ It fails as we have not regenerated the lock:
 
 We fix it and the build succeeds again:
   $ dune_pkg_lock_normalized
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (2 packages):
+  opam:
   - bar.0.0.1
   - foo.0.0.1
   $ build_pkg foo

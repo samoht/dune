@@ -27,7 +27,7 @@ specify it in the context.
 Specifying the directory to the lock command should work:
 
   $ dune_pkg_lock_normalized foo.lock
-  Solution for foo.lock:
-  opam sandbox:
+  Solution for foo.lock (2 packages):
+  opam:
   - a.0.0.1
   - b.0.0.1

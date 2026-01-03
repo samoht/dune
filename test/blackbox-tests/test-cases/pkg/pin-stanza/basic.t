@@ -23,8 +23,8 @@ in any repository
   > EOF
 
   $ dune_pkg_lock_normalized
-  Solution for dune.lock:
-  duniverse (dune-built):
+  Solution for dune.lock (1 package):
+  dune:
   - foo.1.0.0
 
 

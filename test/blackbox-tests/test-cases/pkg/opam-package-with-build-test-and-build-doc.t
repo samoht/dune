@@ -12,8 +12,8 @@ In this test we demonstrate that we don't currently do anything special with tho
   > EOF
 
   $ solve with-build-test-doc
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (1 package):
+  opam:
   - with-build-test-doc.0.0.1
 The lockfile should contain the `build-test` and `build-doc` fields inside the build
 action.

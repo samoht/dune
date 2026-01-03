@@ -25,8 +25,8 @@ Notice that the constraints field doesn't introduce additional packages. The
   >  (name x)
   >  (depends foo bar))
   > EOF
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (2 packages):
+  opam:
   - bar.1.0.0
   - foo.1.0.0
 
@@ -70,7 +70,7 @@ If we add one:
   >  (name x)
   >  (depends foo bar))
   > EOF
-  Solution for dune.lock:
-  opam sandbox:
+  Solution for dune.lock (2 packages):
+  opam:
   - bar.1.9.1
   - foo.0.9.0
