@@ -230,6 +230,18 @@ module File : sig
   val write_to_disk : lock_file_path:Path.t -> t -> unit
 end
 
+(** Format of the lock on disk *)
+module Lock_format : sig
+  type t =
+    | Directory (** dune.lock/ directory with lock.dune and .pkg files *)
+    | Single_file (** Single dune.lock file with repos and versions *)
+
+  (** [detect path] determines whether the path is a directory or single-file lock.
+      Returns [None] if the path doesn't exist or is neither a valid lock directory
+      nor a valid lock file. *)
+  val detect : Path.t -> t option
+end
+
 module Write_disk : sig
   type lock_dir := t
   type t
@@ -246,6 +258,10 @@ end
 
 val read_disk : Path.t -> (t, User_message.t) result
 val read_disk_exn : Path.t -> t
+
+(** To read a single-file lock format, use:
+    1. Parse with [Io.with_lexbuf_from_file] and [File.decode]
+    2. Convert to [t] with [Lock_pkg.file_to_lock] *)
 
 module Make_load (Io : sig
     include Monad.S
