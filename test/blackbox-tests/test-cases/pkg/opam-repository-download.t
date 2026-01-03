@@ -28,6 +28,7 @@ Make a mock repo tarball that will get used by dune to download the package
 
   $ dune_pkg_lock_normalized
   Solution for dune.lock:
+  opam sandbox:
   - bar.0.0.1
   - foo.0.0.1
 
@@ -47,6 +48,7 @@ other systems and thus shouldn't be included.
   $ add_mock_repo_if_needed "file://$(pwd)/mock-opam-repository"
   $ dune_pkg_lock_normalized
   Solution for dune.lock:
+  opam sandbox:
   - bar.0.0.1
   - foo.0.0.1
 
@@ -69,6 +71,7 @@ in the repo and make sure it locks the older version.
   $ add_mock_repo_if_needed "git+file://$(pwd)/mock-opam-repository#${REPO_HASH}"
   $ dune_pkg_lock_normalized
   Solution for dune.lock:
+  opam sandbox:
   - bar.0.0.1
   - foo.0.0.1
   $ grep "mock-opam-repository#$REPO_HASH" ${default_lock_dir}/lock.dune > /dev/null
@@ -80,6 +83,7 @@ repository and thus the new foo package.
   $ add_mock_repo_if_needed "git+file://$(pwd)/mock-opam-repository"
   $ dune_pkg_lock_normalized
   Solution for dune.lock:
+  opam sandbox:
   - bar.0.0.1
   - foo.0.1.0
   $ grep "mock-opam-repository#$NEW_REPO_HASH" ${default_lock_dir}/lock.dune > /dev/null
@@ -110,6 +114,7 @@ So now the test should work as it can't access the repo:
   $ rm -r ${default_lock_dir}
   $ dune_pkg_lock_normalized
   Solution for dune.lock:
+  opam sandbox:
   - bar.0.0.1
   - foo.0.1.0
 
@@ -122,6 +127,7 @@ restored the repo to where it was before)
   $ rm -r ${default_lock_dir}
   $ dune_pkg_lock_normalized
   Solution for dune.lock:
+  opam sandbox:
   - bar.1.0.0
   - foo.0.1.0
 
@@ -147,6 +153,7 @@ Locking that branch should work and pick `bar.2.0.0`:
   $ rm -r ${default_lock_dir}
   $ dune_pkg_lock_normalized
   Solution for dune.lock:
+  opam sandbox:
   - bar.2.0.0
   - foo.0.1.0
 
@@ -173,5 +180,6 @@ So we should get `bar.1.0.0` when locking.
   $ rm -r ${default_lock_dir}
   $ dune_pkg_lock_normalized
   Solution for dune.lock:
+  opam sandbox:
   - bar.1.0.0
   - foo.0.1.0

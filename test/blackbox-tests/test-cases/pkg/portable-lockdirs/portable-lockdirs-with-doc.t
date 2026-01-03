@@ -29,6 +29,7 @@ dune-workspace.
   Solution for dune.lock
   
   Dependencies common to all supported platforms:
+  opam sandbox:
   - foo.0.0.1
 
 The list-locked-dependencies command does some validation that there are no

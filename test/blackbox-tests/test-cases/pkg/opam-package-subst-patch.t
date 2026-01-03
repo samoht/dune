@@ -15,6 +15,7 @@ Make a package with a substs and patches field field
 
   $ solve with-substs-and-patches
   Solution for dune.lock:
+  opam sandbox:
   - with-substs-and-patches.0.0.1
   $ append_to_lockpkg with-substs-and-patches.0.0.1 <<EOF
   > (source (copy $PWD/source))

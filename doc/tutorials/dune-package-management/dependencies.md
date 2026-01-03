@@ -169,6 +169,26 @@ your project depends on it, thus if it is a transitive dependency.
 :::
 
 
+## Editor Integration with Dependencies
+
+When you add a dependency that uses Dune as its build system, Dune places
+its source code in the `duniverse/` directory. This enables full editor
+integration:
+
+* **Go to definition**: Merlin and LSP can navigate into the source code of
+  your dependencies, not just to the interface.
+
+* **Edit dependencies**: You can modify dependency code directly for debugging
+  or contributing patches upstream.
+
+To fetch duniverse package sources explicitly, use:
+
+```sh
+$ dune pkg fetch
+```
+
+See {doc}`locking` for more details on the duniverse workflow.
+
 ## External Dependencies
 
 Many packages also declare external system dependencies ("depexts") that must

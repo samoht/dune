@@ -32,6 +32,7 @@ Run the solver and generate a lock directory.
 
   $ dune_pkg_lock_normalized
   Solution for dune.lock:
+  opam sandbox:
   - bar.0.5.0
   - baz.0.1.0
   - foo.0.0.1
@@ -94,6 +95,7 @@ Print the contents of each file in the lockdir:
 Run the solver again preferring oldest versions of dependencies:
   $ dune_pkg_lock_normalized --version-preference=oldest
   Solution for dune.lock:
+  opam sandbox:
   - bar.0.4.0
   - baz.0.1.0
   - foo.0.0.1
@@ -168,14 +170,14 @@ Run the solver again. This time it will fail.
   - bar -> (problem)
       No usable implementations:
         bar.0.5.0:
-          Package does not satisfy constraints of local package
-          lockfile_generation_test
+          Rejected by depends of local package lockfile_generation_test
+          (constraint: >= 0.6)
         bar.0.4.0:
-          Package does not satisfy constraints of local package
-          lockfile_generation_test
+          Rejected by depends of local package lockfile_generation_test
+          (constraint: >= 0.6)
         bar.0.0.1:
-          Package does not satisfy constraints of local package
-          lockfile_generation_test
+          Rejected by depends of local package lockfile_generation_test
+          (constraint: >= 0.6)
   [1]
 
 We'll also test how the lockfile generation works with alternate solutions.
@@ -197,6 +199,7 @@ both.
 
   $ dune_pkg_lock_normalized
   Solution for dune.lock:
+  opam sandbox:
   - bar.0.5.0
   - bar-or-baz.0.0.1
 Top level or is simple, but does nested or work? nested-r defines nested or
@@ -221,6 +224,7 @@ well as bar or qux.
 
   $ dune_pkg_lock_normalized
   Solution for dune.lock:
+  opam sandbox:
   - bar.0.5.0
   - baz.0.1.0
   - nested-or.0.0.1
@@ -241,6 +245,7 @@ in between.
 
   $ dune_pkg_lock_normalized
   Solution for dune.lock:
+  opam sandbox:
   - bar.0.5.0
   - priorities.0.0.1
   - quux.0.0.1
@@ -268,5 +273,6 @@ we'd expect version 2 to be chosen:
 
   $ dune_pkg_lock_normalized
   Solution for dune.lock:
+  opam sandbox:
   - negation.0.0.1
   - pkg.2

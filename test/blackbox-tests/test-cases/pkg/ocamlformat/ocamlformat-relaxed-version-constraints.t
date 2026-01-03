@@ -29,6 +29,7 @@ This should choose the 0.24+foo version:
   $ echo "version=0.24" > .ocamlformat
   $ DUNE_CONFIG__LOCK_DEV_TOOL=enabled dune fmt
   Solution for _build/.dev-tools.locks/ocamlformat:
+  opam sandbox:
   - ocamlformat.0.24+foo
   File "foo.ml", line 1, characters 0-0:
   Error: Files _build/default/foo.ml and _build/default/.formatted/foo.ml
@@ -44,6 +45,7 @@ This should choose the 0.24+bar version:
   $ rm -r "${dev_tool_lock_dir}"
   $ DUNE_CONFIG__LOCK_DEV_TOOL=enabled dune fmt
   Solution for _build/.dev-tools.locks/ocamlformat:
+  opam sandbox:
   - ocamlformat.0.25+bar
   File "foo.ml", line 1, characters 0-0:
   Error: Files _build/default/foo.ml and _build/default/.formatted/foo.ml
@@ -66,9 +68,9 @@ This should fail as there is no version matching 0.24.1:
   - ocamlformat -> (problem)
       No usable implementations:
         ocamlformat.0.25+bar:
-          Package does not satisfy constraints of local package
-          ocamlformat_dev_tool_wrapper
+          Rejected by depends of local package ocamlformat_dev_tool_wrapper
+          (constraint: >= 0.24.1 & <= 0.24.1___MAX_VERSION)
         ocamlformat.0.24+foo:
-          Package does not satisfy constraints of local package
-          ocamlformat_dev_tool_wrapper
+          Rejected by depends of local package ocamlformat_dev_tool_wrapper
+          (constraint: >= 0.24.1 & <= 0.24.1___MAX_VERSION)
   [1]

@@ -28,6 +28,7 @@ should favor the dune metadata in such a case.
 
   $ dune_pkg_lock_normalized
   Solution for dune.lock:
+  duniverse (dune-built):
   - bar.dev
   - foo.dev
 

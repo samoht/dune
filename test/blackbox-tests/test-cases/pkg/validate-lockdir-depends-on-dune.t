@@ -14,6 +14,7 @@ Reproduce internal error with dune pkg validate-lockdir in #11188.
   >   a))
   > EOF
   Solution for dune.lock:
+  opam sandbox:
   - a.0.0.1
 
 Dune is able to verify this lock directory correctly:

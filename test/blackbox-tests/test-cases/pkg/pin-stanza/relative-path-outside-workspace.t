@@ -45,6 +45,7 @@ Make a second package depending on the first via a pin:
 Lock and build the second package to demonstrate that everything works so far:
   $ dune_pkg_lock_normalized
   Solution for dune.lock:
+  duniverse (dune-built):
   - foo.dev
   $ dune exec ./bar.exe
   foo

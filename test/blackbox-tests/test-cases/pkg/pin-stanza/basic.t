@@ -24,6 +24,7 @@ in any repository
 
   $ dune_pkg_lock_normalized
   Solution for dune.lock:
+  duniverse (dune-built):
   - foo.1.0.0
 
 

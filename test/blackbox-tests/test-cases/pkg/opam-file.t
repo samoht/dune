@@ -24,6 +24,7 @@ of the disjunction to be picked for a solution:
   > EOF
   $ dune_pkg_lock_normalized
   Solution for dune.lock:
+  opam sandbox:
   - a.0.0.1
 
 With the right filters, the other side of the disjunction should get picked:
@@ -36,6 +37,7 @@ With the right filters, the other side of the disjunction should get picked:
   > EOF
   $ dune_pkg_lock_normalized
   Solution for dune.lock:
+  opam sandbox:
   - b.0.0.1
 
 Unreachable packages should not be included. In the next test, "b" should not

@@ -109,6 +109,7 @@ url and the extra source.
   $ add_mock_repo_if_needed
   $ dune_pkg_lock_normalized
   Solution for dune.lock:
+  duniverse (dune-built):
   - needs-patch.0.0.1
 
   $ dune_cmd subst 'md5=[0-9a-f]+' 'md5=$HASH'< "${default_lock_dir}/needs-patch.0.0.1.pkg"
@@ -169,6 +170,7 @@ Lock the project to use that new package
 
   $ dune_pkg_lock_normalized
   Solution for dune.lock:
+  duniverse (dune-built):
   - needs-patch.0.0.2
 
 Running the binary should work and output the double patched message:

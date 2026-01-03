@@ -10,6 +10,7 @@ Make a package with a depopts field
 
   $ solve with-depopts
   Solution for dune.lock:
+  opam sandbox:
   - with-depopts.0.0.1
 
 When depopts are supported and selected, the above lock should change and we
@@ -31,6 +32,7 @@ Depopts should not be selected if they conflict with other constraints:
 
   $ solve no-foo
   Solution for dune.lock:
+  opam sandbox:
   - no-foo.0.0.1
   - with-depopts.0.0.1
 

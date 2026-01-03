@@ -35,5 +35,6 @@ We can override the sources set by packages we're fetching:
 
   $ dune_pkg_lock_normalized
   Solution for dune.lock:
+  duniverse (dune-built):
   - bar.dev
   - foo.dev

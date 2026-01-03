@@ -153,7 +153,6 @@ let pp_packages_by_target packages =
   in
   match sections with
   | [] -> Pp.nop
-  | [ (_, pkgs) ] -> pp_packages pkgs
   | _ ->
     let pp_section (label, pkgs) =
       Pp.concat ~sep:Pp.cut [ Pp.verbatim (label ^ ":"); pp_packages pkgs ]

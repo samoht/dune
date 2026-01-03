@@ -22,6 +22,7 @@ Create .ocamlformat file
 Install ocamlformat. 0.26.0 should be installed because that's the version in .ocamlformat.
   $ dune tools install ocamlformat
   Solution for _build/.dev-tools.locks/ocamlformat:
+  duniverse (dune-built):
   - ocamlformat.0.26.0
 
 Change the version in .ocamlformat.
@@ -35,4 +36,5 @@ Install ocamlformat again. Dune should detect that the version has changed and r
   for 0.26.0 of the tool, whereas version 0.27.0 now needs to be installed. The
   tool will now be re-locked.
   Solution for _build/.dev-tools.locks/ocamlformat:
+  duniverse (dune-built):
   - ocamlformat.0.27.0

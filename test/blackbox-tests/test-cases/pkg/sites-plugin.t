@@ -151,6 +151,7 @@ We should observe the same behaviour that when running test above.
 
   $ dune_pkg_lock_normalized
   Solution for dune.lock:
+  duniverse (dune-built):
   - app.0.0.1
   - plugin1.0.0.1
   $ dune build @runtest 2>&1 | dune_cmd sanitize

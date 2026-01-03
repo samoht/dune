@@ -34,9 +34,11 @@
   >  (depends bar))
   > EOF
   Solution for dune.lock:
+  opam sandbox:
   - bar.0.0.1
   - foo.0.0.1
   Solution for dune.workspace.lock:
+  opam sandbox:
   - bar.0.0.1
   - foo.0.0.1
 

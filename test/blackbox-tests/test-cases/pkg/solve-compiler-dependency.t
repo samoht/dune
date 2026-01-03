@@ -29,6 +29,7 @@ When the latest version of all packages is the same, the ocaml-base-compiler
 package is chosen, which is what we want.
   $ solve ocaml
   Solution for dune.lock:
+  opam sandbox:
   - ocaml.5.2.0
   - ocaml-base-compiler.5.2.0
 
@@ -43,6 +44,7 @@ solver respects the avoid-version flag between multiple versions of
 the same package.
   $ solve ocaml
   Solution for dune.lock:
+  opam sandbox:
   - ocaml.5.2.0
   - ocaml-base-compiler.5.2.0
 
@@ -67,6 +69,7 @@ version of ocaml-base-compiler without the avoid-version flag is
 unstable.
   $ solve ocaml
   Solution for dune.lock:
+  opam sandbox:
   - ocaml.5.2.0
   - ocaml-base-compiler.5.2.0
 
@@ -78,6 +81,7 @@ other choices:
   > EOF
   $ solve edgy
   Solution for dune.lock:
+  opam sandbox:
   - edgy.1.0
   - ocaml.5.3.0
   - ocaml-variants.5.3.0+trunk (this version should be avoided)
@@ -87,6 +91,7 @@ other choices:
   > EOF
   $ solve edgy
   Solution for dune.lock:
+  opam sandbox:
   - edgy.1.0
   - ocaml.5.2.0
   - ocaml-base-compiler.5.2.0+alpha1 (this version should be avoided)

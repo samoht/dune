@@ -11,6 +11,7 @@ Test conversion of opam sources into lock dir package specifications
 
   $ solve testpkg
   Solution for dune.lock:
+  opam sandbox:
   - testpkg.0.0.1
 
   $ showpkg() {
@@ -38,6 +39,7 @@ Test conversion of opam sources into lock dir package specifications
 
   $ solve testpkg
   Solution for dune.lock:
+  opam sandbox:
   - testpkg.0.0.1
 
   $ showpkg | dune_cmd subst "$PWD" '<pwd>'
@@ -63,6 +65,7 @@ Unsupported backends:
 
   $ solve testpkg 2>&1
   Solution for dune.lock:
+  opam sandbox:
   - testpkg.0.0.1
   $ showpkg
   (version 0.0.1)
@@ -84,6 +87,7 @@ git+http
 
   $ solve testpkg 2>&1
   Solution for dune.lock:
+  opam sandbox:
   - testpkg.0.0.1
   $ showpkg
   (version 0.0.1)
@@ -104,6 +108,7 @@ git+file
   > EOF
   $ solve testpkg 2>&1
   Solution for dune.lock:
+  opam sandbox:
   - testpkg.0.0.1
   $ showpkg
   (version 0.0.1)
@@ -124,6 +129,7 @@ git+foobar
   > EOF
   $ solve testpkg 2>&1
   Solution for dune.lock:
+  opam sandbox:
   - testpkg.0.0.1
   $ showpkg
   (version 0.0.1)
@@ -144,6 +150,7 @@ file+git
   > EOF
   $ solve testpkg 2>&1
   Solution for dune.lock:
+  opam sandbox:
   - testpkg.0.0.1
   $ showpkg
   (version 0.0.1)

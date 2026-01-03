@@ -58,6 +58,7 @@ Lock and build with explicit dune pkg lock:
   Solution for dune.lock
   
   Dependencies common to all supported platforms:
+  duniverse (dune-built):
   - foo.0.0.1
 
   $ dune exec --display short bar 2>&1 | grep "Building"

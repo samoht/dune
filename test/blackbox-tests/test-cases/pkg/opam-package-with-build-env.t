@@ -12,6 +12,7 @@ Make a package with a build-env field
 
   $ solve with-build-env
   Solution for dune.lock:
+  opam sandbox:
   - with-build-env.0.0.1
 The lockfile should contain a setenv action.
 

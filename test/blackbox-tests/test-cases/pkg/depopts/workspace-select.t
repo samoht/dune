@@ -29,6 +29,7 @@ Select just foo
 
   $ dune_pkg_lock_normalized
   Solution for dune.lock:
+  opam sandbox:
   - foo.0.0.1
 
 Select both foo and bar
@@ -45,6 +46,7 @@ Select both foo and bar
 
   $ dune_pkg_lock_normalized
   Solution for dune.lock:
+  opam sandbox:
   - bar.0.0.1
   - foo.0.0.1
 

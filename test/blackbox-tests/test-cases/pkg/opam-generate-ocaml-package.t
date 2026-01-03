@@ -10,6 +10,7 @@ To mark it, we use `conflict-class: "ocaml-core-compiler"`
 
   $ solve foocaml
   Solution for dune.lock:
+  opam sandbox:
   - foocaml.0.0.1
 
   $ grep ocaml ${default_lock_dir}/lock.dune

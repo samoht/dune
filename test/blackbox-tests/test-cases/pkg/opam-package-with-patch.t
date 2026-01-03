@@ -22,6 +22,7 @@ Make a package with a patch
 
   $ solve with-patch
   Solution for dune.lock:
+  opam sandbox:
   - with-patch.0.0.1
   $ append_to_lockpkg with-patch.0.0.1 <<EOF
   > (source (copy $PWD/source))

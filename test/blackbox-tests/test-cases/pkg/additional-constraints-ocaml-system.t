@@ -34,6 +34,7 @@ Try solving without additional constraints:
   $ add_mock_repo_if_needed
   $ dune_pkg_lock_normalized
   Solution for dune.lock:
+  opam sandbox:
   - ocaml.0.0.1
   - ocaml-base-compiler.0.0.1
 
@@ -51,5 +52,6 @@ Now make a workspace file adding the constarint on ocaml-system:
 Solve again. This time ocaml-system is chosen.
   $ dune_pkg_lock_normalized
   Solution for dune.lock:
+  opam sandbox:
   - ocaml.0.0.1
   - ocaml-system.0.0.1

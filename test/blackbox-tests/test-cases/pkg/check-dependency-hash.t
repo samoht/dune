@@ -58,6 +58,7 @@ Add a non-local dependency to the package:
   >  (depends a))
   > EOF
   Solution for dune.lock:
+  opam sandbox:
   - a.0.0.1
   $ cat ${default_lock_dir}/lock.dune
   (lang package 0.1)

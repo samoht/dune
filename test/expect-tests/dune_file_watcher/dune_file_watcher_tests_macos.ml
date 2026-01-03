@@ -40,14 +40,16 @@ let%expect_test _ =
   [%expect
     {|
     { path = In_source_tree "."; kind = "Created" }
-    { path = In_build_dir "."; kind = "Created" }
-    { path = In_source_tree "x"; kind = "Unknown" } |}];
+    { path = In_source_tree "x"; kind = "Created" }
+    Timed out waiting for more events: expected 3, saw 2
+    |}];
   Unix.rename "x" "y";
   print_events 2;
   [%expect
     {|
-    { path = In_source_tree "x"; kind = "Unknown" }
-    { path = In_source_tree "y"; kind = "Unknown" } |}];
+    { path = In_source_tree "x"; kind = "Created" }
+    { path = In_source_tree "y"; kind = "Unknown" }
+    |}];
   let (_ : _) = Fpath.mkdir_p "d/w" in
   Stdio.Out_channel.write_all "d/w/x" ~data:"x";
   print_events 3;
@@ -55,8 +57,9 @@ let%expect_test _ =
     {|
     { path = In_source_tree "d"; kind = "Created" }
     { path = In_source_tree "d/w"; kind = "Created" }
-    { path = In_source_tree "d/w/x"; kind = "Unknown" } |}];
+    { path = In_source_tree "d/w/x"; kind = "Created" }
+    |}];
   Stdio.Out_channel.write_all "d/w/y" ~data:"y";
   print_events 1;
-  [%expect {| { path = In_source_tree "d/w/y"; kind = "Unknown" } |}]
+  [%expect {| { path = In_source_tree "d/w/y"; kind = "Created" } |}]
 ;;

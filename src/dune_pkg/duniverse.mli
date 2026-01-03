@@ -36,3 +36,8 @@ val classify : Lock_dir.Pkg.t -> package_target
     package name to target. Packages that use dune go to duniverse,
     others go to opam sandbox. *)
 val classify_all : Lock_dir.Pkg.t Package_name.Map.t -> package_target Package_name.Map.t
+
+(** [get_patches pkg ~platform] extracts patch file paths from the package's
+    build command for the given platform. Patches are returned in the order
+    they should be applied. *)
+val get_patches : Lock_dir.Pkg.t -> platform:Solver_env.t -> String_with_vars.t list

@@ -52,9 +52,17 @@ module Priority = struct
 end
 
 module Context = struct
+  type constraint_kind =
+    | Depends
+    | Conflicts
+
   type rejection =
     | Unavailable
-    | Refuted_by of Package_name.t
+    | Refuted_by of
+        { local_package : Package_name.t
+        ; constraint_kind : constraint_kind
+        ; version_formula : OpamFormula.version_formula option
+        }
 
   let local_package_default_version =
     Package_version.to_opam_package_version Lock_dir.Pkg_info.default_version
@@ -153,12 +161,37 @@ module Context = struct
     }
   ;;
 
+  let string_of_version_constraint (rel, v) =
+    let string_of_relop =
+      let pos = { OpamParserTypes.FullPos.filename = ""; start = 0, 0; stop = 0, 0 } in
+      fun pelem -> OpamPrinter.FullPos.relop { pelem; pos }
+    in
+    Printf.sprintf "%s %s" (string_of_relop rel) (OpamPackage.Version.to_string v)
+  ;;
+
+  let pp_version_formula = function
+    | None -> Pp.nop
+    | Some OpamFormula.Empty -> Pp.nop
+    | Some formula ->
+      let str = OpamFormula.string_of_formula string_of_version_constraint formula in
+      Pp.textf " (constraint: %s)" str
+  ;;
+
   let pp_rejection = function
     | Unavailable -> Pp.paragraph "Availability condition not satisfied"
-    | Refuted_by pkg ->
-      Pp.paragraphf
-        "Package does not satisfy constraints of local package %s"
-        (Package_name.to_string pkg)
+    | Refuted_by { local_package; constraint_kind; version_formula } ->
+      let kind_str =
+        match constraint_kind with
+        | Depends -> "depends"
+        | Conflicts -> "conflicts"
+      in
+      Pp.hovbox
+        (Pp.seq
+           (Pp.textf
+              "Rejected by %s of local package %s"
+              kind_str
+              (Package_name.to_string local_package))
+           (pp_version_formula version_formula))
   ;;
 
   let eval_to_bool (filter : OpamTypes.filter) : (bool, [> `Not_a_bool of string ]) result
@@ -247,47 +280,81 @@ module Context = struct
          ~formula:filtered_formula
   ;;
 
-  exception Found of Package_name.t
+  type refutation =
+    { local_package : Package_name.t
+    ; constraint_kind : constraint_kind
+    ; version_formula : OpamFormula.version_formula option
+    }
+
+  exception Found of refutation
+
+  (* Extract the version formula that applies to the given package name from a formula *)
+  let extract_version_formula package_name formula =
+    let result = ref None in
+    OpamFormula.iter
+      (fun (name', f) ->
+         if OpamPackage.Name.equal name' package_name then result := Some f)
+      formula;
+    !result
+  ;;
 
   let try_refute t package =
     let version = OpamPackage.version package in
+    let package_name = OpamPackage.name package in
     match
-      let name = Package_name.of_opam_package_name (OpamPackage.name package) in
+      let name = Package_name.of_opam_package_name package_name in
       Table.find (Lazy.force t.local_constraints) name
     with
     | None -> None
     | Some local_packages ->
       (try
          List.iter local_packages ~f:(fun pkg ->
+           let depends_formula = Lazy.force pkg.depends in
            match
              match
-               Lazy.force pkg.depends
+               depends_formula
                |> OpamFormula.partial_eval (fun (name', f) ->
-                 if OpamPackage.Name.equal name' (OpamPackage.name package)
+                 if OpamPackage.Name.equal name' package_name
                  then
                    if OpamFormula.check_version_formula f version then `True else `False
                  else `Formula (Atom (name', f)))
              with
-             | `False -> `Reject
+             | `False -> `Reject_depends
              | `Formula _ | `True ->
+               let conflicts_formula = Lazy.force pkg.conflicts in
                (match
-                  Lazy.force pkg.conflicts
+                  conflicts_formula
                   |> OpamFormula.partial_eval (fun (name', f) ->
-                    if OpamPackage.Name.equal name' (OpamPackage.name package)
+                    if OpamPackage.Name.equal name' package_name
                     then
                       if OpamFormula.check_version_formula f version
                       then `True
                       else `False
                     else `Formula (Atom (name', f)))
                 with
-                | `True -> `Reject
+                | `True -> `Reject_conflicts
                 | `Formula _ | `False -> `Continue)
            with
            | `Continue -> ()
-           | `Reject -> raise_notrace (Found pkg.name));
+           | `Reject_depends ->
+             raise_notrace
+               (Found
+                  { local_package = pkg.name
+                  ; constraint_kind = Depends
+                  ; version_formula = extract_version_formula package_name depends_formula
+                  })
+           | `Reject_conflicts ->
+             let conflicts_formula = Lazy.force pkg.conflicts in
+             raise_notrace
+               (Found
+                  { local_package = pkg.name
+                  ; constraint_kind = Conflicts
+                  ; version_formula =
+                      extract_version_formula package_name conflicts_formula
+                  }));
          None
        with
-       | Found p -> Some p)
+       | Found r -> Some r)
   ;;
 
   let repo_candidate t name =
@@ -316,9 +383,11 @@ module Context = struct
         priority, result)
     in
     let rejected =
-      List.map rejected ~f:(fun (version, rejected_by) ->
-        let priority = Priority.rejected version in
-        priority, Error (Refuted_by rejected_by))
+      List.map
+        rejected
+        ~f:(fun (version, { local_package; constraint_kind; version_formula }) ->
+          let priority = Priority.rejected version in
+          priority, Error (Refuted_by { local_package; constraint_kind; version_formula }))
     in
     let available =
       rejected @ available

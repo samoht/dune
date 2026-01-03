@@ -538,6 +538,7 @@ let main =
             ; "Dune_util"
             ; "Dune_upgrader"
             ; "Dune_pkg"
+            ; "Dune_patch"
             ; "Cmdliner"
             ; "Cmdliner_arg"
             ; "Cmdliner_base"

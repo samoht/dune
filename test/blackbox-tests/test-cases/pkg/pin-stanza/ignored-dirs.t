@@ -34,4 +34,5 @@ should be ignored.
 
   $ dune_pkg_lock_normalized
   Solution for dune.lock:
+  duniverse (dune-built):
   - foo.dev

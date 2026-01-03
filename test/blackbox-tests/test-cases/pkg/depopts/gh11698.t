@@ -26,4 +26,5 @@ Reproduce the bug in #11698
   >  (depends dep))
   > EOF
   Solution for dune.lock:
+  duniverse (dune-built):
   - dep.1.0.0

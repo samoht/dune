@@ -25,6 +25,7 @@ Demonstrate the translation of filtered dependencies
 
   $ solve bar 2>/dev/null
   Solution for dune.lock:
+  opam sandbox:
   - bar.0.0.1
   - pkg-build.0.0.1
 

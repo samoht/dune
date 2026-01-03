@@ -186,16 +186,82 @@ When building, Dune will read the information from the lock directory and set
 up rules for the packages. Check {doc}`/explanation/mental-model` for details
 about rules.
 
-The rules that the package management sets up include:
+Dune classifies packages into two categories based on their build system:
+
+* **Duniverse packages** (dune-built): Packages that use Dune as their build
+  system are placed in a `duniverse/` directory and built alongside your
+  project code in the same build context.
+
+* **Opam sandbox packages**: Packages that use other build systems (make,
+  autoconf, etc.) are built in a separate sandbox, similar to how opam builds
+  packages.
+
+When you run `dune pkg lock`, the output shows which packages fall into each
+category:
+
+```
+$ dune pkg lock
+Solution for dune.lock
+
+Dependencies common to all supported platforms:
+duniverse (dune-built):
+- base.v0.16.3
+- ppx_sexp_conv.v0.16.0
+- sexplib0.v0.16.0
+
+opam sandbox:
+- conf-gmp.4
+- zarith.1.14
+```
+
+#### Duniverse: Full Editor Integration
+
+The duniverse approach provides significant advantages for development:
+
+* **Full editor tooling**: Merlin and LSP can navigate into dependency source
+  code, not just to the first jump point. You can "go to definition" all the
+  way through your dependency chain.
+
+* **Editable dependencies**: You can modify dependency code directly in the
+  `duniverse/` directory. Changes are picked up immediately on rebuild.
+
+* **Unified build**: Everything builds in one dune context, so there's no
+  separate "install" step for duniverse packages.
+
+To fetch duniverse package sources before building:
+
+```
+$ dune pkg fetch
+Fetching base.v0.16.3 to duniverse/base.v0.16.3
+Fetching ppx_sexp_conv.v0.16.0 to duniverse/ppx_sexp_conv.v0.16.0
+Fetching sexplib0.v0.16.0 to duniverse/sexplib0.v0.16.0
+Fetched 3 duniverse package(s) to duniverse/
+```
+
+The `duniverse/` directory is automatically treated as vendored, which means:
+- Warnings are suppressed
+- Tests are not run by default
+- The directory can optionally be committed to version control
+
+:::{note}
+The duniverse workflow is inspired by
+[opam-monorepo](https://github.com/tarides/opam-monorepo), but integrated
+directly into Dune and with automatic fallback to sandbox builds for non-Dune
+packages.
+:::
+
+#### Opam Sandbox Packages
+
+For packages that don't use Dune as their build system, the rules include:
 
 * Fetch rules to download and unpack the source archives, and also download any
-additional sources such as patches
+  additional sources such as patches
 * Build rules to execute the build instructions stored in the lock directory
 * Install rules to put the artifacts that were built into the appropriate
   Dune-managed folders
 
-Creating these processes as rules mean that they will only be executed on
-demand, so if the project has already downloaded the sources, it does not need
+Creating these processes as rules means that they will only be executed on
+demand. If the project has already downloaded the sources, it does not need
 to download them again. Likewise, if packages are installed, they stay
 installed.
 
@@ -208,8 +274,22 @@ build.
 ## Packaging for Dune Compatibility
 
 Dune can build and install most packages as dependencies, even if they are not
-built with Dune themselves. Dune will execute the build instructions from the
-lock directory, very similar to opam.
+built with Dune themselves.
+
+### Dune Packages (Duniverse)
+
+Packages that use Dune as their build system get the best experience. They are:
+
+* Built alongside your project code in the same context
+* Fully navigable in editors (Merlin/LSP)
+* Editable for local modifications
+
+No special compatibility considerations are needed for Dune packages.
+
+### Non-Dune Packages (Opam Sandbox)
+
+Packages that use other build systems are built in a sandbox. Dune will execute
+the build instructions from the lock directory, very similar to opam.
 
 However, packages must adhere to certain rules to be compatible with Dune.
 

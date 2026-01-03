@@ -37,6 +37,7 @@ Test that we can identify the test-only locked dependencies of a package
   >   (qux :with-test)))
   > EOF
   Solution for dune.lock:
+  opam sandbox:
   - a.0.0.2
   - b.0.0.1
   - bar.0.0.1
@@ -85,6 +86,7 @@ is run with with-test=true so the dependency won't even be in the lockdir.
   >   bar))
   > EOF
   Solution for dune.lock:
+  opam sandbox:
   - b.0.0.1
   - bar.0.0.1
   - c.0.0.1
@@ -112,6 +114,7 @@ incompatible version of the dependency will be in the lockdir.
   >   bar))
   > EOF
   Solution for dune.lock:
+  opam sandbox:
   - a.0.0.2
   - b.0.0.1
   - bar.0.0.1

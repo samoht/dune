@@ -19,6 +19,7 @@ We don't need bar, so we skip it
 
   $ solve foo
   Solution for dune.lock:
+  opam sandbox:
   - foo.0.0.1
 
   $ cat ${default_lock_dir}/foo.0.0.1.pkg
@@ -37,6 +38,7 @@ Self dependency
 
   $ solve foo
   Solution for dune.lock:
+  opam sandbox:
   - foo.0.0.1
 
   $ cat ${default_lock_dir}/foo.0.0.1.pkg
@@ -54,6 +56,7 @@ Using post to break cycle:
 
   $ solve bar
   Solution for dune.lock:
+  opam sandbox:
   - bar.0.0.1
   - foo.0.0.1
 
@@ -76,6 +79,7 @@ post "cycle":
 
   $ solve foo
   Solution for dune.lock:
+  opam sandbox:
   - foo.0.0.1
 
   $ cat ${default_lock_dir}/foo.0.0.1.pkg
@@ -91,4 +95,5 @@ In depopts:
 
   $ solve foo
   Solution for dune.lock:
+  opam sandbox:
   - foo.0.0.1

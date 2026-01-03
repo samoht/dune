@@ -39,12 +39,14 @@ Here is the output of solving for multiple contexts:
   >  (depends A B C))
   > EOF
   Solution for dune.lock:
+  opam sandbox:
   - A.1.2.0
   - B.2.1+rc1
   - C.81.0.4044.138
   - D.0.4.0.beta1
   - E.3.0~alpha1
   Solution for foo.lock:
+  opam sandbox:
   - A.1.2.0
   - B.2.1+rc1
   - C.81.0.4044.138

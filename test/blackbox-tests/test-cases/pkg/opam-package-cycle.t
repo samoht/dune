@@ -16,16 +16,19 @@ Solver doesn't complain about cycles.
 
   $ solve a
   Solution for dune.lock:
+  opam sandbox:
   - a.0.0.1
   - b.0.0.1
   - c.0.0.1
   $ solve b
   Solution for dune.lock:
+  opam sandbox:
   - a.0.0.1
   - b.0.0.1
   - c.0.0.1
   $ solve c
   Solution for dune.lock:
+  opam sandbox:
   - a.0.0.1
   - b.0.0.1
   - c.0.0.1

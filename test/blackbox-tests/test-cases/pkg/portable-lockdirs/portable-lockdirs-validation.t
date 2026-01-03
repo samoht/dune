@@ -31,6 +31,7 @@ Solve dependencies:
   Solution for dune.lock
   
   Dependencies common to all supported platforms:
+  opam sandbox:
   - a.0.0.1
   - b.0.0.2
   - c.0.0.1

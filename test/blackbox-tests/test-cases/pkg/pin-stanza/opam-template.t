@@ -29,6 +29,7 @@ command is currently not respected when the package is pinned.
 
   $ dune_pkg_lock_normalized
   Solution for dune.lock:
+  duniverse (dune-built):
   - opam-template.dev
   $ build_pkg opam-template
 

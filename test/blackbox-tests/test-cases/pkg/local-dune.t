@@ -20,5 +20,6 @@ Dune is defined in the workspace where we're solving
   >  (depends bar))
   > EOF
   Solution for dune.lock:
+  opam sandbox:
   - bar.0.0.1
   - test-dep.0.0.1

@@ -51,6 +51,7 @@ Solve the project:
   Solution for dune.lock
   
   Dependencies common to all supported platforms:
+  opam sandbox:
   - foo.0.0.1
 
 Confirming that the build action creates the conditional file:

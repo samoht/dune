@@ -32,6 +32,7 @@ Local pinned source.
   > EOF
   $ runtest "file://$PWD/$dir"
   Solution for dune.lock:
+  opam sandbox:
   - bar.1.0.0
   (version 1.0.0)
   (dev)
@@ -46,6 +47,7 @@ Local pinned source.
   > EOF
   $ runtest "file://$PWD/$dir"
   Solution for dune.lock:
+  opam sandbox:
   - bar.1.0.0
   (version 1.0.0)
   (dev)
@@ -60,6 +62,7 @@ Local pinned source.
   > EOF
   $ runtest "file://$PWD/$dir"
   Solution for dune.lock:
+  opam sandbox:
   - bar.1.0.0
   (version 1.0.0)
   (dev)
@@ -74,6 +77,7 @@ Local pinned source.
   > EOF
   $ runtest "file://$PWD/$dir"
   Solution for dune.lock:
+  opam sandbox:
   - bar.1.0.0
   (version 1.0.0)
   (dev)
@@ -93,6 +97,7 @@ Git pinned source:
   $ cd ..
   $ runtest "git+file://$PWD/$dir"
   Solution for dune.lock:
+  opam sandbox:
   - bar.1.0.0
   (version 1.0.0)
   (dev)
@@ -112,6 +117,7 @@ Git pinned source with toplevel opam file:
   $ cd ..
   $ runtest "git+file://$PWD/$dir"
   Solution for dune.lock:
+  opam sandbox:
   - bar.1.0.0
   (version 1.0.0)
   (dev)
@@ -132,6 +138,7 @@ Git pinned source with toplevel opam dir 1
   $ cd ..
   $ runtest "git+file://$PWD/$dir"
   Solution for dune.lock:
+  opam sandbox:
   - bar.1.0.0
   (version 1.0.0)
   (dev)

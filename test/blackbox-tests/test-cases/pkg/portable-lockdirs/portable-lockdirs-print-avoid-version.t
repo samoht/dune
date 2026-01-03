@@ -20,4 +20,5 @@ avoid-version, include a message to that extent in the output.
   Solution for dune.lock
   
   Dependencies common to all supported platforms:
+  opam sandbox:
   - foo.0.0.1 (this version should be avoided)

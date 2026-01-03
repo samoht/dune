@@ -36,6 +36,7 @@ Create a package that writes a different value to some files depending on the os
   Solution for dune.lock
   
   Dependencies common to all supported platforms:
+  opam sandbox:
   - foo.0.0.1
 
   $ cat ${default_lock_dir}/lock.dune

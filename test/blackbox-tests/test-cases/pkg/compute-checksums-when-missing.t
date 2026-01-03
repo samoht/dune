@@ -22,6 +22,7 @@ A file that will comprise the package source:
   The source archive will be downloaded from: http://0.0.0.0:1
   Dune will compute its own checksum for this source archive.
   Solution for dune.lock:
+  opam sandbox:
   - foo.0.0.1
 
 Replace the path in the lockfile as it would otherwise include the sandbox
@@ -52,6 +53,7 @@ Recreate the foo package with a fake port number to signal that the file will
   The source archive will be downloaded from: http://0.0.0.0:9000
   Dune will compute its own checksum for this source archive.
   Solution for dune.lock:
+  opam sandbox:
   - foo.0.0.1
   $ cat ${default_lock_dir}/foo.0.0.1.pkg
   (version 0.0.1)
@@ -71,6 +73,7 @@ Check that no checksum is computed for a local source file:
   > EOF
   $ solve foo 2>&1
   Solution for dune.lock:
+  opam sandbox:
   - foo.0.0.1
 
 Check that no checksum is computed for a local source directory:
@@ -83,6 +86,7 @@ Check that no checksum is computed for a local source directory:
   > EOF
   $ solve foo 2>&1
   Solution for dune.lock:
+  opam sandbox:
   - foo.0.0.1
 
 Create 3 packages that all share the same source url with no checksum. Dune
@@ -123,6 +127,7 @@ asserted by the fact that the webserver will only serve the file a single time.
   The source archive will be downloaded from: http://0.0.0.0:2
   Dune will compute its own checksum for this source archive.
   Solution for dune.lock:
+  opam sandbox:
   - bar.0.0.1
   - baz.0.0.1
   - foo.0.0.1

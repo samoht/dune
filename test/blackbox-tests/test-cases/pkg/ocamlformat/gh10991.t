@@ -19,6 +19,7 @@ Initial file:
 
   $ DUNE_CONFIG__LOCK_DEV_TOOL=enabled dune fmt
   Solution for _build/.dev-tools.locks/ocamlformat:
+  opam sandbox:
   - ocamlformat.0.0.1
   File "foo.ml", line 1, characters 0-0:
   Error: Files _build/default/foo.ml and _build/default/.formatted/foo.ml

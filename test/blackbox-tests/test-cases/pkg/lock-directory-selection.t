@@ -68,13 +68,16 @@ all lockdirs portable.
 Generate all lockdirs:
   $ dune pkg lock dune.macos.arm64.lock
   Solution for dune.macos.arm64.lock:
+  opam sandbox:
   - arm64-only.0.0.1
   - macos-only.0.0.1
   $ dune pkg lock dune.macos.lock
   Solution for dune.macos.lock:
+  opam sandbox:
   - macos-only.0.0.1
   $ dune pkg lock dune.linux.lock
   Solution for dune.linux.lock:
+  opam sandbox:
   - linux-only.0.0.1
 
 Demonstrate that the correct lockdir is being chosen by building packages that
@@ -140,6 +143,7 @@ Test that cond statements can have a default value:
 
   $ dune pkg lock dune.lock
   Solution for dune.lock:
+  opam sandbox:
   - linux-only.0.0.1
   $ dune clean
   $ build_pkg linux-only

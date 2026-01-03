@@ -30,5 +30,6 @@ respect the pin-depends
 
   $ dune_pkg_lock_normalized
   Solution for dune.lock:
+  opam sandbox:
   - bar.1.0.0
   - foo.dev

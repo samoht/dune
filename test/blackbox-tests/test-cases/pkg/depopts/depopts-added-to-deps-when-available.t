@@ -16,6 +16,7 @@ The optional dependency on "b" is not included in foo's dependencies because
 "b" is not part of the package solution:
   $ solve foo
   Solution for dune.lock:
+  opam sandbox:
   - a.0.0.1
   - foo.0.0.1
   $ cat ${default_lock_dir}/foo.0.0.1.pkg
@@ -33,6 +34,7 @@ Solve again, this time depending on both "foo" and "bar". Now "b" is among
 the dependencies of "foo", since "b" is part of the package solution:
   $ solve foo bar
   Solution for dune.lock:
+  opam sandbox:
   - a.0.0.1
   - b.0.0.1
   - bar.0.0.1

@@ -24,6 +24,7 @@ Demonstrate various cases representing depexts in lockfiles.
   Solution for dune.lock
   
   Dependencies common to all supported platforms:
+  opam sandbox:
   - foo.0.0.1
 
   $ cat ${default_lock_dir}/foo.0.0.1.pkg

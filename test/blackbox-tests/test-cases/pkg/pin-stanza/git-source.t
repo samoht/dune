@@ -28,6 +28,7 @@ We create a repo with a fixed name for the default branch.
 
   $ dune_pkg_lock_normalized
   Solution for dune.lock:
+  duniverse (dune-built):
   - foo.dev
 
 We create a tag that clashes with the name of the branch (hence we needed to
@@ -39,6 +40,7 @@ This should work without issue, as we never reference the ambiguous reference:
 
   $ dune_pkg_lock_normalized
   Solution for dune.lock:
+  duniverse (dune-built):
   - foo.dev
 
 If we use the duplicate reference in the config
@@ -58,6 +60,7 @@ ambiguous:
 
   $ dune_pkg_lock_normalized
   Solution for dune.lock:
+  duniverse (dune-built):
   - foo.dev
 
 If we then change the reference of the branch to point to a different revision
@@ -90,6 +93,7 @@ Locking should work, as there are no ambiguous references.
 
   $ dune_pkg_lock_normalized
   Solution for dune.lock:
+  duniverse (dune-built):
   - foo.dev
 
 For branches the namespace is `refs/heads/`:
@@ -108,4 +112,5 @@ Likewise locking a branch this way should work as well:
 
   $ dune_pkg_lock_normalized
   Solution for dune.lock:
+  duniverse (dune-built):
   - foo.dev

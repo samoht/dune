@@ -243,7 +243,7 @@ let summary_message
         let pkgs =
           OpamPackage.Set.elements package_set |> List.map ~f:opam_package_to_pkg
         in
-        Pkg_common.pp_packages pkgs)
+        Pkg_common.pp_packages_by_target pkgs)
     in
     let uncommon_packages_by_platform =
       Solver_env.Map.map opam_package_sets_by_platform ~f:(fun package_set ->

@@ -20,6 +20,7 @@ The version of foo that should be selected is 1.0.0
   >  (depends foo))
   > EOF
   Solution for dune.lock:
+  opam sandbox:
   - bar.1.0.0
   - foo.1.0.0
 
@@ -39,7 +40,7 @@ constraint on `foo` will fail:
   Selected candidates: x.dev
   - foo -> (problem)
       No usable implementations:
-        foo.1.0.0: Package does not satisfy constraints of local package x
+        foo.1.0.0: Rejected by depends of local package x (constraint: = dev)
   [1]
 
 But specifying a version for the local package `x` yields a solution:
@@ -53,6 +54,7 @@ But specifying a version for the local package `x` yields a solution:
   >  (depends (foo (= :version))))
   > EOF
   Solution for dune.lock:
+  opam sandbox:
   - bar.1.0.0
   - foo.1.0.0
 
@@ -68,5 +70,6 @@ of the dune-project:
   > (lang dune 3.11)
   > EOF
   Solution for dune.lock:
+  opam sandbox:
   - bar.1.0.0
   - foo.1.0.0

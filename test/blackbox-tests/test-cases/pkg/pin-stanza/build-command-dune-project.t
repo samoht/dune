@@ -54,10 +54,13 @@ Demonstrate the build command we construct for different types of projects:
 
   $ dune_pkg_lock_normalized
   Solution for dune.lock:
+  duniverse (dune-built):
   - dune-only.dev
+  - template.dev
+  
+  opam sandbox:
   - mixed.dev
   - opam-only.dev
-  - template.dev
   $ build_command() {
   > grep "$1" "${default_lock_dir}/$2.dev.pkg"
   > }

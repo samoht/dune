@@ -54,6 +54,7 @@ Locking should produce the newest package from `new`
   $ mkdir dune-workspace-cache
   $ XDG_CACHE_HOME=$(pwd)/dune-workspace-cache dune_pkg_lock_normalized
   Solution for dune.lock:
+  opam sandbox:
   - foo.2.0
 
 If we just use `old` we should get the older `foo` package in our lockfile
@@ -78,6 +79,7 @@ solution:
   $ rm -r dune-workspace-cache && mkdir dune-workspace-cache
   $ XDG_CACHE_HOME=$(pwd)/dune-workspace-cache dune_pkg_lock_normalized
   Solution for dune.lock:
+  opam sandbox:
   - foo.1.0
 
 If we specify both repositories to be used, we should still get the new foo
@@ -102,6 +104,7 @@ package:
   $ rm -r dune-workspace-cache && mkdir dune-workspace-cache
   $ XDG_CACHE_HOME=$(pwd)/dune-workspace-cache dune_pkg_lock_normalized
   Solution for dune.lock:
+  opam sandbox:
   - foo.2.0
 
 If we use the ordered set language format and try to exclude `new` from the
@@ -127,4 +130,5 @@ older version of foo:
   $ rm -r dune-workspace-cache && mkdir dune-workspace-cache
   $ XDG_CACHE_HOME=$(pwd)/dune-workspace-cache dune_pkg_lock_normalized
   Solution for dune.lock:
+  opam sandbox:
   - foo.1.0

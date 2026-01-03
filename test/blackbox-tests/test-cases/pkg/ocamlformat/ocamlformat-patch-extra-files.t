@@ -60,6 +60,7 @@ Make a project that uses the fake ocamlformat:
 First run of 'dune fmt' is supposed to format the fail.
   $ DUNE_CONFIG__LOCK_DEV_TOOL=enabled dune fmt
   Solution for _build/.dev-tools.locks/ocamlformat:
+  duniverse (dune-built):
   - ocamlformat.0.26.2
   File "foo.ml", line 1, characters 0-0:
   Error: Files _build/default/foo.ml and _build/default/.formatted/foo.ml

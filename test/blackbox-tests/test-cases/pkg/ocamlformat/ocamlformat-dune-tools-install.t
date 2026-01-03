@@ -46,6 +46,7 @@ Installing ocamlformat via `dune tools install` should work:
 
   $ dune tools install ocamlformat
   Solution for _build/.dev-tools.locks/ocamlformat:
+  duniverse (dune-built):
   - ocamlformat.0.26.2
 
 Formatting should use the locked ocamlformat with the feature flag enabled:

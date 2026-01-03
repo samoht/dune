@@ -27,6 +27,7 @@ Make another package that depends on that and outputs the exported env vars
   > EOF
   > solve deps-on-with-setenv
   Solution for dune.lock:
+  opam sandbox:
   - deps-on-with-setenv.0.0.1
   - with-setenv.0.0.1
 The exported env from the first package should be in the lock dir.
@@ -104,6 +105,7 @@ difference between a propagated export_env versus the initial env.
   > EOF
   > solve deps-on-with-setenv-2
   Solution for dune.lock:
+  opam sandbox:
   - deps-on-with-setenv-2.0.0.1
   - with-setenv.0.0.1
   - with-setenv-2.0.0.1

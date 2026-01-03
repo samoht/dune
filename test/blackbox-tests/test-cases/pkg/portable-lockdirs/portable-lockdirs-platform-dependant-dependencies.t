@@ -54,20 +54,25 @@ A package that conditionally depends on packages depending on the OS:
   Solution for dune.lock
   
   Dependencies common to all supported platforms:
+  opam sandbox:
   - foo.0.0.1
   
   Additionally, some packages will only be built on specific platforms.
   
   arch = arm64; os = linux:
+  opam sandbox:
   - linux-only.0.0.1
   
   arch = arm64; os = macos:
+  opam sandbox:
   - macos-only.0.0.1
   
   arch = x86_64; os = linux:
+  opam sandbox:
   - linux-only.0.0.1
   
   arch = x86_64; os = macos:
+  opam sandbox:
   - macos-only.0.0.1
 
 Build the project as if we were on linux and confirm that only the linux-specific dependency is installed:

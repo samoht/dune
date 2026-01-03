@@ -54,6 +54,7 @@ Helper function that creates a workspace file with a given solver env.
   >  (depends bar))
   > EOF
   Solution for dune.lock:
+  opam sandbox:
   - b.0.0.1
   - bar.0.0.1
 

@@ -25,6 +25,7 @@ Without a ".ocamlformat" file, "dune fmt" takes the latest version of
 OCamlFormat.
   $ DUNE_CONFIG__LOCK_DEV_TOOL=enabled dune fmt --preview
   Solution for _build/.dev-tools.locks/ocamlformat:
+  duniverse (dune-built):
   - ocamlformat.0.26.3
   File "foo.ml", line 1, characters 0-0:
   Error: Files _build/default/foo.ml and _build/default/.formatted/foo.ml
@@ -46,6 +47,7 @@ With a ".ocamlformat" file, "dune fmt" takes the version mentioned inside ".ocam
 file.
   $ DUNE_CONFIG__LOCK_DEV_TOOL=enabled dune fmt --preview
   Solution for _build/.dev-tools.locks/ocamlformat:
+  duniverse (dune-built):
   - ocamlformat.0.26.2
   File "foo.ml", line 1, characters 0-0:
   Error: Files _build/default/foo.ml and _build/default/.formatted/foo.ml
@@ -68,6 +70,7 @@ When the lock dir is removed, the solving/lock is renewed:
   $ rm -r "${dev_tool_lock_dir}"
   $ DUNE_CONFIG__LOCK_DEV_TOOL=enabled dune fmt --preview
   Solution for _build/.dev-tools.locks/ocamlformat:
+  duniverse (dune-built):
   - ocamlformat.0.26.2
   File "foo.ml", line 1, characters 0-0:
   Error: Files _build/default/foo.ml and _build/default/.formatted/foo.ml

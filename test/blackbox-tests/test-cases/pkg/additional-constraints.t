@@ -26,6 +26,7 @@ Notice that the constraints field doesn't introduce additional packages. The
   >  (depends foo bar))
   > EOF
   Solution for dune.lock:
+  opam sandbox:
   - bar.1.0.0
   - foo.1.0.0
 
@@ -56,7 +57,7 @@ There are no valid version of foo at the moment:
   Selected candidates: bar.1.9.1 x.dev
   - foo -> (problem)
       No usable implementations:
-        foo.1.0.0: Package does not satisfy constraints of local package x
+        foo.1.0.0: Rejected by depends of local package x
   [1]
 
 If we add one:
@@ -70,5 +71,6 @@ If we add one:
   >  (depends foo bar))
   > EOF
   Solution for dune.lock:
+  opam sandbox:
   - bar.1.9.1
   - foo.0.9.0

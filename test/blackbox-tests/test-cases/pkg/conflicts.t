@@ -23,7 +23,7 @@ The solver should say no solution rather than just ignoring the conflict.
   Selected candidates: bar.0.0.1 x.dev
   - foo -> (problem)
       No usable implementations:
-        foo.0.0.1: Package does not satisfy constraints of local package x
+        foo.0.0.1: Rejected by conflicts of local package x
   [1]
 
 There could be more than one conflict and they can have version constraints:
@@ -49,10 +49,11 @@ There could be more than one conflict and they can have version constraints:
   Selected candidates: bar.0.0.1 bar2.0.0.1 x.dev
   - foo -> (problem)
       No usable implementations:
-        foo.0.0.1: Package does not satisfy constraints of local package x
+        foo.0.0.1: Rejected by conflicts of local package x (constraint: < 0.2)
   - foo2 -> (problem)
       No usable implementations:
-        foo2.0.0.1: Package does not satisfy constraints of local package x
+        foo2.0.0.1:
+          Rejected by conflicts of local package x (constraint: < 0.2)
   [1]
 
 When conflicts are obtained from an opam file instead of a dune-project,
@@ -79,10 +80,11 @@ disjunction, either package is problematic:
       User requested = 3.XX
   - foo -> (problem)
       No usable implementations:
-        foo.0.0.1: Package does not satisfy constraints of local package x
+        foo.0.0.1: Rejected by conflicts of local package x (constraint: < 0.2)
   - foo2 -> (problem)
       No usable implementations:
-        foo2.0.0.1: Package does not satisfy constraints of local package x
+        foo2.0.0.1:
+          Rejected by conflicts of local package x (constraint: < 0.2)
 
 Adding a new version of `foo` only resolves one conflict:
 
@@ -97,7 +99,8 @@ Adding a new version of `foo` only resolves one conflict:
       User requested = 3.XX
   - foo2 -> (problem)
       No usable implementations:
-        foo2.0.0.1: Package does not satisfy constraints of local package x
+        foo2.0.0.1:
+          Rejected by conflicts of local package x (constraint: < 0.2)
 
 Addition of `foo2` to solve the last remaining conflict:
 
@@ -106,6 +109,7 @@ Addition of `foo2` to solve the last remaining conflict:
   > (lang dune 3.11)
   > EOF
   Solution for dune.lock:
+  opam sandbox:
   - bar.0.0.1
   - bar2.0.0.1
   - foo.0.2
@@ -124,6 +128,7 @@ due to the version constraints conflicts:
   >  (depends bar bar2))
   > EOF
   Solution for dune.lock:
+  opam sandbox:
   - bar.0.0.1
   - bar2.0.0.1
   - foo.0.0.1

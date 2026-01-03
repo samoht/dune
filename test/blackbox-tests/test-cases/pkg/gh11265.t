@@ -19,7 +19,7 @@ A package which depends on a single package and also conflicts with the same pac
   Selected candidates: foo.dev
   - bar -> (problem)
       No usable implementations:
-        bar.0.0.1: Package does not satisfy constraints of local package foo
+        bar.0.0.1: Rejected by conflicts of local package foo
   [1]
 
 Now add an additional conflict on a non-existant package "baz". Dune should continue to fail to find a solution due to the conflict with "bar".
@@ -38,6 +38,6 @@ Now add an additional conflict on a non-existant package "baz". Dune should cont
   Selected candidates: foo.dev
   - bar -> (problem)
       No usable implementations:
-        bar.0.0.1: Package does not satisfy constraints of local package foo
+        bar.0.0.1: Rejected by conflicts of local package foo
   [1]
 

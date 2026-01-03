@@ -73,6 +73,7 @@ Lock, build, and run the executable in the project:
 
   $ dune_pkg_lock_normalized
   Solution for dune.lock:
+  duniverse (dune-built):
   - foo.0.0.1
   $ dune exec bar
   Hello, World!

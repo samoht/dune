@@ -32,6 +32,7 @@ Test variable filters on dependencies
 Regular dependencies are resolved transitively:
   $ solve depends-on-foo
   Solution for dune.lock:
+  opam sandbox:
   - depends-on-foo.0.0.1
   - foo.0.0.1
   - foo-dependency.0.0.1
@@ -39,17 +40,20 @@ Regular dependencies are resolved transitively:
 Transitive test dependencies are not included:
   $ solve depends-on-foo-with-test
   Solution for dune.lock:
+  opam sandbox:
   - depends-on-foo-with-test.0.0.1
 
 Test dependencies of the project are included:
   $ solve "(foo :with-test)"
   Solution for dune.lock:
+  opam sandbox:
   - foo.0.0.1
   - foo-dependency.0.0.1
 
 Test dependencies of test dependencies are excluded:
   $ solve "(depends-on-foo-with-test :with-test)"
   Solution for dune.lock:
+  opam sandbox:
   - depends-on-foo-with-test.0.0.1
 
 Conflicting packages can't be co-installed:
@@ -80,6 +84,7 @@ Conflicting packages in transitive dependencies can't be co-installed:
 Conflicts with transitive test dependencies don't affect the solution:
   $ solve depends-on-foo-with-test conflicts-with-foo
   Solution for dune.lock:
+  opam sandbox:
   - conflicts-with-foo.0.0.1
   - depends-on-foo-with-test.0.0.1
 

@@ -13,6 +13,7 @@ constraints.
 
   $ solve foo
   Solution for dune.lock:
+  opam sandbox:
   - a.0.0.1
   - foo.0.0.1
 

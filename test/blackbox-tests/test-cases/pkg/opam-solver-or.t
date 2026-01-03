@@ -15,6 +15,7 @@ Demonstrate the generation of the lock directory in the presence of "|"
 
   $ solve b
   Solution for dune.lock:
+  opam sandbox:
   - a1.0.0.1
   - b.0.0.1
 Only a1 or a2 should appear but not both.
@@ -35,6 +36,7 @@ packages, so comparing their version numbers is meaningless.
 
   $ solve b
   Solution for dune.lock:
+  opam sandbox:
   - a1.0.0.1
   - b.0.0.1
 
@@ -50,6 +52,7 @@ which is completely omitted from the solution).
 
   $ solve b
   Solution for dune.lock:
+  opam sandbox:
   - a2.0.0.2
   - b.0.0.2
 
@@ -61,6 +64,7 @@ Same solution if a1 only known version is excluded:
 
   $ solve b
   Solution for dune.lock:
+  opam sandbox:
   - a2.0.0.2
   - b.0.0.2
 
@@ -74,6 +78,7 @@ solver to try to find a solution which doesn't include it.
 
   $ solve b
   Solution for dune.lock:
+  opam sandbox:
   - a1.0.0.1
   - b.0.0.1
 
@@ -85,6 +90,7 @@ Update a1.0.0.1 to also be flagged as avoid-version:
 
   $ solve b
   Solution for dune.lock:
+  opam sandbox:
   - a2.0.0.1
   - b.0.0.1
 
@@ -97,6 +103,7 @@ avoid-version:
 
   $ solve b
   Solution for dune.lock:
+  opam sandbox:
   - a2.0.0.2 (this version should be avoided)
   - b.0.0.2
 
@@ -151,6 +158,7 @@ avoid-version:
 
   $ solve a
   Solution for dune.lock:
+  opam sandbox:
   - a.0.1
   - d.0.1 (this version should be avoided)
   - f.0.1 (this version should be avoided)

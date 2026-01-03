@@ -21,6 +21,7 @@ a lockdir containing an "ocaml" lockfile.
 
   $ dune tools exec ocamllsp
   Solution for _build/.dev-tools.locks/ocaml-lsp-server:
+  opam sandbox:
   - ocaml-base-compiler.5.2.0
   - ocaml-compiler.5.2.0
   - ocaml-lsp-server.0.0.1

@@ -20,6 +20,7 @@ Running the solver explicitely should write the solution into the build log:
   Solution for dune.lock
   
   Dependencies common to all supported platforms:
+  opam sandbox:
   - foo.0.0.1
 
 We should be seeing that it has created a lock dir solution depending on foo.0.0.1:

@@ -24,5 +24,6 @@ We can pull multiple packages from a single source
 
   $ dune_pkg_lock_normalized
   Solution for dune.lock:
+  duniverse (dune-built):
   - bar.dev
   - foo.dev

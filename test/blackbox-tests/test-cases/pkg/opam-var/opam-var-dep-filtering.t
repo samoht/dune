@@ -23,6 +23,7 @@ Regular dependencies
 
   $ solve testpkg
   Solution for dune.lock:
+  opam sandbox:
   - foo.0.0.1
   - testpkg.1
 
@@ -32,6 +33,7 @@ Regular dependencies
 
   $ solve testpkg
   Solution for dune.lock:
+  opam sandbox:
   - testpkg.2
 
 Depopts. We don't have proper support for depopts yet, so these don't work.
@@ -44,6 +46,7 @@ the same way as depends
 
   $ solve testpkg
   Solution for dune.lock:
+  opam sandbox:
   - testpkg.2
 
   $ mkpkg "testpkg" 2 <<'EOF' 
@@ -52,4 +55,5 @@ the same way as depends
 
   $ solve testpkg
   Solution for dune.lock:
+  opam sandbox:
   - testpkg.2

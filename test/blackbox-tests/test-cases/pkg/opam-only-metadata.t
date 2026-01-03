@@ -36,6 +36,7 @@ Test that we can read package metadata from opam files.
 
   $ dune_pkg_lock_normalized
   Solution for dune.lock:
+  opam sandbox:
   - a.0.1
   - b.0.6
   - d.0.0.1
@@ -65,6 +66,7 @@ Test that we can read package metadata from opam files.
 
   $ dune_pkg_lock_normalized
   Solution for dune.lock:
+  opam sandbox:
   - a.0.1
   - b.0.6
   - c.0.1

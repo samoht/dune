@@ -77,6 +77,7 @@ Generate a mock opam repository
 
   $ build_single_package foo
   Solution for dune.lock:
+  opam sandbox:
   - foo.0.0.1
   package: foo.0.0.1
   enable: enable
@@ -86,6 +87,7 @@ Generate a mock opam repository
   package conjunction string selection: bar
   $ build_single_package bar
   Solution for dune.lock:
+  opam sandbox:
   - bar.0.0.1
   installed
   installed or pinned
@@ -94,6 +96,7 @@ Generate a mock opam repository
   conjunction with some undefined vars
   $ build_single_package baz
   Solution for dune.lock:
+  opam sandbox:
   - baz.0.0.1
   installed
   not madeup:installed
@@ -101,6 +104,7 @@ Generate a mock opam repository
   
   $ build_single_package error1
   Solution for dune.lock:
+  opam sandbox:
   - error1.0.0.1
   File "dune.lock/error1.0.0.1.pkg", line 7, characters 4-17:
   7 |     %{pkg-self:a}
@@ -109,6 +113,7 @@ Generate a mock opam repository
   [1]
   $ build_single_package error2
   Solution for dune.lock:
+  opam sandbox:
   - error2.0.0.1
   File "dune.lock/error2.0.0.1.pkg", line 7, characters 4-17:
   7 |     %{pkg-self:a}
@@ -117,6 +122,7 @@ Generate a mock opam repository
   [1]
   $ build_single_package error3
   Solution for dune.lock:
+  opam sandbox:
   - error3.0.0.1
   File "dune.lock/error3.0.0.1.pkg", line 5, characters 7-20:
   5 |   (run not-a-program echo hello)))
@@ -126,6 +132,7 @@ Generate a mock opam repository
   [1]
   $ build_single_package error4
   Solution for dune.lock:
+  opam sandbox:
   - error4.0.0.1
   File "dune.lock/error4.0.0.1.pkg", line 5, characters 7-37:
   5 |   (run not-a-program-%{pkg-self:name} echo hello)))

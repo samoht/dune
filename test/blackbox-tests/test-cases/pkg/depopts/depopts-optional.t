@@ -17,4 +17,5 @@ the solver.
   >  (conflicts bar))
   > EOF
   Solution for dune.lock:
+  opam sandbox:
   - foo.0.0.1

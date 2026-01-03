@@ -74,3 +74,44 @@ let classify (pkg : Lock_dir.Pkg.t) =
 ;;
 
 let classify_all pkgs = Package_name.Map.map pkgs ~f:classify
+
+(* Extract patch file paths from an action, in order of application *)
+let rec extract_patches_from_action (action : Action.t) =
+  match action with
+  | Patch sw -> [ sw ]
+  | Progn actions -> List.concat_map actions ~f:extract_patches_from_action
+  | Concurrent actions -> List.concat_map actions ~f:extract_patches_from_action
+  | Chdir (_, action)
+  | Setenv (_, _, action)
+  | Redirect_out (_, _, _, action)
+  | Redirect_in (_, _, action)
+  | Ignore (_, action)
+  | No_infer action
+  | With_accepted_exit_codes (_, action)
+  | Withenv (_, action)
+  | When (_, action) -> extract_patches_from_action action
+  | Pipe (_, actions) -> List.concat_map actions ~f:extract_patches_from_action
+  | Run _
+  | Dynamic_run _
+  | Echo _
+  | Cat _
+  | Copy _
+  | Symlink _
+  | Copy_and_add_line_directive _
+  | System _
+  | Bash _
+  | Write_file _
+  | Mkdir _
+  | Diff _
+  | Cram _
+  | Substitute _
+  | Format_dune_file _ -> []
+;;
+
+(* Get patches from a package's build command for the current platform *)
+let get_patches (pkg : Lock_dir.Pkg.t) ~platform =
+  match Lock_dir.Conditional_choice.choose_for_platform pkg.build_command ~platform with
+  | None -> []
+  | Some Lock_dir.Build_command.Dune -> []
+  | Some (Lock_dir.Build_command.Action action) -> extract_patches_from_action action
+;;

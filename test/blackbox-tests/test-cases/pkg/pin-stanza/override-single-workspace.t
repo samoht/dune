@@ -32,6 +32,7 @@ Here we demonstrate that projects override their sub projects:
   > EOF
   $ dune_pkg_lock_normalized
   Solution for dune.lock:
+  duniverse (dune-built):
   - bar.dev
 
   $ print_source "bar.dev"

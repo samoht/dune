@@ -71,20 +71,25 @@ Solve the project. The solution will contain extra files for both versions of fo
   Solution for dune.lock
   
   Dependencies common to all supported platforms:
+  opam sandbox:
   - bar.0.0.1
   
   Additionally, some packages will only be built on specific platforms.
   
   arch = arm64; os = linux:
+  opam sandbox:
   - foo.1
   
   arch = arm64; os = macos:
+  opam sandbox:
   - foo.2
   
   arch = x86_64; os = linux:
+  opam sandbox:
   - foo.1
   
   arch = x86_64; os = macos:
+  opam sandbox:
   - foo.2
 
 Verify the contents of the extra files for each version of foo:

@@ -44,6 +44,7 @@ With this project set up, lets depend on it.
   >  (depends nondune))
   > EOF
   Solution for dune.lock:
+  opam sandbox:
   - nondune.dev
   $ cat > dune <<EOF
   > (executable

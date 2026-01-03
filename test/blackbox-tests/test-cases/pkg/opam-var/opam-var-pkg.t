@@ -48,6 +48,7 @@ We echo each package variable.
   > EOF
   > solve testpkg
   Solution for dune.lock:
+  opam sandbox:
   - foo.0.0.1
   - testpkg.0.0.1
 Inspecting the lockfile we can see how each opam package variable was translated into a

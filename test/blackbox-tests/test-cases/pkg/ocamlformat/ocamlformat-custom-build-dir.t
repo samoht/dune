@@ -34,6 +34,7 @@ Install our fake ocamlformat, making sure to override the build directory.
 
   $ dune tools install ocamlformat --build-dir="${custom_build_dir}"
   Solution for _other_build/.dev-tools.locks/ocamlformat:
+  duniverse (dune-built):
   - ocamlformat.0.26.2
 
 This should've worked and picked up our ocamlformat using the lock dir

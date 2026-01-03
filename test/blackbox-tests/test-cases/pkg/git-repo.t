@@ -29,6 +29,7 @@ Locking should produce the newest package from the repo
   $ mkdir dune-cache
   $ XDG_CACHE_HOME=$PWD/dune-cache dune_pkg_lock_normalized
   Solution for dune.lock:
+  opam sandbox:
   - foo.1.0
 
 Now let's assume a new version of foo is released.
@@ -45,6 +46,7 @@ version in the lock file
 
   $ XDG_CACHE_HOME=$PWD/dune-cache dune_pkg_lock_normalized
   Solution for dune.lock:
+  opam sandbox:
   - foo.1.1
 
 If the package selected has some additional files that are supposed to be
@@ -73,6 +75,7 @@ Locking should be successful and it should include the additional file
 
   $ XDG_CACHE_HOME=$PWD/dune-cache dune_pkg_lock_normalized
   Solution for dune.lock:
+  opam sandbox:
   - foo.1.2
 
   $ find ${default_lock_dir} | sort

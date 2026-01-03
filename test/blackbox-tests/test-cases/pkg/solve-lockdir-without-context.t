@@ -28,5 +28,6 @@ Specifying the directory to the lock command should work:
 
   $ dune_pkg_lock_normalized foo.lock
   Solution for foo.lock:
+  opam sandbox:
   - a.0.0.1
   - b.0.0.1

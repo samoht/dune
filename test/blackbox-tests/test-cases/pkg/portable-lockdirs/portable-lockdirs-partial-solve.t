@@ -35,6 +35,7 @@ to solve for macos, linux, and windows by default.
   Solution for dune.lock
   
   Dependencies common to all supported platforms:
+  opam sandbox:
   - foo.0.0.1
   
   No package solution was found for some requsted platforms.

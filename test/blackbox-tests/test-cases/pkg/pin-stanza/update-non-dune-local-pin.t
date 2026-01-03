@@ -32,6 +32,7 @@ Make a package "foo" whose build will fail after printing a message:
 
   $ dune_pkg_lock_normalized
   Solution for dune.lock:
+  opam sandbox:
   - foo.dev
 
 Attempt to build the package the first time:
