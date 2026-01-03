@@ -1569,36 +1569,34 @@ let file_contents_by_path ~portable_lock_dir t =
         package_filename, Pkg.encode ~portable_lock_dir ~solved_for_platforms pkg))
 ;;
 
-module Lock_format = struct
-  type t =
-    | Directory
-    | Single_file
+type format =
+  | Directory
+  | Single_file
 
-  let detect path =
-    match Path.stat path with
-    | Error _ -> None
-    | Ok { st_kind = S_DIR; _ } ->
-      (* Check if it's a valid lock directory by looking for metadata file *)
-      let metadata_path = Path.relative path metadata_filename in
-      (match Path.stat metadata_path with
-       | Ok { st_kind = S_REG; _ } -> Some Directory
-       | _ -> None)
-    | Ok { st_kind = S_REG; _ } ->
-      (* Check if it's a valid single-file lock by trying to parse the lang header *)
-      (try
-         Io.with_lexbuf_from_file path ~f:(fun lexbuf ->
-           let ast = Dune_sexp.Parser.parse ~mode:Single lexbuf in
-           match Dune_sexp.Ast.remove_locs ast with
-           | List [ Atom a1; Atom a2; _ ]
-             when String.equal (Dune_sexp.Atom.to_string a1) "lang"
-                  && String.equal (Dune_sexp.Atom.to_string a2) "package" ->
-             Some Single_file
-           | _ -> None)
-       with
-       | _ -> None)
-    | Ok _ -> None
-  ;;
-end
+let detect_format path =
+  match Path.stat path with
+  | Error _ -> None
+  | Ok { st_kind = S_DIR; _ } ->
+    (* Check if it's a valid lock directory by looking for metadata file *)
+    let metadata_path = Path.relative path metadata_filename in
+    (match Path.stat metadata_path with
+     | Ok { st_kind = S_REG; _ } -> Some Directory
+     | _ -> None)
+  | Ok { st_kind = S_REG; _ } ->
+    (* Check if it's a valid single-file lock by trying to parse the lang header *)
+    (try
+       Io.with_lexbuf_from_file path ~f:(fun lexbuf ->
+         let ast = Dune_sexp.Parser.parse ~mode:Single lexbuf in
+         match Dune_sexp.Ast.remove_locs ast with
+         | List [ Atom a1; Atom a2; _ ]
+           when String.equal (Dune_sexp.Atom.to_string a1) "lang"
+                && String.equal (Dune_sexp.Atom.to_string a2) "package" ->
+           Some Single_file
+         | _ -> None)
+     with
+     | _ -> None)
+  | Ok _ -> None
+;;
 
 module Write_disk = struct
   (* Checks whether path refers to a valid lock directory and returns a value

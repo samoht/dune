@@ -231,16 +231,14 @@ module File : sig
 end
 
 (** Format of the lock on disk *)
-module Lock_format : sig
-  type t =
-    | Directory (** dune.lock/ directory with lock.dune and .pkg files *)
-    | Single_file (** Single dune.lock file with repos and versions *)
+type format =
+  | Directory (** dune.lock/ directory with lock.dune and .pkg files *)
+  | Single_file (** Single dune.lock file with repos and versions *)
 
-  (** [detect path] determines whether the path is a directory or single-file lock.
-      Returns [None] if the path doesn't exist or is neither a valid lock directory
-      nor a valid lock file. *)
-  val detect : Path.t -> t option
-end
+(** [detect_format path] determines whether the path is a directory or single-file lock.
+    Returns [None] if the path doesn't exist or is neither a valid lock directory
+    nor a valid lock file. *)
+val detect_format : Path.t -> format option
 
 module Write_disk : sig
   type lock_dir := t
