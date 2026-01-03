@@ -1,11 +1,52 @@
 open Import
 module Display = Dune_engine.Display
 
+(* Platform detection for install command hints *)
+module Platform = struct
+  type package_manager =
+    | Apt
+    | Brew
+    | Dnf
+    | Pacman
+    | Apk
+    | Unknown
+
+  let detect () =
+    let path = Env_path.path Env.initial in
+    let has_cmd cmd = Option.is_some (Bin.which ~path cmd) in
+    if has_cmd "brew"
+    then Brew
+    else if has_cmd "apt"
+    then Apt
+    else if has_cmd "dnf"
+    then Dnf
+    else if has_cmd "pacman"
+    then Pacman
+    else if has_cmd "apk"
+    then Apk
+    else Unknown
+  ;;
+
+  let install_command pm packages =
+    match pm with
+    | Apt -> sprintf "apt install %s" (String.concat ~sep:" " packages)
+    | Brew -> sprintf "brew install %s" (String.concat ~sep:" " packages)
+    | Dnf -> sprintf "dnf install %s" (String.concat ~sep:" " packages)
+    | Pacman -> sprintf "pacman -S %s" (String.concat ~sep:" " packages)
+    | Apk -> sprintf "apk add %s" (String.concat ~sep:" " packages)
+    | Unknown -> sprintf "# install: %s" (String.concat ~sep:" " packages)
+  ;;
+end
+
 let depexts_hint = function
   | [] -> None
   | depexts ->
-    [ Pp.textf "You may want to verify the following depexts are installed:"
-    ; Pp.enumerate ~f:Pp.verbatim depexts
+    let pm = Platform.detect () in
+    let install_cmd = Platform.install_command pm depexts in
+    [ Pp.textf "Missing system dependencies: %s" (String.concat ~sep:", " depexts)
+    ; Pp.nop
+    ; Pp.textf "To install:"
+    ; Pp.verbatim (sprintf "  %s" install_cmd)
     ]
     |> Pp.concat_map ~sep:Pp.cut ~f:(fun pp -> Pp.box pp)
     |> Option.some
