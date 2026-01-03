@@ -119,19 +119,9 @@ module List_cmd = struct
   let command = Cmd.v info term
 end
 
-(* ---- Create subcommand (prepare package for patching) ---- *)
+(* ---- Diff subcommand (show what would be in a patch) ---- *)
 
-let create_patch ~lock_dir_path ~patches_dir name =
-  let lock_dir = Lock_dir.read_disk_exn (Path.source lock_dir_path) in
-  let pkg =
-    match find_package lock_dir name with
-    | Some pkg -> pkg
-    | None ->
-      User_error.raise
-        [ Pp.textf "Package %s not found in lock directory" (Package_name.to_string name)
-        ]
-  in
-  let version = pkg.info.version in
+let show_diff ~patches_dir name version =
   let duniverse_pkg_dir = Duniverse.package_dir name version in
   let pkg_path = Path.source duniverse_pkg_dir in
   if not (Path.exists pkg_path)
@@ -142,20 +132,43 @@ let create_patch ~lock_dir_path ~patches_dir name =
           (Path.Source.to_string duniverse_pkg_dir)
       ; Pp.text "Run 'dune pkg fetch' first to download package sources."
       ];
-  let _patch_file = patch_path ~patches_dir name version in
-  Console.print_user_message
-    (User_message.make
-       [ Pp.textf
-           "Preparing %s.%s for patching..."
-           (Package_name.to_string name)
-           (Package_version.to_string version)
-       ; Pp.textf "Edit files in %s/ then run:" (Path.Source.to_string duniverse_pkg_dir)
-       ; Pp.textf "  dune pkg patch commit %s" (Package_name.to_string name)
-       ]);
-  Fiber.return ()
+  let git_dir = Path.relative pkg_path ".git" in
+  if Path.exists git_dir
+  then (
+    (* Has git - show diff *)
+    Console.print_user_message
+      (User_message.make
+         [ Pp.textf
+             "Changes in %s.%s:"
+             (Package_name.to_string name)
+             (Package_version.to_string version)
+         ; Pp.nop
+         ; Pp.textf "Run: git -C %s diff" (Path.to_string pkg_path)
+         ]);
+    Fiber.return ())
+  else (
+    let patch_file = patch_path ~patches_dir name version in
+    Console.print_user_message
+      (User_message.make
+         [ Pp.textf
+             "Package %s is not a git repository."
+             (Path.Source.to_string duniverse_pkg_dir)
+         ; Pp.nop
+         ; Pp.text "To track changes, initialize with git first:"
+         ; Pp.textf
+             "  cd %s && git init && git add -A && git commit -m 'original'"
+             (Path.Source.to_string duniverse_pkg_dir)
+         ; Pp.nop
+         ; Pp.text "Then make your changes and run:"
+         ; Pp.textf
+             "  git -C %s diff > %s"
+             (Path.to_string pkg_path)
+             (Path.Source.to_string patch_file)
+         ]);
+    Fiber.return ())
 ;;
 
-module Create_cmd = struct
+module Diff_cmd = struct
   let term =
     let+ builder = Common.Builder.term
     and+ pkg_name =
@@ -165,24 +178,34 @@ module Create_cmd = struct
     let common, config = Common.init builder in
     Scheduler.go_with_rpc_server ~common ~config (fun () ->
       with_lock_dir (fun ~lock_dir_path ~patches_dir ->
+        let lock_dir = Lock_dir.read_disk_exn (Path.source lock_dir_path) in
         let name = Package_name.of_string pkg_name in
-        create_patch ~lock_dir_path ~patches_dir name))
+        let pkg =
+          match find_package lock_dir name with
+          | Some pkg -> pkg
+          | None ->
+            User_error.raise
+              [ Pp.textf
+                  "Package %s not found in lock directory"
+                  (Package_name.to_string name)
+              ]
+        in
+        show_diff ~patches_dir name pkg.info.version))
   ;;
 
   let info =
-    let doc = "Prepare a package for patching" in
+    let doc = "Show local changes to a package" in
     let man =
       [ `S "DESCRIPTION"
+      ; `P "Shows instructions for viewing local modifications to a duniverse package."
       ; `P
-          "Prepares a package for patching by verifying it exists in the duniverse \
-           directory."
-      ; `P "After running this command, edit the files in duniverse/<pkg>.<version>/."
-      ; `P "Then run $(b,dune pkg patch commit <PKG>) to generate the patch file."
+          "Edit files directly in duniverse/<pkg>.<version>/, then use this command to \
+           see your changes."
       ; `S "EXAMPLES"
-      ; `Pre "  dune pkg patch create fmt"
+      ; `Pre "  dune pkg patch diff fmt"
       ]
     in
-    Cmd.info "create" ~doc ~man
+    Cmd.info "diff" ~doc ~man
   ;;
 
   let command = Cmd.v info term
@@ -356,12 +379,12 @@ let info =
          the patches/ directory and applied automatically when running 'dune pkg fetch'."
     ; `S "COMMANDS"
     ; `P "$(b,dune pkg patch list) - List all patches and their status"
-    ; `P "$(b,dune pkg patch create PKG) - Prepare a package for patching"
+    ; `P "$(b,dune pkg patch diff PKG) - Show local changes to a package"
     ; `P "$(b,dune pkg patch commit PKG) - Generate patch from local modifications"
     ; `P "$(b,dune pkg patch remove PKG) - Remove a patch"
     ; `S "WORKFLOW"
-    ; `P "1. Run $(b,dune pkg patch create fmt) to prepare for patching"
-    ; `P "2. Edit files in duniverse/fmt.0.9.0/"
+    ; `P "1. Edit files directly in duniverse/fmt.0.9.0/"
+    ; `P "2. Run $(b,dune pkg patch diff fmt) to view your changes"
     ; `P "3. Run $(b,dune pkg patch commit fmt) to generate the patch"
     ; `P "4. The patch is applied automatically on $(b,dune pkg fetch)"
     ]
@@ -370,7 +393,7 @@ let info =
 ;;
 
 let subcommands =
-  [ List_cmd.command; Create_cmd.command; Commit_cmd.command; Remove_cmd.command ]
+  [ List_cmd.command; Diff_cmd.command; Commit_cmd.command; Remove_cmd.command ]
 ;;
 
 let command = Cmd.group info subcommands

@@ -38,12 +38,12 @@ Test list with empty patches directory:
   No patches found.
 
 Test error when package not found:
-  $ dune pkg patch create nonexistent 2>&1
+  $ dune pkg patch diff nonexistent 2>&1
   Error: Package nonexistent not found in lock directory
   [1]
 
-Test create action (package not fetched):
-  $ dune pkg patch create foo 2>&1
+Test diff action (package not fetched):
+  $ dune pkg patch diff foo 2>&1
   Error: Package directory duniverse/foo.0.0.1 does not exist.
   Run 'dune pkg fetch' first to download package sources.
   [1]
@@ -61,7 +61,7 @@ Test remove with no patch:
 
 Test that patch without subcommand shows error:
   $ dune pkg patch 2>&1
-  dune: required COMMAND name is missing, must be one of 'commit', 'create', 'list' or 'remove'.
+  dune: required COMMAND name is missing, must be one of 'commit', 'diff', 'list' or 'remove'.
   Usage: dune pkg patch COMMAND …
   Try 'dune pkg patch --help' or 'dune --help' for more information.
   [1]
