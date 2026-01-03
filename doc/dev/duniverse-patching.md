@@ -14,9 +14,10 @@ enabling local modifications to dependencies and easier upstream contribution.
 | Single-file derive | ✅ Done | `Lock.File.derive` |
 | Single-file conversion | ✅ Done | `Lock.File.of_lock`, `Lock_pkg.file_to_lock` |
 | Format detection | ✅ Done | `Lock.detect_format` |
-| CLI integration | ❌ Pending | `dune pkg lock --format=single-file` |
-| Single-file as default | ❌ Pending | Needs CLI integration first |
-| Tests for single-file | ❌ Pending | Need blackbox tests |
+| CLI integration (write) | ✅ Done | `dune pkg lock --format=single-file` |
+| CLI integration (read) | ⏸️ Blocked | Needs async loading architecture |
+| Single-file as default | ❌ Pending | Needs read support first |
+| Tests for single-file | ✅ Done | `test/blackbox-tests/test-cases/pkg/single-file-lock.t` |
 | `dune pkg patch` command | ❌ Not started | See Commands section |
 | Patch application on fetch | ❌ Not started | |
 | Git-based cache for patches | ❌ Not started | Low priority |
