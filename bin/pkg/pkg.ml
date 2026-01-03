@@ -1,3 +1,4 @@
+module Deps = Deps
 module Fetch = Fetch
 module Group = Group
 module Lock = Lock
