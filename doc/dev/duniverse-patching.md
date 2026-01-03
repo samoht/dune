@@ -18,7 +18,7 @@ enabling local modifications to dependencies and easier upstream contribution.
 | CLI integration (read) | ⏸️ Blocked | Needs async loading architecture |
 | Single-file as default | ❌ Pending | Needs read support first |
 | Tests for single-file | ✅ Done | `test/blackbox-tests/test-cases/pkg/single-file-lock.t` |
-| `dune pkg patch` command | ❌ Not started | See Commands section |
+| `dune pkg patch` command | ✅ Done | `bin/pkg/patch.ml`, tests in `test/blackbox-tests/test-cases/pkg/patch-command.t` |
 | Patch application on fetch | ❌ Not started | |
 | Git-based cache for patches | ❌ Not started | Low priority |
 
