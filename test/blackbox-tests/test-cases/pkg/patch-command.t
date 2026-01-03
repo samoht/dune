@@ -18,10 +18,10 @@ Create a project that depends on foo:
 
 Lock the project:
   $ dune pkg lock 2>&1 | head -5
-  Solution for dune.lock
+  Solution for dune.lock (1 package)
   
   Dependencies common to all supported platforms:
-  opam sandbox:
+  opam:
   - foo.0.0.1
 
 

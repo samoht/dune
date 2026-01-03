@@ -6,6 +6,21 @@ module Rev_store = Dune_pkg.Rev_store
 module OpamUrl = Dune_pkg.OpamUrl
 module Pkg_cache = Dune_pkg.Pkg_cache
 module Solver_env = Dune_pkg.Solver_env
+module Package_version = Dune_pkg.Package_version
+
+(* Default patches directory for user patches *)
+let default_patches_dir = Path.Source.of_string "patches"
+
+(* Get the user patch file path for a package *)
+let user_patch_path ~patches_dir name version =
+  let filename =
+    sprintf
+      "%s@%s.patch"
+      (Package_name.to_string name)
+      (Package_version.to_string version)
+  in
+  Path.Source.relative patches_dir filename
+;;
 
 (* Get the default lock dir path *)
 let get_default_lock_dir_path () = Dune_rules.Lock_dir.default_source_path |> Path.source
@@ -148,7 +163,35 @@ let apply_patch ~target_dir ~patch_file =
   ()
 ;;
 
-let fetch_package ~rev_store ~platform pkg =
+(* Apply a user patch from the patches/ directory *)
+let apply_user_patch ~target_dir ~patch_source_path =
+  let open Fiber.O in
+  let patch_path = Path.source patch_source_path in
+  if not (Path.exists patch_path)
+  then Fiber.return () (* No user patch for this package *)
+  else (
+    Console.print_user_message
+      (User_message.make
+         [ Pp.textf
+             "  Applying user patch %s..."
+             (Path.Source.to_string patch_source_path)
+         ]);
+    let stderr =
+      Dune_engine.Process.Io.make_stderr
+        ~output_on_success:Swallow
+        ~output_limit:Dune_engine.Execution_parameters.Action_output_limit.default
+    in
+    let+ () =
+      Dune_patch.For_tests.exec
+        Dune_engine.Display.Quiet
+        ~patch:patch_path
+        ~dir:target_dir
+        ~stderr
+    in
+    ())
+;;
+
+let fetch_package ~rev_store ~platform ~patches_dir pkg =
   let open Fiber.O in
   let { Lock_dir.Pkg_info.name; version; source; extra_sources; _ } =
     pkg.Lock_dir.Pkg.info
@@ -225,23 +268,28 @@ let fetch_package ~rev_store ~platform pkg =
                     (Dune_pkg.Checksum.to_string actual)
                 ]))
       in
-      (* Step 3: Apply patches from build command *)
+      (* Step 3: Apply patches from build command (opam patches) *)
       let patches = Duniverse.get_patches pkg ~platform in
-      if List.is_empty patches
-      then Fiber.return ()
-      else (
-        Console.print_user_message
-          (User_message.make
-             [ Pp.textf "  Applying %d patch(es)..." (List.length patches) ]);
-        Fiber.sequential_iter patches ~f:(fun patch_sw ->
-          (* Patches are String_with_vars, but in lock files they should be literals *)
-          match Dune_lang.String_with_vars.text_only patch_sw with
-          | None ->
-            User_error.raise
-              [ Pp.text "Patch file path contains variables, which is not supported" ]
-          | Some patch_file ->
-            let patch_local = Path.Local.of_string patch_file in
-            apply_patch ~target_dir:target ~patch_file:patch_local)))
+      let* () =
+        if List.is_empty patches
+        then Fiber.return ()
+        else (
+          Console.print_user_message
+            (User_message.make
+               [ Pp.textf "  Applying %d opam patch(es)..." (List.length patches) ]);
+          Fiber.sequential_iter patches ~f:(fun patch_sw ->
+            (* Patches are String_with_vars, but in lock files they should be literals *)
+            match Dune_lang.String_with_vars.text_only patch_sw with
+            | None ->
+              User_error.raise
+                [ Pp.text "Patch file path contains variables, which is not supported" ]
+            | Some patch_file ->
+              let patch_local = Path.Local.of_string patch_file in
+              apply_patch ~target_dir:target ~patch_file:patch_local))
+      in
+      (* Step 4: Apply user patches from patches/ directory *)
+      let user_patch = user_patch_path ~patches_dir name version in
+      apply_user_patch ~target_dir:target ~patch_source_path:user_patch)
 ;;
 
 let fetch_duniverse ~lock_dir_path () =
@@ -270,13 +318,13 @@ let fetch_duniverse ~lock_dir_path () =
       Console.print_user_message
         (User_message.make
            [ Pp.textf
-               "%d duniverse package(s) have no source URL (likely local packages)."
+               "%d dune package(s) have no source URL (likely local packages)."
                (List.length duniverse_without_sources)
            ])
     else
       Console.print_user_message
         (User_message.make
-           [ Pp.text "No duniverse packages to fetch (all packages use opam sandbox)." ]);
+           [ Pp.text "No dune packages to fetch (all packages use opam)." ]);
     Fiber.return ())
   else (
     (* Create duniverse directory if it doesn't exist *)
@@ -292,10 +340,12 @@ let fetch_duniverse ~lock_dir_path () =
     let* rev_store = Rev_store.get in
     (* Get current platform for patch selection *)
     let* platform = Pkg_common.poll_solver_env_from_current_system () in
+    (* Use default patches directory *)
+    let patches_dir = default_patches_dir in
     (* Fetch each package *)
     let+ () =
       Fiber.sequential_iter duniverse_pkgs ~f:(fun pkg ->
-        fetch_package ~rev_store ~platform pkg)
+        fetch_package ~rev_store ~platform ~patches_dir pkg)
     in
     Console.print_user_message
       (User_message.make

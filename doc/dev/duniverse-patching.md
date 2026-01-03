@@ -19,7 +19,7 @@ enabling local modifications to dependencies and easier upstream contribution.
 | Single-file as default | ❌ Pending | Needs read support first |
 | Tests for single-file | ✅ Done | `test/blackbox-tests/test-cases/pkg/single-file-lock.t` |
 | `dune pkg patch` command | ✅ Done | `bin/pkg/patch.ml`, tests in `test/blackbox-tests/test-cases/pkg/patch-command.t` |
-| Patch application on fetch | ❌ Not started | |
+| Patch application on fetch | ✅ Done | Applied in `bin/pkg/fetch.ml` after opam patches |
 | Git-based cache for patches | ❌ Not started | Low priority |
 
 ## Goals
