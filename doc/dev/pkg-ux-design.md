@@ -62,17 +62,39 @@ The following improvements have been implemented:
 - **File:** `bin/pkg/outdated.ml:98-100`
 - Updated to show `->` instead of `<`
 
+### 6. Added `dune pkg deps` command
+- **File:** `bin/pkg/deps.ml` (new)
+- Provides unified dependency introspection with `--tree` and `--why` flags
+- **Example:** `dune pkg deps --tree` shows dependency tree
+- **Example:** `dune pkg deps --why fmt` shows why a package is needed
+
+### 7. Enhanced `dune show depexts` output
+- **File:** `bin/describe/describe_depexts.ml`
+- Added `--pm` flag to specify package manager
+- Added `--json` flag for structured output
+- Added `--short` flag for package names only
+- Now detects platform and shows installation commands
+
+### 8. Improved solver conflict error messages
+- **File:** `src/dune_pkg/opam_solver.ml`
+- **Before:** Lists each rejected version individually: `foo.1.0.0: Rejected by depends of x`
+- **After:** Groups by reason with versions in brackets: `Rejected by depends of x [1.0.0, 0.9.0]`
+- Improved outcome text: `(problem)` → `(no usable version)`, `(no candidates)`, `(conflict)`
+
 **140+ test files were updated** with the new output format.
 
 ---
 
 ## Executive Summary
 
-Overall, Dune's package management UX is functional but lacks some polish and discoverability features that modern package managers provide. The biggest gaps are around:
+Overall, Dune's package management UX is functional. Recent improvements addressed:
+1. **Dependency introspection** — `dune pkg deps` with `--tree` and `--why` flags
+2. **Better error messages** — Solver diagnostics now more specific
+3. **System dependency tooling** — `dune show depexts` with platform detection
+
+Remaining gaps:
 1. **Missing common commands** (`add`, `remove`, `update`, `init`)
-2. **Lack of visual feedback** (no colors, minimal progress indicators)
-3. **Sparse dependency information** (no tree view, no `why` explanations)
-4. **Inconsistent output formatting**
+2. **Lack of visual feedback** (no colours, minimal progress indicators)
 
 ---
 
@@ -467,18 +489,12 @@ Pp.textf "Solution for %s (%d package%s)" ... pkg_count (if pkg_count = 1 then "
 
 ---
 
-## Deferred Quick Wins
-
-4. **Add timing info** ("Completed in 1.2s") - requires threading timing through output
-5. **Show build progress** ("Building foo.0.0.1 (3/8)") - requires build system changes
-
----
-
 ## Medium Effort Improvements (Future Work)
 
-1. **Add `dune pkg deps`** — unified dependency introspection with `--tree` and `--why` flags
-2. **Add `--color` flag** — colour as enhancement after structure is solid
-3. **Improve conflict error messages** — show dependency chain, suggest specific actions
+1. **Show build progress count** — `Building foo.0.0.1 (3/8)`
+2. **Add `dune pkg deps`** — unified dependency introspection with `--tree` and `--why` flags
+3. **Add `--color` flag** — colour as enhancement after structure is solid
+4. **Improve conflict error messages** — show dependency chain, suggest specific actions
 
 ## Larger Initiatives (Needs Justification)
 
