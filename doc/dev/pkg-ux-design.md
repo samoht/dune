@@ -502,6 +502,64 @@ Pp.textf "Solution for %s (%d package%s)" ... pkg_count (if pkg_count = 1 then "
 2. ~~**Add `dune pkg deps`**~~ — ✅ Done (see #6 above)
 3. **Add `--color` flag** — colour as enhancement after structure is solid
 4. ~~**Improve conflict error messages**~~ — ✅ Done (see #8 above)
+5. **Auto-lock option** — see section below
+
+---
+
+### Auto-Lock When Out of Sync
+
+**Current behavior:**
+```
+File "dune.lock/lock.dune", line 1, characters 0-0:
+Error: The lock dir is not sync with your dune-project
+Hint: run dune pkg lock
+```
+
+**Proposal:** Add opt-in auto-lock via CLI flag and config file.
+
+**Option 1: CLI flag (one-time)**
+```bash
+dune build --auto-lock        # One-time auto-lock
+```
+
+**Option 2: Global config (user preference)**
+```lisp
+; ~/.config/dune/config
+(lang dune 3.18)
+(auto_lock enabled)           ; Auto-lock when out of sync
+```
+
+**Option 3: dune-workspace (per-workspace override)**
+```lisp
+; dune-workspace
+(lang dune 3.18)
+(auto_lock enabled)           ; Override for this workspace
+```
+
+**NOT in dune-project** — this is a user preference, not a project policy.
+All contributors shouldn't be forced into automatic behavior.
+
+**Improved error message (when not enabled):**
+```
+Error: Lock dir out of sync with dune-project
+Hint: Run `dune pkg lock` to regenerate
+      Or use `dune build --auto-lock` for one-time auto-lock
+      Or add (auto_lock enabled) to ~/.config/dune/config
+```
+
+**Rationale:**
+- Default remains explicit (lock changes are VCS-significant)
+- Power users can opt-in to npm/yarn-like automatic behavior
+- Global config = user preference across all projects
+- dune-workspace = per-workspace override (e.g., for CI)
+- CLI flag = one-time convenience
+
+**Implementation:**
+- `src/dune_config_file/dune_config.ml` — add `auto_lock` field
+- `src/dune_rules/workspace.ml` — add `auto_lock` field (optional override)
+- `bin/common.ml` — add `--auto-lock` flag
+- `src/dune_pkg/package_universe.ml` — check flag in `validate_dependency_hash`
+- If enabled, call lock regeneration instead of erroring
 
 ## Larger Initiatives (Needs Justification)
 
