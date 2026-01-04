@@ -1,5 +1,15 @@
 open Import
 
+(** Progress tracking for package builds. Call [set_total] at the start
+    of a build to enable progress counts like "(1/5)". *)
+module Progress : sig
+  (** Set the total number of packages to build. Call this before building. *)
+  val set_total : int -> unit
+
+  (** Reset the progress counter. Call this before a new build. *)
+  val reset : unit -> unit
+end
+
 (** Formats a message in the style of a progress message. The text of
     the message will be "<verb> <object_>" with the verb colored to match
     the verb in progress messages (e.g. "Downloading", and the message

@@ -2314,8 +2314,10 @@ let setup_pkg_install_alias =
       Action_builder.of_memo
         (let open Memo.O in
          let+ db = DB.of_ctx ctx_name ~allow_sharing:true in
-         Pkg_digest.Map.values db.pkg_digest_table
-         |> List.map ~f:(fun { DB.Pkg_table.pkg_digest; _ } -> pkg_digest))
+         let digests = Pkg_digest.Map.values db.pkg_digest_table in
+         (* Set the total package count for progress reporting *)
+         Pkg_build_progress.Progress.set_total (List.length digests);
+         List.map digests ~f:(fun { DB.Pkg_table.pkg_digest; _ } -> pkg_digest))
     in
     List.map pkg_digests ~f:(fun pkg_digest ->
       Paths.make ~relative:Path.Build.relative pkg_digest (Dependencies ctx_name)

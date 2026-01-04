@@ -12,6 +12,29 @@ module Status = struct
   ;;
 end
 
+(* Progress tracking for package builds *)
+module Progress = struct
+  type t =
+    { mutable total : int
+    ; mutable completed : int
+    }
+
+  let state = { total = 0; completed = 0 }
+  let set_total n = state.total <- n
+
+  let reset () =
+    state.total <- 0;
+    state.completed <- 0
+  ;;
+
+  let increment () =
+    state.completed <- state.completed + 1;
+    state.completed
+  ;;
+
+  let format () = if state.total > 0 then Some (state.completed, state.total) else None
+end
+
 let format_user_message ~verb ~object_ =
   let status_tag = User_message.Style.Ok in
   User_message.make
@@ -26,19 +49,29 @@ module Message = struct
     }
 
   let user_message { package_name; package_version; status } =
-    format_user_message
-      ~verb:(Status.to_string status)
-      ~object_:
-        (Pp.textf
-           "%s.%s"
-           (Package.Name.to_string package_name)
-           (Package_version.to_string package_version))
+    let pkg_str =
+      sprintf
+        "%s.%s"
+        (Package.Name.to_string package_name)
+        (Package_version.to_string package_version)
+    in
+    let object_ =
+      match Progress.format () with
+      | None -> Pp.text pkg_str
+      | Some (current, total) -> Pp.textf "%s (%d/%d)" pkg_str current total
+    in
+    format_user_message ~verb:(Status.to_string status) ~object_
   ;;
 
   let display t =
     match !Dune_engine.Clflags.display with
     | Quiet -> ()
-    | Short | Verbose -> Console.print_user_message (user_message t)
+    | Short | Verbose ->
+      (* Increment counter when displaying building message *)
+      (match t.status with
+       | `Building -> ignore (Progress.increment () : int)
+       | `Downloading -> ());
+      Console.print_user_message (user_message t)
   ;;
 
   let encode { package_name; package_version; status } =
