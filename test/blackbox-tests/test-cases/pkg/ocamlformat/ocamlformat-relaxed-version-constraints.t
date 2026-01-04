@@ -65,7 +65,7 @@ This should fail as there is no version matching 0.24.1:
   Lock directory _build/.dev-tools.locks/ocamlformat:
   Couldn't solve the package dependency formula.
   Selected candidates: ocamlformat_dev_tool_wrapper.dev
-  - ocamlformat -> (problem)
+  - ocamlformat -> (no usable version)
       No usable implementations:
         ocamlformat.0.25+bar:
           Rejected by depends of local package ocamlformat_dev_tool_wrapper

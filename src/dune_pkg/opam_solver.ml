@@ -1302,7 +1302,11 @@ module Solver = struct
       let pp_outcome t =
         match t.selected_impl with
         | Some sel -> Input.pp_impl_long sel
-        | None -> Pp.text "(problem)"
+        | None ->
+          (match rejects t with
+           | _, `No_candidates -> Pp.text "(no candidates)"
+           | _, `All_unusable -> Pp.text "(no usable version)"
+           | _, `Conflicts -> Pp.text "(conflict)")
       ;;
 
       (* Format a textual description of this component's report. *)

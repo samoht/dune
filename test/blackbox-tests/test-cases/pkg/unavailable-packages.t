@@ -96,7 +96,7 @@ available on linux.
   Lock directory dune.macos.lock:
   Couldn't solve the package dependency formula.
   Selected candidates: x.dev
-  - linux-only -> (problem)
+  - linux-only -> (no usable version)
       No usable implementations:
         linux-only.0.0.2: Availability condition not satisfied
         linux-only.0.0.1: Availability condition not satisfied
@@ -123,7 +123,7 @@ variable in its `available` filter. The undefined-var.0.0.2 package has a valid
   Lock directory dune.macos.lock:
   Couldn't solve the package dependency formula.
   Selected candidates: x.dev
-  - undefined-var -> (problem)
+  - undefined-var -> (no usable version)
       No usable implementations:
         undefined-var.0.0.2: Availability condition not satisfied
         undefined-var.0.0.1: Availability condition not satisfied
@@ -136,7 +136,7 @@ filter resolves to a string instead of to a boolean.
   Lock directory dune.lock:
   Couldn't solve the package dependency formula.
   Selected candidates: x.dev
-  - availability-string -> (problem)
+  - availability-string -> (no usable version)
       No usable implementations:
         availability-string.0.0.2: Availability condition not satisfied
         availability-string.0.0.1: Availability condition not satisfied
@@ -144,7 +144,7 @@ filter resolves to a string instead of to a boolean.
   Lock directory dune.macos.lock:
   Couldn't solve the package dependency formula.
   Selected candidates: x.dev
-  - availability-string -> (problem)
+  - availability-string -> (no usable version)
       No usable implementations:
         availability-string.0.0.2: Availability condition not satisfied
         availability-string.0.0.1: Availability condition not satisfied

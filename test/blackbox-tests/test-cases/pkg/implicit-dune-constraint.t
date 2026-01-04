@@ -18,7 +18,7 @@ dependency.
   
   Couldn't solve the package dependency formula.
   Selected candidates: foo.0.0.1 x.dev
-  - dune -> (problem)
+  - dune -> (conflict)
       User requested = 3.XX
       foo 0.0.1 requires <= 2.0.0
       Rejected candidates:

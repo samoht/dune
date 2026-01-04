@@ -39,7 +39,7 @@ Solver error when solving fails with the same error on all platforms:
   ...with this error:
   Couldn't solve the package dependency formula.
   Selected candidates: a.0.0.1 b.0.0.1 foo.dev
-  - c -> (problem)
+  - c -> (conflict)
       a 0.0.1 requires = 0.1
       Rejected candidates:
         c.0.2: Incompatible with restriction: = 0.1
@@ -65,7 +65,7 @@ with the platforms where they are relevant:
   ...with this error:
   Couldn't solve the package dependency formula.
   Selected candidates: a.0.0.1 b.0.0.1 foo.dev
-  - c -> (problem)
+  - c -> (conflict)
       a 0.0.1 requires = 0.1
       Rejected candidates:
         c.0.2: Incompatible with restriction: = 0.1
@@ -76,7 +76,7 @@ with the platforms where they are relevant:
   ...with this error:
   Couldn't solve the package dependency formula.
   Selected candidates: a.0.0.1 b.0.0.1 foo.dev
-  - c -> (problem)
+  - c -> (conflict)
       a 0.0.1 requires = 0.3
       Rejected candidates:
         c.0.2: Incompatible with restriction: = 0.3

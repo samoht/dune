@@ -33,7 +33,7 @@ Local conflict class defined in a local package:
   
   Couldn't solve the package dependency formula.
   Selected candidates: foo.dev x.dev foo&x
-  - bar -> (problem)
+  - bar -> (conflict)
       Rejected candidates:
         bar.0.0.1: In same conflict class (ccc) as foo
   [1]
@@ -53,7 +53,7 @@ Now the conflict class comes from the opam repository
   
   Couldn't solve the package dependency formula.
   Selected candidates: foo.0.0.1 x.dev
-  - bar -> (problem)
+  - bar -> (conflict)
       Rejected candidates:
         bar.0.0.1: In same conflict class (ccc) as foo
   [1]

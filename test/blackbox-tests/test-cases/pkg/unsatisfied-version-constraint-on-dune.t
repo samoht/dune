@@ -26,7 +26,7 @@ Solve the dependencies:
   
   Couldn't solve the package dependency formula.
   Selected candidates: foo.dev
-  - dune -> (problem)
+  - dune -> (conflict)
       User requested = 3.XX
       foo dev requires < 3.XX
       Rejected candidates:

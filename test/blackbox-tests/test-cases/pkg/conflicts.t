@@ -21,7 +21,7 @@ The solver should say no solution rather than just ignoring the conflict.
   
   Couldn't solve the package dependency formula.
   Selected candidates: bar.0.0.1 x.dev
-  - foo -> (problem)
+  - foo -> (no usable version)
       No usable implementations:
         foo.0.0.1: Rejected by conflicts of local package x
   [1]
@@ -47,10 +47,10 @@ There could be more than one conflict and they can have version constraints:
   
   Couldn't solve the package dependency formula.
   Selected candidates: bar.0.0.1 bar2.0.0.1 x.dev
-  - foo -> (problem)
+  - foo -> (no usable version)
       No usable implementations:
         foo.0.0.1: Rejected by conflicts of local package x (constraint: < 0.2)
-  - foo2 -> (problem)
+  - foo2 -> (no usable version)
       No usable implementations:
         foo2.0.0.1:
           Rejected by conflicts of local package x (constraint: < 0.2)
@@ -78,10 +78,10 @@ disjunction, either package is problematic:
   Selected candidates: bar.0.0.1 bar2.0.0.1 x.dev
   - dune -> dune.3.XX
       User requested = 3.XX
-  - foo -> (problem)
+  - foo -> (no usable version)
       No usable implementations:
         foo.0.0.1: Rejected by conflicts of local package x (constraint: < 0.2)
-  - foo2 -> (problem)
+  - foo2 -> (no usable version)
       No usable implementations:
         foo2.0.0.1:
           Rejected by conflicts of local package x (constraint: < 0.2)
@@ -97,7 +97,7 @@ Adding a new version of `foo` only resolves one conflict:
   Selected candidates: bar.0.0.1 bar2.0.0.1 foo.0.2 x.dev
   - dune -> dune.3.XX
       User requested = 3.XX
-  - foo2 -> (problem)
+  - foo2 -> (no usable version)
       No usable implementations:
         foo2.0.0.1:
           Rejected by conflicts of local package x (constraint: < 0.2)

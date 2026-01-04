@@ -63,7 +63,7 @@ Conflicting packages can't be co-installed:
   
   Couldn't solve the package dependency formula.
   Selected candidates: foo.0.0.1 foo-dependency.0.0.1 x.dev
-  - conflicts-with-foo -> (problem)
+  - conflicts-with-foo -> (conflict)
       Rejected candidates:
         conflicts-with-foo.0.0.1: Requires foo conflict with all versions
   [1]
@@ -76,7 +76,7 @@ Conflicting packages in transitive dependencies can't be co-installed:
   Couldn't solve the package dependency formula.
   Selected candidates: depends-on-foo.0.0.1 foo.0.0.1 foo-dependency.0.0.1
                        x.dev
-  - conflicts-with-foo -> (problem)
+  - conflicts-with-foo -> (conflict)
       Rejected candidates:
         conflicts-with-foo.0.0.1: Requires foo conflict with all versions
   [1]

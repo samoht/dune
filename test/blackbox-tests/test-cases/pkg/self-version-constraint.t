@@ -38,7 +38,7 @@ constraint on `foo` will fail:
   
   Couldn't solve the package dependency formula.
   Selected candidates: x.dev
-  - foo -> (problem)
+  - foo -> (no usable version)
       No usable implementations:
         foo.1.0.0: Rejected by depends of local package x (constraint: = dev)
   [1]
