@@ -43,7 +43,7 @@ Lock the dependencies:
 Check that fetch command shows message when duniverse packages have no sources:
 
   $ dune pkg fetch
-  1 dune package(s) have no source URL (likely local packages).
+  1 package(s) have no source URL (likely local packages).
 
 Now let's test with a package that has an actual source URL.
 
@@ -74,7 +74,7 @@ Fetch the package:
 
   $ dune pkg fetch
   Fetching mypkg.1.0.0 to duniverse/mypkg.1.0.0
-  Fetched 1 duniverse package(s) to duniverse/
+  Fetched 1 package(s) to duniverse/
 
 Verify the package was placed in duniverse/:
 

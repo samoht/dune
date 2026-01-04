@@ -1498,6 +1498,26 @@ end = struct
         ; pkg_digest = _
         } ->
       assert (Package.Name.equal pkg_digest.name info.name);
+      (* For non-dune packages in duniverse, use duniverse sources instead of fetching *)
+      let* info =
+        let duniverse_path = Duniverse.package_dir info.name info.version in
+        let* in_duniverse =
+          Fs_memo.dir_exists (Path.Outside_build_dir.In_source_dir duniverse_path)
+        in
+        match in_duniverse, Duniverse.classify pkg with
+        | true, Duniverse.Opam_sandbox ->
+          (* Non-dune package in duniverse: override source to use local path *)
+          let abs_path =
+            Path.source duniverse_path
+            |> Path.to_absolute_filename
+            |> Path.External.of_string
+          in
+          let duniverse_source = Source.external_copy (Loc.none, abs_path) in
+          Memo.return { info with Pkg_info.source = Some duniverse_source }
+        | _ ->
+          (* Either not in duniverse, or a dune package (handled elsewhere) *)
+          Memo.return info
+      in
       let* platform = Lock_dir.Sys_vars.solver_env in
       let choose_for_current_platform field =
         Dune_pkg.Lock.Conditional_choice.choose_for_platform field ~platform
@@ -2348,14 +2368,27 @@ let setup_pkg_install_alias =
     |> Gen_rules.rules_here
 ;;
 
-(* Check if a package is classified as duniverse and has sources in the duniverse directory.
-   If so, the package will be built as normal vendored code, not via .pkg/ rules. *)
-let is_duniverse_with_sources (lock_pkg : Lock_dir.Pkg.t) =
-  match Duniverse.classify lock_pkg with
-  | Duniverse.Opam_sandbox -> Memo.return false
-  | Duniverse.Duniverse ->
-    let duniverse_path = Duniverse.package_dir lock_pkg.info.name lock_pkg.info.version in
+(* Check if a package has sources in the duniverse directory.
+   Returns (in_duniverse, is_dune_pkg) where:
+   - in_duniverse: true if sources exist in duniverse/
+   - is_dune_pkg: true if package uses dune as build system *)
+let duniverse_status (lock_pkg : Lock_dir.Pkg.t) =
+  let duniverse_path = Duniverse.package_dir lock_pkg.info.name lock_pkg.info.version in
+  let+ in_duniverse =
     Fs_memo.dir_exists (Path.Outside_build_dir.In_source_dir duniverse_path)
+  in
+  let is_dune_pkg =
+    match Duniverse.classify lock_pkg with
+    | Duniverse.Duniverse -> true
+    | Duniverse.Opam_sandbox -> false
+  in
+  in_duniverse, is_dune_pkg
+;;
+
+(* For backwards compatibility - check if package is dune-based in duniverse *)
+let is_duniverse_with_sources (lock_pkg : Lock_dir.Pkg.t) =
+  let+ in_duniverse, is_dune_pkg = duniverse_status lock_pkg in
+  in_duniverse && is_dune_pkg
 ;;
 
 let setup_package_rules (db : DB.t) ~package_universe ~dir ~pkg_digest

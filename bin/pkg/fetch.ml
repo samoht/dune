@@ -286,34 +286,27 @@ let fetch_duniverse ~lock_dir_path ~solver_env () =
   let lock_path = Path.source lock_dir_path in
   let* lock_dir = Lock_pkg.read_disk_fiber ~solver_env lock_path in
   let all_pkgs = Lock_dir.Packages.to_pkg_list lock_dir.packages in
-  (* Filter to only duniverse packages that have a source URL *)
-  let duniverse_pkgs =
-    List.filter all_pkgs ~f:(fun pkg ->
-      match Duniverse.classify pkg with
-      | Duniverse.Duniverse -> Option.is_some pkg.info.source
-      | Duniverse.Opam_sandbox -> false)
+  (* Fetch ALL packages that have a source URL to duniverse (both dune and non-dune) *)
+  let fetchable_pkgs =
+    List.filter all_pkgs ~f:(fun (pkg : Lock_dir.Pkg.t) -> Option.is_some pkg.info.source)
   in
-  if List.is_empty duniverse_pkgs
+  if List.is_empty fetchable_pkgs
   then (
-    (* Check if there are duniverse packages without sources *)
-    let duniverse_without_sources =
-      List.filter all_pkgs ~f:(fun pkg ->
-        match Duniverse.classify pkg with
-        | Duniverse.Duniverse -> Option.is_none pkg.info.source
-        | Duniverse.Opam_sandbox -> false)
+    (* Check if there are packages without sources (local packages) *)
+    let pkgs_without_sources =
+      List.filter all_pkgs ~f:(fun (pkg : Lock_dir.Pkg.t) ->
+        Option.is_none pkg.info.source)
     in
-    if not (List.is_empty duniverse_without_sources)
+    if not (List.is_empty pkgs_without_sources)
     then
       Console.print_user_message
         (User_message.make
            [ Pp.textf
-               "%d dune package(s) have no source URL (likely local packages)."
-               (List.length duniverse_without_sources)
+               "%d package(s) have no source URL (likely local packages)."
+               (List.length pkgs_without_sources)
            ])
     else
-      Console.print_user_message
-        (User_message.make
-           [ Pp.text "No dune packages to fetch (all packages use opam)." ]);
+      Console.print_user_message (User_message.make [ Pp.text "No packages to fetch." ]);
     Fiber.return ())
   else (
     (* Create duniverse directory if it doesn't exist *)
@@ -333,7 +326,7 @@ let fetch_duniverse ~lock_dir_path ~solver_env () =
     let patches_dir = default_patches_dir in
     (* Fetch each package and count how many were actually fetched *)
     let+ fetched_results =
-      Fiber.sequential_map duniverse_pkgs ~f:(fun pkg ->
+      Fiber.sequential_map fetchable_pkgs ~f:(fun pkg ->
         fetch_package ~rev_store ~platform ~patches_dir pkg)
     in
     let num_fetched = List.filter fetched_results ~f:Fun.id |> List.length in
@@ -342,7 +335,7 @@ let fetch_duniverse ~lock_dir_path ~solver_env () =
       Console.print_user_message
         (User_message.make
            [ Pp.textf
-               "Fetched %d duniverse package(s) to %s/"
+               "Fetched %d package(s) to %s/"
                num_fetched
                (Path.Source.to_string Duniverse.duniverse_dir)
            ]))
@@ -369,15 +362,16 @@ let term =
 ;;
 
 let info =
-  let doc = "Fetch duniverse package sources" in
+  let doc = "Fetch package sources to duniverse" in
   let man =
     [ `S "DESCRIPTION"
     ; `P
-        "Fetches the source code for packages that will be built in the duniverse \
-         directory. These are packages that use dune as their build system and will be \
-         built alongside your project code, enabling full editor tooling support."
+        "Fetches the source code for all locked packages to the duniverse directory. \
+         Packages using dune as their build system are built alongside your project \
+         code, while other packages are built in the .pkg sandbox but from duniverse \
+         sources."
     ; `P
-        "Packages are downloaded to duniverse/<name>.<version>/ and can be edited \
+        "All packages are downloaded to duniverse/<name>.<version>/ and can be edited \
          directly. Changes will be reflected in your project builds."
     ; `S "EXAMPLES"
     ; `Pre "  dune pkg fetch"
