@@ -542,6 +542,7 @@ let shared_with_config_file =
   ; action_stderr_on_success
   ; project_defaults = None
   ; pkg_enabled = None
+  ; auto_lock = None
   ; experimental = None
   }
 ;;

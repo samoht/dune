@@ -41,8 +41,10 @@ We add the bar dependency to the test package
 It fails as we have not regenerated the lock:
   $ dune build
   File "dune.lock/lock.dune", line 1, characters 0-0:
-  Error: The lock dir is not sync with your dune-project
-  Hint: run dune pkg lock
+  Error: Lock dir out of sync with dune-project
+  Hint: Run 'dune pkg lock' to regenerate
+  Hint: Or add '(auto_lock enabled)' to ~/.config/dune/config for automatic
+  re-locking
   [1]
 
 We fix it and the build succeeds again:

@@ -739,11 +739,26 @@ let raise_on_lock_dir_out_of_sync =
           let source_path = Dune_pkg.Lock.in_source_tree path in
           let loc_path = Path.source source_path in
           let loc = Loc.in_file (Path.relative loc_path "lock.dune") in
-          let hints = Pp.[ text "run dune pkg lock" ] in
+          let hints =
+            Pp.
+              [ concat
+                  ~sep:(text " ")
+                  [ text "Run"
+                  ; User_message.command "dune pkg lock"
+                  ; text "to regenerate"
+                  ]
+              ; concat
+                  ~sep:(text " ")
+                  [ text "Or add"
+                  ; User_message.command "(auto_lock enabled)"
+                  ; text "to ~/.config/dune/config for automatic re-locking"
+                  ]
+              ]
+          in
           User_error.raise
             ~loc
             ~hints
-            [ Pp.text "The lock dir is not sync with your dune-project" ]
+            [ Pp.text "Lock dir out of sync with dune-project" ]
       else Memo.return ())
     |> Memo.Lazy.force)
   |> Staged.unstage

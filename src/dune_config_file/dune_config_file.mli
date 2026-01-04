@@ -100,6 +100,7 @@ module Dune_config : sig
       ; action_stderr_on_success : Action_output_on_success.t field
       ; project_defaults : Project_defaults.t field
       ; pkg_enabled : Pkg_enabled.t field
+      ; auto_lock : bool field
       ; experimental : (string * (Loc.t * string)) list field
       }
   end
