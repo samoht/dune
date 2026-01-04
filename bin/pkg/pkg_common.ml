@@ -121,7 +121,14 @@ let unset_solver_vars_of_workspace workspace ~lock_dir_path =
 
 let find_local_packages =
   let open Memo.O in
+  let duniverse_dir = Dune_pkg.Duniverse.marker_dirname in
   Dune_rules.Dune_load.packages ()
+  >>| Package.Name.Map.filter ~f:(fun pkg ->
+    (* Exclude packages in duniverse/ - they are vendored dependencies, not local packages *)
+    let dir = Package.dir pkg in
+    match Path.Source.explode dir with
+    | first :: _ when String.equal first duniverse_dir -> false
+    | _ -> true)
   >>| Package.Name.Map.map ~f:Dune_pkg.Local_package.of_package
 ;;
 
