@@ -56,8 +56,7 @@ There are no valid version of foo at the moment:
   Couldn't solve the package dependency formula.
   Selected candidates: bar.1.9.1 x.dev
   - foo -> (no usable version)
-      No usable implementations:
-        foo.1.0.0: Rejected by depends of local package x
+      Rejected by depends of local package x [1.0.0]
   [1]
 
 If we add one:

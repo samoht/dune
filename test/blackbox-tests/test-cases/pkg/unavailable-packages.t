@@ -97,9 +97,7 @@ available on linux.
   Couldn't solve the package dependency formula.
   Selected candidates: x.dev
   - linux-only -> (no usable version)
-      No usable implementations:
-        linux-only.0.0.2: Availability condition not satisfied
-        linux-only.0.0.1: Availability condition not satisfied
+      Availability condition not satisfied [0.0.2, 0.0.1]
   [1]
 
 The latest version of the package will be chosen on linux but the middle
@@ -124,9 +122,7 @@ variable in its `available` filter. The undefined-var.0.0.2 package has a valid
   Couldn't solve the package dependency formula.
   Selected candidates: x.dev
   - undefined-var -> (no usable version)
-      No usable implementations:
-        undefined-var.0.0.2: Availability condition not satisfied
-        undefined-var.0.0.1: Availability condition not satisfied
+      Availability condition not satisfied [0.0.2, 0.0.1]
   [1]
 
 Warnings will be printed and no solution will be found as the availability
@@ -137,17 +133,13 @@ filter resolves to a string instead of to a boolean.
   Couldn't solve the package dependency formula.
   Selected candidates: x.dev
   - availability-string -> (no usable version)
-      No usable implementations:
-        availability-string.0.0.2: Availability condition not satisfied
-        availability-string.0.0.1: Availability condition not satisfied
+      Availability condition not satisfied [0.0.2, 0.0.1]
   Error: Unable to solve dependencies for the following lock directories:
   Lock directory dune.macos.lock:
   Couldn't solve the package dependency formula.
   Selected candidates: x.dev
   - availability-string -> (no usable version)
-      No usable implementations:
-        availability-string.0.0.2: Availability condition not satisfied
-        availability-string.0.0.1: Availability condition not satisfied
+      Availability condition not satisfied [0.0.2, 0.0.1]
   [1]
 
 The middle version will be picked as this is the only one available if

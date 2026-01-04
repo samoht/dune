@@ -29,5 +29,4 @@ Solve the dependencies:
   - dune -> (conflict)
       User requested = 3.XX
       foo dev requires < 3.XX
-      Rejected candidates:
-        dune.3.XX: Incompatible with restriction: < 3.XX
+      Incompatible with restriction: < 3.XX [3.XX]

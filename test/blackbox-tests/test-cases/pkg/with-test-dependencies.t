@@ -64,8 +64,7 @@ Conflicting packages can't be co-installed:
   Couldn't solve the package dependency formula.
   Selected candidates: foo.0.0.1 foo-dependency.0.0.1 x.dev
   - conflicts-with-foo -> (conflict)
-      Rejected candidates:
-        conflicts-with-foo.0.0.1: Requires foo conflict with all versions
+      Requires foo conflict with all versions [0.0.1]
   [1]
 
 Conflicting packages in transitive dependencies can't be co-installed:
@@ -77,8 +76,7 @@ Conflicting packages in transitive dependencies can't be co-installed:
   Selected candidates: depends-on-foo.0.0.1 foo.0.0.1 foo-dependency.0.0.1
                        x.dev
   - conflicts-with-foo -> (conflict)
-      Rejected candidates:
-        conflicts-with-foo.0.0.1: Requires foo conflict with all versions
+      Requires foo conflict with all versions [0.0.1]
   [1]
 
 Conflicts with transitive test dependencies don't affect the solution:

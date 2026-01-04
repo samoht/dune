@@ -1250,20 +1250,56 @@ module Solver = struct
           Pp.hovbox (Pp.text "Reason for rejection unknown: " ++ msg)
       ;;
 
-      let show_rejections ~verbose rejected =
-        let by_version (a, _) (b, _) = Input.Impl.compare_version b a in
-        let rejected = List.sort ~compare:by_version rejected in
-        let rec aux i = function
-          | [] -> Pp.nop
-          | _ when i = 5 && not verbose -> Pp.cut ++ Pp.text "..."
-          | (impl, problem) :: xs ->
-            Pp.cut
-            ++ Pp.hovbox
-                 ~indent:2
-                 (Input.pp_impl_long impl ++ Pp.text ": " ++ pp_reject (impl, problem))
-            ++ aux (i + 1) xs
+      (* Group rejections by reason and show versions briefly *)
+      let show_rejections rejected =
+        (* Extract a string key for grouping similar reasons *)
+        let reason_key (_, reason) =
+          match reason with
+          | `Model_rejection Context.Unavailable -> "unavailable"
+          | `Model_rejection (Context.Refuted_by { local_package; constraint_kind; _ }) ->
+            let kind =
+              match constraint_kind with
+              | Context.Depends -> "depends"
+              | Conflicts -> "conflicts"
+            in
+            Printf.sprintf "%s:%s" kind (Package_name.to_string local_package)
+          | `FailsRestriction r ->
+            Printf.sprintf "restriction:%s" (Input.Restriction.to_string r)
+          | `DepFailsRestriction _ -> "dep-fails"
+          | `ClassConflict (_, cl) ->
+            Printf.sprintf "class:%s" (OpamPackage.Name.to_string cl)
+          | `ConflictsRole _ -> "conflicts-role"
+          | `DiagnosticsFailure _ -> "unknown"
         in
-        aux 0 rejected
+        (* Group by reason using a string map *)
+        let groups =
+          List.fold_left rejected ~init:String.Map.empty ~f:(fun acc r ->
+            let key = reason_key r in
+            String.Map.update acc key ~f:(function
+              | None -> Some [ r ]
+              | Some l -> Some (r :: l)))
+          |> String.Map.to_list
+        in
+        let pp_group (_, group) =
+          match group with
+          | [] -> Pp.nop
+          | (impl, reason) :: rest ->
+            let versions =
+              impl :: List.map rest ~f:fst
+              |> List.sort ~compare:(fun a b -> Input.Impl.compare_version b a)
+              |> List.map ~f:(fun i ->
+                match Input.Impl.version i with
+                | Some pkg -> OpamPackage.version_to_string pkg
+                | None -> "dev")
+            in
+            let versions_str =
+              if List.length versions <= 3
+              then String.concat ~sep:", " versions
+              else String.concat ~sep:", " (List.take 3 versions) ^ ", ..."
+            in
+            Pp.cut ++ Pp.hbox (pp_reject (impl, reason) ++ Pp.textf " [%s]" versions_str)
+        in
+        Pp.concat_map groups ~f:pp_group
       ;;
 
       let rejects t =
@@ -1275,21 +1311,12 @@ module Solver = struct
         t.bad, summary
       ;;
 
-      let pp_candidates ~verbose t =
+      let pp_candidates t =
         if t.selected_impl = None
-        then
-          Pp.cut
-          ++
+        then (
           match rejects t with
-          | _, `No_candidates -> Pp.paragraph "No known implementations at all"
-          | bad, `All_unusable ->
-            Pp.vbox
-              ~indent:2
-              (Pp.paragraph "No usable implementations:" ++ show_rejections ~verbose bad)
-          | bad, `Conflicts ->
-            Pp.vbox
-              ~indent:2
-              (Pp.paragraph "Rejected candidates:" ++ show_rejections ~verbose bad)
+          | _, `No_candidates -> Pp.cut ++ Pp.paragraph "No known implementations at all"
+          | bad, (`All_unusable | `Conflicts) -> show_rejections bad)
         else Pp.nop
       ;;
 
@@ -1310,12 +1337,12 @@ module Solver = struct
       ;;
 
       (* Format a textual description of this component's report. *)
-      let pp ~verbose t =
+      let pp t =
         Pp.vbox
           ~indent:2
           (Pp.hovbox (Input.pp_role t.role ++ Pp.text " -> " ++ pp_outcome t)
            ++ pp_notes t
-           ++ pp_candidates ~verbose t)
+           ++ pp_candidates t)
       ;;
     end
 
@@ -1462,7 +1489,7 @@ module Solver = struct
     | None -> Error req
   ;;
 
-  let pp_rolemap ~verbose reasons =
+  let pp_rolemap reasons =
     let good, bad, unknown =
       Input.Role.Map.to_list reasons
       |> List.partition_three ~f:(fun (role, component) ->
@@ -1473,14 +1500,13 @@ module Solver = struct
            | _, `No_candidates -> `Right role
            | _, _ -> `Middle component))
     in
-    let pp_bad = Diagnostics.Component.pp ~verbose in
     let pp_unknown role = Pp.box (Input.Role.pp role) in
     match unknown with
     | [] ->
       Pp.paragraph "Selected candidates: "
       ++ Pp.hovbox (Pp.concat_map ~sep:Pp.space good ~f:Input.pp_impl)
       ++ Pp.cut
-      ++ Pp.enumerate bad ~f:pp_bad
+      ++ Pp.enumerate bad ~f:Diagnostics.Component.pp
     | _ ->
       (* In case of unknown packages, no need to print the full diagnostic
          list, the problem is simpler. *)
@@ -1495,11 +1521,11 @@ module Solver = struct
     >>= Diagnostics.of_result context
   ;;
 
-  let diagnostics ?(verbose = false) context req =
+  let diagnostics ?verbose:_ context req =
     let+ diag = diagnostics_rolemap context req in
     Pp.paragraph "Couldn't solve the package dependency formula."
     ++ Pp.cut
-    ++ Pp.vbox (pp_rolemap ~verbose diag)
+    ++ Pp.vbox (pp_rolemap diag)
   ;;
 
   let packages_of_result sels =

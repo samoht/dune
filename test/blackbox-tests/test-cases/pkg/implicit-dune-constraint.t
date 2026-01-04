@@ -21,8 +21,7 @@ dependency.
   - dune -> (conflict)
       User requested = 3.XX
       foo 0.0.1 requires <= 2.0.0
-      Rejected candidates:
-        dune.3.XX: Incompatible with restriction: <= 2.0.0
+      Incompatible with restriction: <= 2.0.0 [3.XX]
   $ test "4.0.0"
   Solution for dune.lock (1 package):
   opam:

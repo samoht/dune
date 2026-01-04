@@ -22,8 +22,7 @@ The solver should say no solution rather than just ignoring the conflict.
   Couldn't solve the package dependency formula.
   Selected candidates: bar.0.0.1 x.dev
   - foo -> (no usable version)
-      No usable implementations:
-        foo.0.0.1: Rejected by conflicts of local package x
+      Rejected by conflicts of local package x [0.0.1]
   [1]
 
 There could be more than one conflict and they can have version constraints:
@@ -48,12 +47,9 @@ There could be more than one conflict and they can have version constraints:
   Couldn't solve the package dependency formula.
   Selected candidates: bar.0.0.1 bar2.0.0.1 x.dev
   - foo -> (no usable version)
-      No usable implementations:
-        foo.0.0.1: Rejected by conflicts of local package x (constraint: < 0.2)
+      Rejected by conflicts of local package x (constraint: < 0.2) [0.0.1]
   - foo2 -> (no usable version)
-      No usable implementations:
-        foo2.0.0.1:
-          Rejected by conflicts of local package x (constraint: < 0.2)
+      Rejected by conflicts of local package x (constraint: < 0.2) [0.0.1]
   [1]
 
 When conflicts are obtained from an opam file instead of a dune-project,
@@ -79,12 +75,9 @@ disjunction, either package is problematic:
   - dune -> dune.3.XX
       User requested = 3.XX
   - foo -> (no usable version)
-      No usable implementations:
-        foo.0.0.1: Rejected by conflicts of local package x (constraint: < 0.2)
+      Rejected by conflicts of local package x (constraint: < 0.2) [0.0.1]
   - foo2 -> (no usable version)
-      No usable implementations:
-        foo2.0.0.1:
-          Rejected by conflicts of local package x (constraint: < 0.2)
+      Rejected by conflicts of local package x (constraint: < 0.2) [0.0.1]
 
 Adding a new version of `foo` only resolves one conflict:
 
@@ -98,9 +91,7 @@ Adding a new version of `foo` only resolves one conflict:
   - dune -> dune.3.XX
       User requested = 3.XX
   - foo2 -> (no usable version)
-      No usable implementations:
-        foo2.0.0.1:
-          Rejected by conflicts of local package x (constraint: < 0.2)
+      Rejected by conflicts of local package x (constraint: < 0.2) [0.0.1]
 
 Addition of `foo2` to solve the last remaining conflict:
 

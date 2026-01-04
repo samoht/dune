@@ -66,11 +66,6 @@ This should fail as there is no version matching 0.24.1:
   Couldn't solve the package dependency formula.
   Selected candidates: ocamlformat_dev_tool_wrapper.dev
   - ocamlformat -> (no usable version)
-      No usable implementations:
-        ocamlformat.0.25+bar:
-          Rejected by depends of local package ocamlformat_dev_tool_wrapper
-          (constraint: >= 0.24.1 & <= 0.24.1___MAX_VERSION)
-        ocamlformat.0.24+foo:
-          Rejected by depends of local package ocamlformat_dev_tool_wrapper
-          (constraint: >= 0.24.1 & <= 0.24.1___MAX_VERSION)
+      Rejected by depends of local package ocamlformat_dev_tool_wrapper
+      (constraint: >= 0.24.1 & <= 0.24.1___MAX_VERSION) [0.25+bar, 0.24+foo]
   [1]

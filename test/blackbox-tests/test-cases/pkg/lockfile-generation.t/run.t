@@ -168,16 +168,8 @@ Run the solver again. This time it will fail.
   Couldn't solve the package dependency formula.
   Selected candidates: baz.0.1.0 foo.0.0.1 lockfile_generation_test.dev
   - bar -> (no usable version)
-      No usable implementations:
-        bar.0.5.0:
-          Rejected by depends of local package lockfile_generation_test
-          (constraint: >= 0.6)
-        bar.0.4.0:
-          Rejected by depends of local package lockfile_generation_test
-          (constraint: >= 0.6)
-        bar.0.0.1:
-          Rejected by depends of local package lockfile_generation_test
-          (constraint: >= 0.6)
+      Rejected by depends of local package lockfile_generation_test
+      (constraint: >= 0.6) [0.5.0, 0.4.0, 0.0.1]
   [1]
 
 We'll also test how the lockfile generation works with alternate solutions.

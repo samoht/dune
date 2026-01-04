@@ -41,8 +41,7 @@ Solver error when solving fails with the same error on all platforms:
   Selected candidates: a.0.0.1 b.0.0.1 foo.dev
   - c -> (conflict)
       a 0.0.1 requires = 0.1
-      Rejected candidates:
-        c.0.2: Incompatible with restriction: = 0.1
+      Incompatible with restriction: = 0.1 [0.2]
   [1]
 
 Modify the "a" package so the solver error is different on different platforms:
@@ -67,8 +66,7 @@ with the platforms where they are relevant:
   Selected candidates: a.0.0.1 b.0.0.1 foo.dev
   - c -> (conflict)
       a 0.0.1 requires = 0.1
-      Rejected candidates:
-        c.0.2: Incompatible with restriction: = 0.1
+      Incompatible with restriction: = 0.1 [0.2]
   
   The dependency solver failed to find a solution for the following platforms:
   - arch = x86_64; os = macos
@@ -78,6 +76,5 @@ with the platforms where they are relevant:
   Selected candidates: a.0.0.1 b.0.0.1 foo.dev
   - c -> (conflict)
       a 0.0.1 requires = 0.3
-      Rejected candidates:
-        c.0.2: Incompatible with restriction: = 0.3
+      Incompatible with restriction: = 0.3 [0.2]
   [1]
