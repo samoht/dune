@@ -137,3 +137,20 @@ Verify that the .pkg directory does NOT contain the mypkg build artifacts
 
   $ ls _build/default/.pkg/mypkg/target 2>/dev/null || echo "No .pkg build for mypkg (expected)"
   No .pkg build for mypkg (expected)
+
+Test that edits to duniverse packages are picked up:
+
+  $ cat >duniverse/mypkg.1.0.0/mypkg.ml <<EOF
+  > let hello = "EDITED: hello from mypkg v2"
+  > EOF
+
+Rebuild - the edit should be picked up:
+
+  $ dune build
+
+  $ cat _build/default/duniverse/mypkg.1.0.0/mypkg.ml
+  let hello = "EDITED: hello from mypkg v2"
+
+This confirms that duniverse packages fetched via `dune pkg fetch` are:
+1. Built in the main context (not .pkg sandbox)
+2. Editable - changes are picked up on rebuild
