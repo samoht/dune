@@ -571,37 +571,41 @@ let opam_package_to_lock_file_pkg
 
 let file_to_lock ~loc ~solver_env (file : Lock.File.t) =
   let open Fiber.O in
+  let portable_lock_dir = Lock.File.is_portable file in
   let* repos, resolved_packages = Lock.File.derive ~loc file in
   (* Build version map from the package list *)
   let version_by_package_name =
     List.fold_left
       file.packages
       ~init:Package_name.Map.empty
-      ~f:(fun acc { Lock.File.Package_entry.name; version } ->
+      ~f:(fun acc { Lock.File.Package_entry.name; version; platforms = _ } ->
         Package_name.Map.add_exn acc name version)
   in
   (* Create stats updater for tracking expanded variables *)
   let stats_updater = Solver_stats.Updater.init () in
   (* Convert each resolved package to Lock.Pkg.t *)
   let+ pkgs =
-    Fiber.parallel_map resolved_packages ~f:(fun (name, version, resolved_package) ->
-      let opam_package =
-        OpamPackage.create
-          (Package_name.to_opam_package_name name)
-          (Package_version.to_opam_package_version version)
-      in
-      match
-        opam_package_to_lock_file_pkg
-          solver_env
-          stats_updater
-          version_by_package_name
-          opam_package
-          ~pinned:false
-          resolved_package
-          ~portable_lock_dir:false
-      with
-      | Ok pkg -> Fiber.return pkg
-      | Error msg -> User_error.raise [ User_message.pp msg ])
+    Fiber.parallel_map
+      resolved_packages
+      ~f:(fun (name, version, _platforms, resolved_package) ->
+        (* TODO: Use platforms to set enabled_on_platforms on the pkg *)
+        let opam_package =
+          OpamPackage.create
+            (Package_name.to_opam_package_name name)
+            (Package_version.to_opam_package_version version)
+        in
+        match
+          opam_package_to_lock_file_pkg
+            solver_env
+            stats_updater
+            version_by_package_name
+            opam_package
+            ~pinned:false
+            resolved_package
+            ~portable_lock_dir
+        with
+        | Ok pkg -> Fiber.return pkg
+        | Error msg -> User_error.raise [ User_message.pp msg ])
   in
   let packages =
     List.fold_left pkgs ~init:Package_name.Map.empty ~f:(fun acc (pkg : Lock.Pkg.t) ->
@@ -620,8 +624,62 @@ let file_to_lock ~loc ~solver_env (file : Lock.File.t) =
     ~repos:(Some repos)
     ~expanded_solver_variable_bindings
     ~solved_for_platform:(Some solver_env)
-    ~portable_lock_dir:false
+    ~portable_lock_dir
 ;;
+
+(* Cache for derived single-file locks.
+   Stores the derived directory-format lock in _build/ for fast subsequent reads. *)
+module Single_file_cache = struct
+  let cache_dir = Path.Build.relative Path.Build.root ".pkg-lock-cache"
+
+  (* Cache path for a given source lock file *)
+  let cache_path_for source_path =
+    let hash = Dune_digest.string (Path.to_string source_path) |> Dune_digest.to_string in
+    Path.Build.relative cache_dir hash
+  ;;
+
+  let mtime_file cache_path = Path.Build.relative cache_path ".source-mtime"
+
+  let get_source_mtime path =
+    match Path.stat path with
+    | Ok { Unix.st_mtime; _ } -> Some st_mtime
+    | Error _ -> None
+  ;;
+
+  let read_cached_mtime cache_path : float option =
+    let mtime_path = Path.build (mtime_file cache_path) in
+    try
+      let contents = Io.read_file mtime_path in
+      Some (Stdlib.float_of_string (String.trim contents))
+    with
+    | _ -> None
+  ;;
+
+  let write_mtime cache_path mtime =
+    let mtime_path = Path.build (mtime_file cache_path) in
+    Io.write_file mtime_path (Stdlib.string_of_float mtime)
+  ;;
+
+  let is_cache_valid source_path cache_path =
+    match get_source_mtime source_path, read_cached_mtime cache_path with
+    | Some source_mtime, Some cached_mtime -> source_mtime = cached_mtime
+    | _ -> false
+  ;;
+
+  let write_cache ~portable_lock_dir cache_path (lock : Lock.t) source_mtime =
+    let cache_build_path = Path.build cache_path in
+    (* Create cache directory *)
+    Path.mkdir_p cache_build_path;
+    (* Write lock in directory format (same as upstream) *)
+    let files = Package_name.Map.empty in
+    Lock.Write_disk.prepare ~portable_lock_dir ~lock_dir_path:cache_build_path ~files lock
+    |> Lock.Write_disk.commit;
+    (* Write source mtime marker *)
+    write_mtime cache_path source_mtime
+  ;;
+
+  let read_from_cache cache_path = Lock.read_disk_exn (Path.build cache_path)
+end
 
 let read_disk_fiber ~solver_env path =
   match Lock.detect_format path with
@@ -635,12 +693,25 @@ let read_disk_fiber ~solver_env path =
     (* Directory format - use sync reader wrapped in Fiber *)
     Fiber.return (Lock.read_disk_exn path)
   | Some Lock.Single_file ->
-    (* Single-file format - parse and derive *)
-    let file =
-      Io.with_lexbuf_from_file path ~f:(fun lexbuf ->
-        let sexps = Dune_sexp.Parser.parse ~mode:Many lexbuf in
-        Dune_sexp.Decoder.parse Lock.File.decode Univ_map.empty (List (Loc.none, sexps)))
-    in
-    let loc = Loc.in_file path in
-    file_to_lock ~loc ~solver_env file
+    (* Single-file format - check cache first, then derive if needed *)
+    let cache_path = Single_file_cache.cache_path_for path in
+    if Single_file_cache.is_cache_valid path cache_path
+    then (* Cache hit - read from cached directory format *)
+      Fiber.return (Single_file_cache.read_from_cache cache_path)
+    else (
+      (* Cache miss - derive from opam repo and cache result *)
+      let file =
+        Io.with_lexbuf_from_file path ~f:(fun lexbuf ->
+          Lock.Metadata.parse_contents lexbuf ~f:(fun _lang -> Lock.File.decode))
+      in
+      let portable_lock_dir = Lock.File.is_portable file in
+      let loc = Loc.in_file path in
+      let open Fiber.O in
+      let+ lock = file_to_lock ~loc ~solver_env file in
+      (* Write to cache for next time (same format as upstream lock dir) *)
+      (match Single_file_cache.get_source_mtime path with
+       | Some mtime ->
+         Single_file_cache.write_cache ~portable_lock_dir cache_path lock mtime
+       | None -> ());
+      lock)
 ;;

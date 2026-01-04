@@ -1,5 +1,6 @@
 open Import
 module Lock_dir = Dune_pkg.Lock
+module Lock_pkg = Dune_pkg.Lock_pkg
 module Source = Dune_pkg.Source
 module Duniverse = Dune_pkg.Duniverse
 module Rev_store = Dune_pkg.Rev_store
@@ -292,10 +293,11 @@ let fetch_package ~rev_store ~platform ~patches_dir pkg =
       apply_user_patch ~target_dir:target ~patch_source_path:user_patch)
 ;;
 
-let fetch_duniverse ~lock_dir_path () =
+let fetch_duniverse ~lock_dir_path ~solver_env () =
   let open Fiber.O in
-  (* Read the lock directory *)
-  let lock_dir = Lock_dir.read_disk_exn (Path.source lock_dir_path) in
+  (* Read the lock - handles both single-file and directory formats *)
+  let lock_path = Path.source lock_dir_path in
+  let* lock_dir = Lock_pkg.read_disk_fiber ~solver_env lock_path in
   let all_pkgs = Lock_dir.Packages.to_pkg_list lock_dir.packages in
   (* Filter to only duniverse packages that have a source URL *)
   let duniverse_pkgs =
@@ -365,14 +367,15 @@ let term =
     let open Fiber.O in
     Pkg_common.check_pkg_management_enabled ()
     >>>
-    let* workspace = Memo.run (Workspace.workspace ()) in
+    let* solver_env = Pkg_common.poll_solver_env_from_current_system ()
+    and* workspace = Memo.run (Workspace.workspace ()) in
     let lock_dirs =
       Pkg_common.Lock_dirs_arg.lock_dirs_of_workspace lock_dirs_arg workspace
     in
     match lock_dirs with
     | [] ->
       User_error.raise [ Pp.text "No lock directories found. Run 'dune pkg lock' first." ]
-    | lock_dir_path :: _ -> fetch_duniverse ~lock_dir_path ())
+    | lock_dir_path :: _ -> fetch_duniverse ~lock_dir_path ~solver_env ())
 ;;
 
 let info =

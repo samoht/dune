@@ -1324,10 +1324,14 @@ end
 
 (* Single-file lock format (as opposed to the dune.lock/ directory format).
 
-   Stores:
+   This format stores only:
    - repo URL + commit hash for reproducibility
    - package name.version list
+   - optional platform constraints per package
    - user patches (optional)
+
+   The full package specs (build commands, dependencies, etc.) are derived
+   from the opam repo at the pinned commit hash.
 
    Example:
    {v
@@ -1337,7 +1341,7 @@ end
    (packages
     fmt.0.9.0
     cmdliner.1.3.0
-    base.v0.17.0)
+    (ocamlfind.1.9.6 (platforms linux macos)))
    (patches
     (fmt patches/fmt@0.9.0.patch))
    v}
@@ -1372,43 +1376,98 @@ module File = struct
     let equal a b = String.equal a.source b.source && String.equal a.hash b.hash
   end
 
+  (* Package entry with optional platform constraints.
+     Format: foo.0.9.0 or (foo.0.9.0 (platforms linux))
+
+     Platform constraints use Ordered_set_lang:
+     - :standard = all platforms defined at top level (default when omitted)
+     - linux macos = only those platforms
+     - (:standard \ linux) = all except linux
+     - linux :standard = linux plus all standard *)
   module Package_entry = struct
     type t =
       { name : Package_name.t
       ; version : Package_version.t
+      ; platforms : Ordered_set_lang.Unexpanded.t option (* None = :standard *)
       }
 
-    (* Encode as "name.version" atom *)
-    let encode { name; version } =
-      let s = Package_name.to_string name ^ "." ^ Package_version.to_string version in
-      Dune_lang.atom_or_quoted_string s
+    let encode { name; version; platforms } =
+      let open Encoder in
+      let name_str = Package_name.to_string name in
+      let version_str = Package_version.to_string version in
+      let pkg_str = name_str ^ "." ^ version_str in
+      match platforms with
+      | None -> string pkg_str
+      | Some osl ->
+        let osl_sexps = Ordered_set_lang.Unexpanded.encode osl in
+        list sexp (string pkg_str :: [ list sexp (string "platforms" :: osl_sexps) ])
     ;;
 
-    (* Decode from "name.version" atom *)
+    let parse_name_version s =
+      let opam_pkg = OpamPackage.of_string s in
+      let name = Package_name.of_opam_package_name (OpamPackage.name opam_pkg) in
+      let version =
+        Package_version.of_opam_package_version (OpamPackage.version opam_pkg)
+      in
+      name, version
+    ;;
+
     let decode =
       let open Decoder in
-      let+ loc, s = located string in
-      match String.lsplit2 s ~on:'.' with
-      | None ->
-        User_error.raise
-          ~loc
-          [ Pp.textf "Invalid package entry %S: expected name.version format" s ]
-      | Some (name_str, version_str) ->
-        let name = Package_name.of_string name_str in
-        let version = Package_version.of_string version_str in
-        { name; version }
+      (* Try simple string first, then list with platforms *)
+      let simple =
+        let+ s = string in
+        let name, version = parse_name_version s in
+        { name; version; platforms = None }
+      in
+      let with_platforms =
+        (* Format: (foo.0.9.0 (platforms ...)) *)
+        enter
+          (let* pkg_str = string in
+           let name, version = parse_name_version pkg_str in
+           let+ platforms =
+             peek
+             >>= function
+             | Some (List _) ->
+               fields
+                 (Ordered_set_lang.Unexpanded.field_o "platforms"
+                  >>| Option.bind ~f:(fun osl ->
+                    (* If it's just :standard with no modifications, treat as None *)
+                    if
+                      Ordered_set_lang.Unexpanded.has_standard osl
+                      && Option.is_none (Ordered_set_lang.Unexpanded.loc osl)
+                    then None
+                    else Some osl))
+             | _ -> return None
+           in
+           { name; version; platforms })
+      in
+      simple <|> with_platforms
     ;;
 
-    let to_dyn { name; version } =
+    let to_dyn { name; version; platforms } =
       Dyn.record
-        [ "name", Package_name.to_dyn name; "version", Package_version.to_dyn version ]
+        [ "name", Package_name.to_dyn name
+        ; "version", Package_version.to_dyn version
+        ; ( "platforms"
+          , match platforms with
+            | None -> Dyn.string ":standard"
+            | Some osl ->
+              (* Encode OSL to sexps and convert to dyn *)
+              Dyn.list
+                (fun s -> Dyn.string (Dune_sexp.to_string s))
+                (Ordered_set_lang.Unexpanded.encode osl) )
+        ]
     ;;
 
     let equal a b =
-      Package_name.equal a.name b.name && Package_version.equal a.version b.version
+      Package_name.equal a.name b.name
+      && Package_version.equal a.version b.version
+      && Option.equal Ordered_set_lang.Unexpanded.equal a.platforms b.platforms
     ;;
   end
 
+  (* Patch entry: package name and patch path *)
   module Patch_entry = struct
     type t =
       { package : Package_name.t
@@ -1430,7 +1489,9 @@ module File = struct
 
     let to_dyn { package; path } =
       Dyn.record
-        [ "package", Package_name.to_dyn package; "path", Path.Local.to_dyn path ]
+        [ "package", Package_name.to_dyn package
+        ; "path", Dyn.string (Path.Local.to_string path)
+        ]
     ;;
 
     let equal a b =
@@ -1438,17 +1499,29 @@ module File = struct
     ;;
   end
 
+  (* Simple single-file format: repos + package versions.
+     Full package info is derived from opam repos.
+
+     The (platforms ...) field defines :standard for per-package constraints.
+     Example:
+       (platforms linux macos)
+       (packages
+        foo.0.9.0
+        (bar.1.0.0 (platforms linux))
+        (baz.2.0.0 (platforms (:standard \ macos)))) *)
   type t =
     { repos : Repo.t list
     ; packages : Package_entry.t list
     ; patches : Patch_entry.t list
+    ; platforms : string list (* defines :standard; empty = all platforms *)
     }
 
-  let to_dyn { repos; packages; patches } =
+  let to_dyn { repos; packages; patches; platforms } =
     Dyn.record
       [ "repos", Dyn.list Repo.to_dyn repos
       ; "packages", Dyn.list Package_entry.to_dyn packages
       ; "patches", Dyn.list Patch_entry.to_dyn patches
+      ; "platforms", Dyn.list Dyn.string platforms
       ]
   ;;
 
@@ -1456,19 +1529,13 @@ module File = struct
     List.equal Repo.equal a.repos b.repos
     && List.equal Package_entry.equal a.packages b.packages
     && List.equal Patch_entry.equal a.patches b.patches
+    && List.equal String.equal a.platforms b.platforms
   ;;
 
-  let encode { repos; packages; patches } =
+  let is_portable t = not (List.is_empty t.platforms)
+
+  let encode { repos; packages; patches; platforms } =
     let open Encoder in
-    let version = Syntax.greatest_supported_version_exn Dune_lang.Pkg.syntax in
-    let lang =
-      list
-        sexp
-        [ string "lang"
-        ; string (Syntax.name Dune_lang.Pkg.syntax)
-        ; Syntax.Version.encode version
-        ]
-    in
     let repos_sexp = list sexp (string "repos" :: List.map repos ~f:Repo.encode) in
     let packages_sexp =
       list sexp (string "packages" :: List.map packages ~f:Package_entry.encode)
@@ -1478,7 +1545,12 @@ module File = struct
       then []
       else [ list sexp (string "patches" :: List.map patches ~f:Patch_entry.encode) ]
     in
-    [ lang; repos_sexp; packages_sexp ] @ patches_sexp
+    let platforms_sexp =
+      if List.is_empty platforms
+      then []
+      else [ list sexp (string "platforms" :: List.map platforms ~f:string) ]
+    in
+    [ repos_sexp; packages_sexp ] @ patches_sexp @ platforms_sexp
   ;;
 
   let decode =
@@ -1486,32 +1558,35 @@ module File = struct
     fields
       (let+ repos = field "repos" ~default:[] (repeat Repo.decode)
        and+ packages = field "packages" ~default:[] (repeat Package_entry.decode)
-       and+ patches = field "patches" ~default:[] (repeat Patch_entry.decode) in
-       { repos; packages; patches })
+       and+ patches = field "patches" ~default:[] (repeat Patch_entry.decode)
+       and+ platforms = field "platforms" ~default:[] (repeat string) in
+       { repos; packages; patches; platforms })
   ;;
 
-  let derive ~loc (file : t) =
+  (* Find the first repo that contains the package *)
+  let rec find_in_repos repos ~name ~version =
     let open Fiber.O in
-    (* Load repos at their pinned hashes *)
-    let* repos =
-      Fiber.parallel_map file.repos ~f:(fun { Repo.source; hash } ->
+    match repos with
+    | [] -> Fiber.return None
+    | repo :: rest ->
+      let* resolved_opt = Opam_repo.load_package repo ~name ~version in
+      (match resolved_opt with
+       | Some resolved -> Fiber.return (Some resolved)
+       | None -> find_in_repos rest ~name ~version)
+  ;;
+
+  let derive ~loc { repos; packages; patches = _; platforms = _ } =
+    (* Load repos at pinned commits and look up each package *)
+    let open Fiber.O in
+    let* opam_repos =
+      Fiber.parallel_map repos ~f:(fun { Repo.source; hash } ->
         Opam_repo.of_git_repo_at_hash loc ~source ~hash)
     in
-    (* Helper to find package in repos *)
-    let rec find_in_repos repos ~name ~version =
-      match repos with
-      | [] -> Fiber.return None
-      | repo :: rest ->
-        let* result = Opam_repo.load_package repo ~name ~version in
-        (match result with
-         | Some _ as found -> Fiber.return found
-         | None -> find_in_repos rest ~name ~version)
-    in
-    (* Load each package from the repos *)
-    let+ packages =
-      Fiber.parallel_map file.packages ~f:(fun { Package_entry.name; version } ->
-        let+ resolved_opt = find_in_repos repos ~name ~version in
+    let+ resolved =
+      Fiber.parallel_map packages ~f:(fun { Package_entry.name; version; platforms } ->
+        let+ resolved_opt = find_in_repos opam_repos ~name ~version in
         match resolved_opt with
+        | Some resolved -> name, version, platforms, resolved
         | None ->
           User_error.raise
             ~loc
@@ -1519,13 +1594,18 @@ module File = struct
                 "Package %s.%s not found in any repository"
                 (Package_name.to_string name)
                 (Package_version.to_string version)
-            ]
-        | Some resolved -> name, version, resolved)
+            ])
     in
-    repos, packages
+    opam_repos, resolved
   ;;
 
-  let of_lock (lck : lock) : t =
+  (* Extract simple platform name (os) from solver env *)
+  let platform_of_solver_env solver_env =
+    Solver_env.get solver_env Package_variable_name.os
+    |> Option.map ~f:Variable_value.to_string
+  ;;
+
+  let of_lock (lck : lock) =
     let repos =
       match lck.repos.used with
       | None -> []
@@ -1537,15 +1617,32 @@ module File = struct
     let packages =
       Packages.to_pkg_list lck.packages
       |> List.map ~f:(fun (pkg : Pkg.t) ->
-        { Package_entry.name = pkg.info.name; version = pkg.info.version })
+        (* TODO: extract platform info from pkg.enabled_on_platforms *)
+        { Package_entry.name = pkg.info.name
+        ; version = pkg.info.version
+        ; platforms = None
+        })
     in
-    (* Patches are not stored in Lock.t - would need to be provided separately *)
-    let patches = [] in
-    { repos; packages; patches }
+    let _loc, solved_for_platforms = lck.solved_for_platforms in
+    let platforms =
+      List.filter_map solved_for_platforms ~f:platform_of_solver_env
+      |> List.sort_uniq ~compare:String.compare
+    in
+    { repos; packages; patches = []; platforms }
   ;;
 
   let write_to_disk ~lock_file_path file =
-    let sexps = encode file in
+    let version = Syntax.greatest_supported_version_exn Dune_lang.Pkg.syntax in
+    let lang =
+      let open Encoder in
+      list
+        sexp
+        [ string "lang"
+        ; string (Syntax.name Dune_lang.Pkg.syntax)
+        ; Syntax.Version.encode version
+        ]
+    in
+    let sexps = lang :: encode file in
     let cst =
       List.map sexps ~f:(fun sexp ->
         Dune_sexp.Ast.add_loc ~loc:Loc.none sexp |> Dune_sexp.Cst.concrete)
@@ -1583,16 +1680,19 @@ let detect_format path =
      | Ok { st_kind = S_REG; _ } -> Some Directory
      | _ -> None)
   | Ok { st_kind = S_REG; _ } ->
-    (* Check if it's a valid single-file lock by trying to parse the lang header *)
+    (* Check if it's a valid single-file lock by checking the first sexp *)
     (try
        Io.with_lexbuf_from_file path ~f:(fun lexbuf ->
-         let ast = Dune_sexp.Parser.parse ~mode:Single lexbuf in
-         match Dune_sexp.Ast.remove_locs ast with
-         | List [ Atom a1; Atom a2; _ ]
-           when String.equal (Dune_sexp.Atom.to_string a1) "lang"
-                && String.equal (Dune_sexp.Atom.to_string a2) "package" ->
-           Some Single_file
-         | _ -> None)
+         let sexps = Dune_sexp.Parser.parse ~mode:Many lexbuf in
+         match sexps with
+         | first :: _ ->
+           (match Dune_sexp.Ast.remove_locs first with
+            | List [ Atom a1; Atom a2; _ ]
+              when String.equal (Dune_sexp.Atom.to_string a1) "lang"
+                   && String.equal (Dune_sexp.Atom.to_string a2) "package" ->
+              Some Single_file
+            | _ -> None)
+         | [] -> None)
      with
      | _ -> None)
   | Ok _ -> None

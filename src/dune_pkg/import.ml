@@ -18,6 +18,7 @@ include struct
   module Blang = Blang
   module Slang = Slang
   module Package_variable_name = Package_variable_name
+  module Ordered_set_lang = Ordered_set_lang
 end
 
 include struct

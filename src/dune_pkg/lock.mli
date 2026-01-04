@@ -144,7 +144,7 @@ val metadata_filename : Filename.t
 (** Single-file lock format (as opposed to the dune.lock/ directory format).
 
     This format stores only repo URLs, commit hashes, and package versions.
-    The full package specs must be re-derived from the opam repo on read.
+    The full package specs are derived from the opam repo on read.
 
     Example:
     {v
@@ -173,9 +173,14 @@ module File : sig
   end
 
   module Package_entry : sig
+    (** Package entry with optional platform constraints.
+        Platform constraints use Ordered_set_lang:
+        - None (omitted) = :standard (all platforms)
+        - Some osl = evaluated against standard set *)
     type t =
       { name : Package_name.t
       ; version : Package_version.t
+      ; platforms : Ordered_set_lang.Unexpanded.t option
       }
 
     val encode : t -> Dune_lang.t
@@ -200,10 +205,15 @@ module File : sig
     { repos : Repo.t list
     ; packages : Package_entry.t list
     ; patches : Patch_entry.t list
+    ; platforms : string list
+      (** Defines :standard for per-package constraints. Empty = all platforms *)
     }
 
   val to_dyn : t -> Dyn.t
   val equal : t -> t -> bool
+
+  (** Returns true if this is a portable lock (has platforms defined) *)
+  val is_portable : t -> bool
 
   (** Encode minimal format to sexp list *)
   val encode : t -> Dune_lang.t list
@@ -212,12 +222,18 @@ module File : sig
   val decode : t Decoder.t
 
   (** [derive ~loc file] loads the repos at their pinned hashes and
-      looks up each package. Returns the repos and list of resolved packages.
+      looks up each package. Returns the repos and list of resolved packages
+      with their platform constraints.
       Raises User_error if a package is not found in any repo. *)
   val derive
     :  loc:Loc.t
     -> t
-    -> (Opam_repo.t list * (Package_name.t * Package_version.t * Resolved_package.t) list)
+    -> (Opam_repo.t list
+       * (Package_name.t
+         * Package_version.t
+         * Ordered_set_lang.Unexpanded.t option
+         * Resolved_package.t)
+           list)
          Fiber.t
 
   (** [of_lock lock] extracts the minimal information from a full lock

@@ -13,6 +13,9 @@ module Serializable : sig
   (** [to_url_and_hash t] parses the serializable format "url#hash" and returns
       the source URL and git commit hash. Returns empty hash if no '#' found. *)
   val to_url_and_hash : t -> string * string
+
+  (** [of_url_and_hash ~source ~hash] creates a serializable from URL and hash. *)
+  val of_url_and_hash : source:string -> hash:string -> t
 end
 
 val to_dyn : t -> Dyn.t

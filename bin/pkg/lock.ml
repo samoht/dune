@@ -22,9 +22,9 @@ module Lock_format = struct
           [ "format" ]
           ~doc:
             (Some
-               "Lock file format. $(b,directory) creates a dune.lock/ directory with \
-                per-package .pkg files (current default). $(b,single-file) creates a \
-                single dune.lock file with repo hashes and package versions."))
+               "Lock file format. $(b,single-file) creates a single dune.lock file with \
+                repo hashes and package versions (default). $(b,directory) creates a \
+                dune.lock/ directory with per-package .pkg files."))
   ;;
 end
 
@@ -617,7 +617,7 @@ let term =
     let format =
       match format with
       | Some f -> f
-      | None -> Lock_format.Directory (* Default to directory format *)
+      | None -> Lock_format.Directory
     in
     lock ~version_preference ~lock_dirs_arg ~print_perf_stats ~portable_lock_dir ~format)
 ;;

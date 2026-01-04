@@ -45,6 +45,10 @@ module Serializable = struct
     | None -> s, ""
     | Some (url, hash) -> url, hash
   ;;
+
+  let of_url_and_hash ~source ~hash =
+    if String.is_empty hash then source else sprintf "%s#%s" source hash
+  ;;
 end
 
 type t =

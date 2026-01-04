@@ -35,6 +35,12 @@ Check the contents of the single-file lock:
   (repos)
   
   (packages foo.0.0.1)
+  
+  (platforms linux macos)
+
+
+
+
 
 Lock again with directory format (default):
   $ rm dune.lock

@@ -4,6 +4,7 @@ module Pkg_cache = Pkg_cache
 module Checksum = Checksum
 module Source = Source
 module Lock = Lock
+module Lock_pkg = Lock_pkg
 module Opam_file = Opam_file
 module Opam_repo = Opam_repo
 module Opam_solver = Opam_solver
