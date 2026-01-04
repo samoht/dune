@@ -83,6 +83,12 @@ let copy_directory ~src ~dst =
 ;;
 
 let do_fetch ~rev_store ~source ~target =
+  (* Convert target string to a Path.t, handling both absolute and relative paths *)
+  let target_path =
+    if Filename.is_relative target
+    then Path.relative Path.root target
+    else Path.of_string target
+  in
   match Source.kind source with
   | `Directory_or_archive src_path ->
     (* Local directory copy *)
@@ -97,27 +103,17 @@ let do_fetch ~rev_store ~source ~target =
       (* Local archive file - extract it *)
       let { Source.url; checksum } = source in
       let checksum_opt = Option.map checksum ~f:snd in
-      Dune_pkg.Fetch.fetch
-        ~unpack:true
-        ~checksum:checksum_opt
-        ~target:(Path.build (Path.Build.of_string target))
-        ~url)
+      Dune_pkg.Fetch.fetch ~unpack:true ~checksum:checksum_opt ~target:target_path ~url)
   | `Fetch ->
     let { Source.url; checksum } = source in
-    let loc, opam_url = url in
+    let _, opam_url = url in
     let checksum_opt = Option.map checksum ~f:snd in
-    (match OpamUrl.classify opam_url loc with
-     | `Git ->
-       Dune_pkg.Fetch.fetch_git
-         rev_store
-         ~target:(Path.build (Path.Build.of_string target))
-         ~url
-     | `Path _ | `Archive ->
-       Dune_pkg.Fetch.fetch
-         ~unpack:true
-         ~checksum:checksum_opt
-         ~target:(Path.build (Path.Build.of_string target))
-         ~url)
+    (* Check if this is a git URL *)
+    if OpamUrl.is_version_control opam_url
+    then Dune_pkg.Fetch.fetch_git rev_store ~target:target_path ~url
+    else
+      (* HTTP archive fetch - use Fetch.fetch directly *)
+      Dune_pkg.Fetch.fetch ~unpack:true ~checksum:checksum_opt ~target:target_path ~url
 ;;
 
 (* Fetch a single extra source file to the target directory *)
@@ -127,15 +123,12 @@ let fetch_extra_source ~rev_store ~target_dir (local_path, (source : Source.t)) 
   let parent = Path.parent_exn dst in
   if not (Path.exists parent) then Path.mkdir_p parent;
   let { Source.url; checksum } = source in
-  let loc, opam_url = url in
+  let _, opam_url = url in
   let checksum_opt = Option.map checksum ~f:snd in
-  (* Fetch as a file (not unpacked) *)
-  match OpamUrl.classify opam_url loc with
-  | `Git ->
-    (* Git extra sources are unusual but handle them *)
-    Dune_pkg.Fetch.fetch_git rev_store ~target:dst ~url
-  | `Path _ | `Archive ->
-    Dune_pkg.Fetch.fetch ~unpack:false ~checksum:checksum_opt ~target:dst ~url
+  (* Check if git or regular HTTP *)
+  if OpamUrl.is_version_control opam_url
+  then Dune_pkg.Fetch.fetch_git rev_store ~target:dst ~url
+  else Dune_pkg.Fetch.fetch ~unpack:false ~checksum:checksum_opt ~target:dst ~url
 ;;
 
 (* Apply a patch file to the target directory *)
@@ -192,6 +185,7 @@ let apply_user_patch ~target_dir ~patch_source_path =
     ())
 ;;
 
+(* Returns true if the package was actually fetched, false if skipped *)
 let fetch_package ~rev_store ~platform ~patches_dir pkg =
   let open Fiber.O in
   let { Lock_dir.Pkg_info.name; version; source; extra_sources; _ } =
@@ -200,7 +194,7 @@ let fetch_package ~rev_store ~platform ~patches_dir pkg =
   match source with
   | None ->
     (* No source means local package or pinned without URL *)
-    Fiber.return ()
+    Fiber.return false
   | Some source ->
     let target = Duniverse.package_dir name version |> Path.source in
     let target_path = Path.to_string target in
@@ -214,7 +208,7 @@ let fetch_package ~rev_store ~platform ~patches_dir pkg =
                (Package_name.to_string name)
                (Dune_pkg.Package_version.to_string version)
            ]);
-      Fiber.return ())
+      Fiber.return false)
     else (
       Console.print_user_message
         (User_message.make
@@ -224,17 +218,9 @@ let fetch_package ~rev_store ~platform ~patches_dir pkg =
                (Dune_pkg.Package_version.to_string version)
                target_path
            ]);
-      (* Step 1: Fetch main source *)
-      let* result =
-        match source.Source.checksum with
-        | Some (_, checksum_value) ->
-          (* Use cache for packages with checksums *)
-          Pkg_cache.get_or_fetch ~checksum:checksum_value ~target ~fetch:(fun ~target ->
-            do_fetch ~rev_store ~source ~target:(Path.to_string target))
-        | None ->
-          (* No checksum (e.g., git sources, directory copies), fetch directly *)
-          do_fetch ~rev_store ~source ~target:target_path
-      in
+      (* Step 1: Fetch main source directly to target *)
+      (* TODO: Add caching with Pkg_cache once basic flow works *)
+      let* result = do_fetch ~rev_store ~source ~target:target_path in
       let* () = handle_fetch_error ~name ~version result in
       (* Step 2: Fetch extra sources (patches, additional files) *)
       let* () =
@@ -290,7 +276,8 @@ let fetch_package ~rev_store ~platform ~patches_dir pkg =
       in
       (* Step 4: Apply user patches from patches/ directory *)
       let user_patch = user_patch_path ~patches_dir name version in
-      apply_user_patch ~target_dir:target ~patch_source_path:user_patch)
+      let+ () = apply_user_patch ~target_dir:target ~patch_source_path:user_patch in
+      true)
 ;;
 
 let fetch_duniverse ~lock_dir_path ~solver_env () =
@@ -344,18 +331,21 @@ let fetch_duniverse ~lock_dir_path ~solver_env () =
     let* platform = Pkg_common.poll_solver_env_from_current_system () in
     (* Use default patches directory *)
     let patches_dir = default_patches_dir in
-    (* Fetch each package *)
-    let+ () =
-      Fiber.sequential_iter duniverse_pkgs ~f:(fun pkg ->
+    (* Fetch each package and count how many were actually fetched *)
+    let+ fetched_results =
+      Fiber.sequential_map duniverse_pkgs ~f:(fun pkg ->
         fetch_package ~rev_store ~platform ~patches_dir pkg)
     in
-    Console.print_user_message
-      (User_message.make
-         [ Pp.textf
-             "Fetched %d duniverse package(s) to %s/"
-             (List.length duniverse_pkgs)
-             (Path.Source.to_string Duniverse.duniverse_dir)
-         ]))
+    let num_fetched = List.filter fetched_results ~f:Fun.id |> List.length in
+    if num_fetched > 0
+    then
+      Console.print_user_message
+        (User_message.make
+           [ Pp.textf
+               "Fetched %d duniverse package(s) to %s/"
+               num_fetched
+               (Path.Source.to_string Duniverse.duniverse_dir)
+           ]))
 ;;
 
 let term =
