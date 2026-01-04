@@ -81,6 +81,12 @@ The following improvements have been implemented:
 - **After:** Groups by reason with versions in brackets: `Rejected by depends of x [1.0.0, 0.9.0]`
 - Improved outcome text: `(problem)` → `(no usable version)`, `(no candidates)`, `(conflict)`
 
+### 9. Added build progress counts
+- **Files:** `src/dune_rules/pkg_build_progress.ml`, `src/dune_rules/pkg_rules.ml`
+- **Before:** `Building foo.1.0.0`
+- **After:** `Building foo.1.0.0 (1/5)`
+- Counter increments as each package build starts
+
 **140+ test files were updated** with the new output format.
 
 ---
@@ -91,10 +97,11 @@ Overall, Dune's package management UX is functional. Recent improvements address
 1. **Dependency introspection** — `dune pkg deps` with `--tree` and `--why` flags
 2. **Better error messages** — Solver diagnostics now more specific
 3. **System dependency tooling** — `dune show depexts` with platform detection
+4. **Build progress** — Package builds now show progress counts `(n/total)`
 
 Remaining gaps:
 1. **Missing common commands** (`add`, `remove`, `update`, `init`)
-2. **Lack of visual feedback** (no colours, minimal progress indicators)
+2. **Lack of visual feedback** (no colours)
 
 ---
 
@@ -491,10 +498,10 @@ Pp.textf "Solution for %s (%d package%s)" ... pkg_count (if pkg_count = 1 then "
 
 ## Medium Effort Improvements (Future Work)
 
-1. **Show build progress count** — `Building foo.0.0.1 (3/8)`
-2. **Add `dune pkg deps`** — unified dependency introspection with `--tree` and `--why` flags
+1. ~~**Show build progress count**~~ — ✅ Done (see #9 above)
+2. ~~**Add `dune pkg deps`**~~ — ✅ Done (see #6 above)
 3. **Add `--color` flag** — colour as enhancement after structure is solid
-4. **Improve conflict error messages** — show dependency chain, suggest specific actions
+4. ~~**Improve conflict error messages**~~ — ✅ Done (see #8 above)
 
 ## Larger Initiatives (Needs Justification)
 
