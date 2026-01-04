@@ -89,9 +89,51 @@ Fetch again - should skip already-fetched package:
 
   $ dune pkg fetch
   Package mypkg.1.0.0 already fetched
-  Fetched 1 duniverse package(s) to duniverse/
 
 The duniverse directory should have the marker file:
 
   $ cat duniverse/.dune-duniverse
   # This directory is managed by dune pkg
+
+Now test the full workflow: build a project that uses the duniverse library.
+
+First, remove the original source directory to avoid conflict:
+
+  $ rm -rf pkg-source
+
+Create a new project that uses the duniverse library:
+
+  $ cat >dune-project <<EOF
+  > (lang dune 3.16)
+  > (package (name myproj) (allow_empty))
+  > EOF
+
+  $ cat >dune <<EOF
+  > (library (name mylib) (libraries mypkg))
+  > EOF
+
+  $ cat >mylib.ml <<EOF
+  > let greeting = Mypkg.hello
+  > EOF
+
+Build the project - it should use the duniverse library, not the .pkg sandbox:
+
+  $ dune build
+
+Verify the library was built correctly:
+
+  $ cat _build/default/mylib.ml
+  let greeting = Mypkg.hello
+
+The duniverse library should be built in the main build context (not .pkg):
+
+  $ ls _build/default/duniverse/mypkg.1.0.0/.mypkg.objs/byte/
+  mypkg.cmi
+  mypkg.cmo
+  mypkg.cmt
+
+Verify that the .pkg directory does NOT contain the mypkg build artifacts
+(since it's a duniverse package, not an opam sandbox package):
+
+  $ ls _build/default/.pkg/mypkg/target 2>/dev/null || echo "No .pkg build for mypkg (expected)"
+  No .pkg build for mypkg (expected)
