@@ -817,8 +817,10 @@ module Action_expander = struct
           Result.map result ~f:(fun values ->
             let is_truthy =
               match values with
-              | [ Value.String "true" ] | [ Value.String "1" ] -> true
-              | [ Value.String s ] -> not (String.is_empty s)
+              | [ Value.String "true" ] -> true
+              | [ Value.String "false" ] -> false
+              | [ Value.String "" ] -> false
+              | [ Value.String _ ] -> true
               | _ :: _ -> true
               | [] -> false
             in
