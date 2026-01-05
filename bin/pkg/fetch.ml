@@ -285,7 +285,7 @@ let fetch_duniverse ~lock_dir_path ~solver_env () =
     let* platform = Pkg_common.poll_solver_env_from_current_system () in
     let patches_dir = default_patches_dir in
     let+ _ =
-      Fiber.sequential_map fetchable_pkgs ~f:(fun pkg ->
+      Fiber.parallel_map fetchable_pkgs ~f:(fun pkg ->
         fetch_package ~rev_store ~platform ~patches_dir pkg)
     in
     ())
@@ -328,7 +328,7 @@ let auto_fetch_missing ~lock_dir_path ~solver_env () =
     let* platform = Pkg_common.poll_solver_env_from_current_system () in
     let patches_dir = default_patches_dir in
     let+ _ =
-      Fiber.sequential_map missing_dune_pkgs ~f:(fun pkg ->
+      Fiber.parallel_map missing_dune_pkgs ~f:(fun pkg ->
         fetch_package ~rev_store ~platform ~patches_dir pkg)
     in
     ())
