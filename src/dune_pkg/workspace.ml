@@ -60,6 +60,18 @@ module Repository = struct
     }
   ;;
 
+  (* Relocatable OCaml compilers from dra27's repository.
+     These compilers can be installed at any path and moved afterwards,
+     enabling cache sharing across projects. See https://github.com/ocaml/RFCs/pull/53 *)
+  let relocatable =
+    { name = "relocatable"
+    ; url =
+        ( Loc.none
+        , OpamUrl.of_string "git+https://github.com/dra27/opam-repository.git#relocatable"
+        )
+    }
+  ;;
+
   let decode =
     let open Decoder in
     fields

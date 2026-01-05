@@ -787,7 +787,7 @@ module Action_expander = struct
         Memo.return [ Value.Dir dir ]
     ;;
 
-    let expand_pkg_macro ~loc (paths : _ Paths.t) deps macro_invocation =
+    let expand_pkg_macro ~loc (self_paths : _ Paths.t) deps macro_invocation =
       let* deps = deps in
       let { Package_variable.name = variable_name; scope } =
         match Package_variable.of_macro_invocation ~loc macro_invocation with
@@ -798,10 +798,10 @@ module Action_expander = struct
              encoding"
             []
       in
-      let variables, paths =
+      let variables, dep_paths =
         let package_name =
           match scope with
-          | Self -> paths.name
+          | Self -> self_paths.name
           | Package package_name -> package_name
         in
         match Package.Name.Map.find deps package_name with
@@ -811,15 +811,35 @@ module Action_expander = struct
       match Package_variable_name.Map.find variables variable_name with
       | Some v -> Memo.return @@ Ok (Variable.dune_value v)
       | None ->
-        let present = Option.is_some paths in
+        let present = Option.is_some dep_paths in
         (* TODO we should be looking it up in all packages now *)
         (match Package_variable_name.to_string variable_name with
          | "pinned" -> Memo.return @@ Ok [ Value.false_ ]
          | "enable" ->
            Memo.return @@ Ok [ Value.String (if present then "enable" else "disable") ]
          | "installed" -> Memo.return @@ Ok [ Value.String (Bool.to_string present) ]
+         | "build-id" ->
+           (* Compute a build-id from the package source directory path.
+              For self-scope, use the current package's paths directly.
+              For other packages, use their paths if available in deps.
+              This is a simplified version of opam's build-id which also includes
+              dependency hashes. *)
+           let pkg_paths =
+             match scope with
+             | Self -> Some self_paths
+             | Package _ -> dep_paths
+           in
+           let build_id =
+             match pkg_paths with
+             | Some paths ->
+               Path.to_string paths.source_dir
+               |> Dune_digest.string
+               |> Dune_digest.to_string
+             | None -> ""
+           in
+           Memo.return @@ Ok [ Value.String build_id ]
          | _ ->
-           (match paths with
+           (match dep_paths with
             | None -> Memo.return (Error (`Undefined_pkg_var variable_name))
             | Some paths ->
               (match

@@ -13,7 +13,13 @@ module Pin_stanza = Dune_lang.Pin_stanza
 module Repository = Dune_pkg.Pkg_workspace.Repository
 module Solver_env = Dune_pkg.Solver_env
 
-let default_repositories = [ Repository.overlay; Repository.upstream ]
+(* Default repositories include the relocatable overlay which provides
+   relocatable OCaml compilers. These can be installed at any path and
+   moved afterwards, enabling cache sharing across projects.
+   Order matters: first repo wins for same package version. *)
+let default_repositories =
+  [ Repository.relocatable; Repository.overlay; Repository.upstream ]
+;;
 
 module Lock_dir = struct
   type t =

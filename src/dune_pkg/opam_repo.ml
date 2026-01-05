@@ -146,29 +146,33 @@ let of_git_repo_at_hash loc ~source ~hash =
     { source = Repo at_rev; serializable; loc }
 ;;
 
-let resolve_repositories ~available_repos ~repositories =
+let resolve_repositories ~available_repos ~repositories ?(on_progress = fun () -> ()) () =
   repositories
   |> Fiber.parallel_map ~f:(fun (loc, name) ->
-    match Workspace.Repository.Name.Map.find available_repos name with
-    | None ->
-      User_error.raise
-        ~loc
-        [ Pp.textf
-            "Repository '%s' is not a known repository"
-            (Workspace.Repository.Name.to_string name)
-        ]
-    | Some repo ->
-      let loc, opam_url = Workspace.Repository.opam_url repo in
-      (match OpamUrl.classify opam_url loc with
-       | `Git -> of_git_repo loc opam_url
-       | `Path path -> Fiber.return @@ of_opam_repo_dir_path loc path
-       | `Archive ->
-         User_error.raise
-           ~loc
-           [ Pp.textf
-               "Repositories stored in archives (%s) are currently unsupported"
-               (OpamUrl.to_string opam_url)
-           ]))
+    let+ result =
+      match Workspace.Repository.Name.Map.find available_repos name with
+      | None ->
+        User_error.raise
+          ~loc
+          [ Pp.textf
+              "Repository '%s' is not a known repository"
+              (Workspace.Repository.Name.to_string name)
+          ]
+      | Some repo ->
+        let loc, opam_url = Workspace.Repository.opam_url repo in
+        (match OpamUrl.classify opam_url loc with
+         | `Git -> of_git_repo loc opam_url
+         | `Path path -> Fiber.return @@ of_opam_repo_dir_path loc path
+         | `Archive ->
+           User_error.raise
+             ~loc
+             [ Pp.textf
+                 "Repositories stored in archives (%s) are currently unsupported"
+                 (OpamUrl.to_string opam_url)
+             ])
+    in
+    on_progress ();
+    result)
 ;;
 
 let revision t =

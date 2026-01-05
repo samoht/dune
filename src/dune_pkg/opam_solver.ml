@@ -41,9 +41,21 @@ module Priority = struct
       (avoid, version)
   ;;
 
+  (* Package name for relocatable-compiler which we prefer for toolchain caching *)
+  let relocatable_compiler_name = OpamPackage.Name.of_string "relocatable-compiler"
+
   let make (package : OpamFile.OPAM.t) =
-    let avoid = List.mem package.flags Pkgflag_AvoidVersion ~equal:Poly.equal in
-    let version = OpamFile.OPAM.package package |> OpamPackage.version in
+    let pkg = OpamFile.OPAM.package package in
+    let name = OpamPackage.name pkg in
+    let version = OpamPackage.version pkg in
+    (* Ignore avoid-version for relocatable-compiler to prefer it for toolchain caching.
+       The relocatable-compiler package has avoid-version to not interfere with normal
+       solves, but we want it to be preferred when building shareable toolchains. *)
+    let avoid =
+      if OpamPackage.Name.equal name relocatable_compiler_name
+      then false
+      else List.mem package.flags Pkgflag_AvoidVersion ~equal:Poly.equal
+    in
     { version; avoid }
   ;;
 

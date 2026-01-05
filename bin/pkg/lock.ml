@@ -33,17 +33,26 @@ module Progress_indicator = struct
     module State = struct
       module Repository = Dune_pkg.Pkg_workspace.Repository
 
+      type repo_progress =
+        { total : int
+        ; completed : int
+        ; repo_names : Repository.Name.t list
+        }
+
       type t =
-        | Updating_repos of Repository.Name.t list
+        | Updating_repos of repo_progress
         | Solving
 
       let pp = function
-        | Updating_repos repo_names ->
-          Pp.textf
-            "Updating package repos %s..."
-            (List.map repo_names ~f:(fun repo_name ->
-               Repository.Name.to_string repo_name |> String.quoted)
-             |> String.enumerate_and)
+        | Updating_repos { total; completed; repo_names } ->
+          let repos_str =
+            List.map repo_names ~f:(fun repo_name ->
+              Repository.Name.to_string repo_name |> String.quoted)
+            |> String.enumerate_and
+          in
+          if completed < total
+          then Pp.textf "Fetching repos %s (%d/%d)..." repos_str completed total
+          else Pp.textf "Updated repos %s" repos_str
         | Solving -> Pp.text "Solving..."
       ;;
     end
@@ -274,15 +283,55 @@ let summary_message
     let maybe_uncommon_packages =
       if Solver_env.Map.is_empty uncommon_packages_by_platform
       then []
-      else
+      else (
+        (* Consolidate platforms with identical package sets to reduce noise.
+           Instead of showing the same packages for arm64/linux and x86_64/linux
+           separately, we group them together. *)
+        let packages_to_platforms =
+          Solver_env.Map.foldi
+            uncommon_packages_by_platform
+            ~init:[]
+            ~f:(fun platform packages acc ->
+              (* Find existing entry with same packages or create new one *)
+              let rec insert = function
+                | [] -> [ packages, [ platform ] ]
+                | (pkgs, platforms) :: rest when OpamPackage.Set.equal pkgs packages ->
+                  (pkgs, platform :: platforms) :: rest
+                | entry :: rest -> entry :: insert rest
+              in
+              insert acc)
+        in
+        (* Summarize a list of platforms compactly by showing common factors *)
+        let summarize_platforms platforms =
+          let get var env =
+            Solver_env.get env var |> Option.map ~f:Dune_pkg.Variable_value.to_string
+          in
+          let os_values =
+            List.filter_map platforms ~f:(get Dune_lang.Package_variable_name.os)
+            |> List.sort_uniq ~compare:String.compare
+          in
+          let arch_values =
+            List.filter_map platforms ~f:(get Dune_lang.Package_variable_name.arch)
+            |> List.sort_uniq ~compare:String.compare
+          in
+          match os_values, arch_values with
+          | [ os ], [ _ ] -> os
+          | [ os ], [] -> os
+          | [], [ arch ] -> arch
+          | [ os ], archs -> Printf.sprintf "%s (%s)" os (String.concat ~sep:", " archs)
+          | oss, [ arch ] -> Printf.sprintf "%s (%s)" arch (String.concat ~sep:", " oss)
+          | _ ->
+            (* Fallback to full format *)
+            List.map platforms ~f:(fun p ->
+              Format.asprintf "%a" Pp.to_fmt (Solver_env.pp_oneline p))
+            |> String.concat ~sep:", "
+        in
         Pp.nop
         :: Pp.text "Additionally, some packages will only be built on specific platforms."
-        :: (Solver_env.Map.to_list uncommon_packages_by_platform
-            |> List.concat_map ~f:(fun (platform, packages) ->
-              [ Pp.nop
-              ; Pp.concat [ Solver_env.pp_oneline platform; Pp.text ":" ]
-              ; pp_package_set packages
-              ]))
+        :: (packages_to_platforms
+            |> List.concat_map ~f:(fun (packages, platforms) ->
+              let platforms_str = summarize_platforms platforms in
+              [ Pp.nop; Pp.textf "%s:" platforms_str; pp_package_set packages ])))
     in
     (let pkg_count = OpamPackage.Map.cardinal pkgs_by_opam_package in
      Pp.tag
@@ -380,11 +429,26 @@ let solve_lock_dir
       Dune_pkg.Pkg_workspace.Repository.Name.Map.keys repo_map
       |> List.sort ~compare:Dune_pkg.Pkg_workspace.Repository.Name.compare
     in
-    progress_state
-    := Some (Progress_indicator.Per_lockdir.State.Updating_repos repo_names);
+    let repositories = repositories_of_lock_dir workspace ~lock_dir_path in
+    let total = List.length repositories in
+    let completed = ref 0 in
+    let update_progress () =
+      progress_state
+      := Some
+           (Progress_indicator.Per_lockdir.State.Updating_repos
+              { total; completed = !completed; repo_names });
+      Console.Status_line.refresh ()
+    in
+    update_progress ();
+    let on_progress () =
+      incr completed;
+      update_progress ()
+    in
     Dune_pkg.Opam_repo.resolve_repositories
       ~available_repos:repo_map
-      ~repositories:(repositories_of_lock_dir workspace ~lock_dir_path)
+      ~repositories
+      ~on_progress
+      ()
   in
   let* pins = resolve_project_pins project_pins in
   let time_solve_start = Time.now () in

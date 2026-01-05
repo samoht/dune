@@ -39,6 +39,7 @@ let search_packages ~query () =
     Dune_pkg.Opam_repo.resolve_repositories
       ~available_repos:(Pkg_common.repositories_of_workspace workspace)
       ~repositories:(Pkg_common.repositories_of_lock_dir workspace ~lock_dir_path)
+      ()
   in
   let re = Option.map ~f:(fun q -> Re.str q |> Re.no_case |> Re.compile) query in
   let* filtered = Fiber.parallel_map ~f:(packages_in_repo ~query:re) repos in

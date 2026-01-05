@@ -35,14 +35,18 @@ val of_git_repo : Loc.t -> OpamUrl.t -> t Fiber.t
     a single-file lock format. *)
 val of_git_repo_at_hash : Loc.t -> source:string -> hash:string -> t Fiber.t
 
-(** [resolve_repositories ~available_repos ~repositories] resolves a list of
-    repository references by looking them up in [available_repos] and creating
-    appropriate [t] instances based on their URL types (git, local path, or
-    archive). Raises [User_error] if a repository is not found or if an archive
-    URL is encountered (not supported). *)
+(** [resolve_repositories ~available_repos ~repositories ?on_progress ()]
+    resolves a list of repository references by looking them up in
+    [available_repos] and creating appropriate [t] instances based on their URL
+    types (git, local path, or archive). The optional [on_progress] callback is
+    called after each repository is resolved. Raises [User_error] if a
+    repository is not found or if an archive URL is encountered (not
+    supported). *)
 val resolve_repositories
   :  available_repos:Workspace.Repository.t Workspace.Repository.Name.Map.t
   -> repositories:(Loc.t * Workspace.Repository.Name.t) list
+  -> ?on_progress:(unit -> unit)
+  -> unit
   -> t list Fiber.t
 
 val revision : t -> Rev_store.At_rev.t

@@ -325,7 +325,7 @@ let setup_lock_rules ~dir ~lock_dir : Gen_rules.result =
                   Pkg_workspace.Repository.name repo, repo)
                 |> Pkg_workspace.Repository.Name.Map.of_list_exn
               in
-              Opam_repo.resolve_repositories ~available_repos ~repositories
+              Opam_repo.resolve_repositories ~available_repos ~repositories ()
               |> Memo.of_non_reproducible_fiber))
        and+ pins =
          (* CR-soon Alizter: This pin logic (extracting workspace pins,

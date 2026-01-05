@@ -6,7 +6,13 @@ module No_flush = struct
   let status_line_len = ref 0
 
   let hide_status_line () =
-    if !status_line_len > 0 then Printf.eprintf "\r%*s\r" !status_line_len ""
+    if !status_line_len > 0
+    then (
+      Printf.eprintf "\r%*s\r" !status_line_len "";
+      (* Flush stderr to ensure the hide sequence is written before any subsequent
+         output. This is important because show_status_line uses Format.err_formatter
+         which has a separate buffer from Printf.eprintf. *)
+      flush stderr)
   ;;
 
   let show_status_line () = if !status_line_len > 0 then Ansi_color.prerr !status_line

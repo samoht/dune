@@ -10,6 +10,7 @@ module Repository : sig
   val upstream : t
   val overlay : t
   val binary_packages : t
+  val relocatable : t
   val decode : t Decoder.t
 
   module Name : sig
