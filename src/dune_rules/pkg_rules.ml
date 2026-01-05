@@ -1600,17 +1600,32 @@ end = struct
       let* depends =
         Memo.parallel_map
           deps
-          ~f:(fun { DB.Pkg_table.dep_pkg = _; dep_loc; dep_pkg_digest } ->
-            let package_universe =
-              match package_universe with
-              | Dev_tool _ ->
-                (* The dependencies of dev tools are installed into the default
-                 context so they may be shared with the project's
-                 dependencies. *)
-                Package_universe.Dependencies Context_name.default
-              | _ -> package_universe
+          ~f:(fun { DB.Pkg_table.dep_pkg; dep_loc; dep_pkg_digest } ->
+            (* Check if this dependency is a duniverse dune package - if so, skip it
+               since it will be built as vendored code, not via .pkg/ rules *)
+            let duniverse_path =
+              Duniverse.package_dir dep_pkg_digest.name dep_pkg.info.version
             in
-            resolve db dep_loc dep_pkg_digest package_universe)
+            let* in_duniverse =
+              Fs_memo.dir_exists (Path.Outside_build_dir.In_source_dir duniverse_path)
+            in
+            match in_duniverse, Duniverse.classify dep_pkg with
+            | true, Duniverse.Duniverse ->
+              (* Duniverse dune package - don't include in .pkg/ dependency chain *)
+              Memo.return None
+            | _ ->
+              let package_universe =
+                match package_universe with
+                | Dev_tool _ ->
+                  (* The dependencies of dev tools are installed into the default
+                   context so they may be shared with the project's
+                   dependencies. *)
+                  Package_universe.Dependencies Context_name.default
+                | _ -> package_universe
+              in
+              let+ pkg = resolve db dep_loc dep_pkg_digest package_universe in
+              Some pkg)
+        >>| List.filter_opt
       and+ files_dir =
         let* lock_dir =
           Package_universe.lock_dir_path package_universe >>| Option.value_exn
