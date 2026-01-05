@@ -22,9 +22,9 @@ module Lock_format = struct
           [ "format" ]
           ~doc:
             (Some
-               "Lock file format. $(b,single-file) creates a single dune.lock file with \
-                repo hashes and package versions (default). $(b,directory) creates a \
-                dune.lock/ directory with per-package .pkg files."))
+               "Lock file format. $(b,directory) creates a dune.lock/ directory with \
+                per-package .pkg files (default). $(b,single-file) creates a single \
+                dune.lock file with repo hashes and package versions."))
   ;;
 end
 
