@@ -15,6 +15,7 @@
   dune_lang
   dune_console
   dune_digest
+  dune_findlib
   re
   dune_vcs
   dune_config

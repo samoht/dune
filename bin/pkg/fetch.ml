@@ -180,11 +180,13 @@ let apply_user_patch ~verbose ~target_dir ~patch_source_path =
 ;;
 
 (* Two levels of verbosity:
-   - status: one line per package (-v or -vv)
-   - verbose: detailed debug messages (-vv only) *)
+   - status: one line per package (shown in status line, not new lines)
+   - verbose: detailed debug messages (-vv only, prints new lines) *)
 let status msg =
   match !Dune_engine.Clflags.display with
-  | Verbose | Short -> Console.print_user_message (User_message.make [ Pp.text msg ])
+  | Verbose | Short ->
+    (* Use status line to avoid adding newlines - updates in place *)
+    Console.Status_line.set (Constant (Pp.text msg))
   | Quiet -> ()
 ;;
 
@@ -206,28 +208,88 @@ let start_fetch ~name ~version =
   pkg_str
 ;;
 
-(* Fetch a source group - packages sharing the same source are fetched once *)
+(* Determine the final directory name for a source group.
+   Uses the project name from dune-project if available, otherwise falls back
+   to the primary package name. Returns (dirname, version). *)
+let determine_dirname group fetched_dir =
+  let { Duniverse.primary_name; primary_version; _ } = group in
+  (* Check if fetched source has a dune-project with a name *)
+  let fetched_source_dir = Path.Source.of_string (Path.to_string fetched_dir) in
+  match Duniverse.read_project_name fetched_source_dir with
+  | Some project_name -> project_name, primary_version
+  | None -> Package_name.to_string primary_name, primary_version
+;;
+
+(* Fetch a source group - packages sharing the same source are fetched once.
+   Returns (was_fetched, final_dirname) where final_dirname is based on the
+   project name from dune-project if available. *)
 let fetch_source_group ~rev_store ~platform ~patches_dir ~pkgs_by_name group =
   let open Fiber.O in
   let { Duniverse.packages; source; primary_name; primary_version } = group in
-  let target = Duniverse.source_group_dir group |> Path.source in
-  let target_path = Path.to_string target in
-  if Path.exists target
-  then (
+  let initial_target = Duniverse.source_group_dir group |> Path.source in
+  let initial_target_path = Path.to_string initial_target in
+  (* Check for existing directory with any name by looking for project name *)
+  let find_existing_dir () =
+    (* First check the initial target *)
+    if Path.exists initial_target
+    then Some initial_target
+    else (
+      (* Check if there's a directory with the project name instead *)
+      let duniverse_path = Path.source Duniverse.duniverse_dir in
+      match Path.readdir_unsorted duniverse_path with
+      | Error _ -> None
+      | Ok entries ->
+        (* Look for a directory that contains a dune-project with matching packages *)
+        List.find_map entries ~f:(fun entry ->
+          let entry_path = Path.relative duniverse_path entry in
+          if not (Path.is_directory entry_path)
+          then None
+          else (
+            let entry_source = Path.Source.of_string (Path.to_string entry_path) in
+            match Duniverse.read_project_name entry_source with
+            | None -> None
+            | Some _ ->
+              (* Check if any of our packages' libraries are in this directory *)
+              let libs = Duniverse.scan_public_libraries entry_source in
+              if List.is_empty libs
+              then None
+              else (
+                (* Heuristic: if this dir has libraries and a dune-project, assume it's ours
+                   if the directory name matches our primary name or project name *)
+                let base = Path.basename entry_path in
+                let expected_prefix = Package_name.to_string primary_name in
+                if String.is_prefix base ~prefix:expected_prefix
+                then Some entry_path
+                else None))))
+  in
+  match find_existing_dir () with
+  | Some existing ->
     (* Already fetched - count all packages as cached *)
-    let pkg_str =
-      sprintf
-        "%s.%s"
-        (Package_name.to_string primary_name)
-        (Package_version.to_string primary_version)
-    in
-    status (sprintf "Cached %s" pkg_str);
+    let dirname = Path.basename existing in
+    status (sprintf "Cached %s" dirname);
     List.iter packages ~f:(fun _ -> Dune_engine.Progress.incr_cached ());
-    Fiber.return false)
-  else (
+    Fiber.return (false, dirname)
+  | None ->
     let pkg_str = start_fetch ~name:primary_name ~version:primary_version in
-    let* result = do_fetch ~rev_store ~source ~target:target_path in
+    let* result = do_fetch ~rev_store ~source ~target:initial_target_path in
     let* () = handle_fetch_error ~name:primary_name ~version:primary_version result in
+    (* Determine the final dirname based on dune-project *)
+    let final_name, final_version = determine_dirname group initial_target in
+    let final_dirname =
+      sprintf "%s.%s" final_name (Package_version.to_string final_version)
+    in
+    let final_target =
+      Path.source (Path.Source.relative Duniverse.duniverse_dir final_dirname)
+    in
+    (* Rename if the project name differs from the initial target *)
+    let target =
+      if String.equal (Path.to_string initial_target) (Path.to_string final_target)
+      then initial_target
+      else (
+        verbose (sprintf "  renaming to %s (from dune-project)" final_dirname);
+        Unix.rename (Path.to_string initial_target) (Path.to_string final_target);
+        final_target)
+    in
     (* Apply extra sources and patches for all packages in the group *)
     let* () =
       Fiber.sequential_iter packages ~f:(fun (name, _version) ->
@@ -283,7 +345,7 @@ let fetch_source_group ~rev_store ~platform ~patches_dir ~pkgs_by_name group =
           apply_user_patch ~verbose ~target_dir:target ~patch_source_path:user_patch)
     in
     Dune_engine.Progress.finish_target ~name:pkg_str;
-    Fiber.return true)
+    Fiber.return (true, final_dirname)
 ;;
 
 let fetch_duniverse ~lock_dir_path ~solver_env () =
@@ -328,23 +390,22 @@ let fetch_duniverse ~lock_dir_path ~solver_env () =
     let* rev_store = Rev_store.get in
     let* platform = Pkg_common.poll_solver_env_from_current_system () in
     let patches_dir = default_patches_dir in
-    let* _ =
+    let* fetch_results =
       Fiber.parallel_map source_groups ~f:(fun group ->
         fetch_source_group ~rev_store ~platform ~patches_dir ~pkgs_by_name group)
+    in
+    (* Build a map from source groups to their actual directory names *)
+    let group_dirnames =
+      List.map2 source_groups fetch_results ~f:(fun group (_was_fetched, dirname) ->
+        group, dirname)
     in
     (* After fetching, generate duniverse/dune with vendor stanzas *)
     (* We scan each fetched directory for libraries to include in vendor stanzas *)
     let dune_content =
       let vendor_stanzas =
-        List.filter_map source_groups ~f:(fun group ->
-          let { Duniverse.packages; primary_name; primary_version; _ } = group in
-          let dirname =
-            sprintf
-              "%s.%s"
-              (Package_name.to_string primary_name)
-              (Package_version.to_string primary_version)
-          in
-          let pkg_dir = Duniverse.source_group_dir group in
+        List.filter_map group_dirnames ~f:(fun (group, dirname) ->
+          let { Duniverse.packages; _ } = group in
+          let pkg_dir = Path.Source.relative Duniverse.duniverse_dir dirname in
           (* Check if this is an opam package (needs sandbox) *)
           let is_opam =
             List.for_all packages ~f:(fun (name, _) ->
@@ -397,18 +458,12 @@ let auto_fetch_missing ~lock_dir_path ~solver_env () =
   let lock_path = Path.source lock_dir_path in
   let* lock_dir = Lock_pkg.read_disk_fiber ~solver_env lock_path in
   let all_pkgs = Lock_dir.Packages.to_pkg_list lock_dir.packages in
-  (* Filter to dune packages with sources *)
-  let dune_pkgs =
-    List.filter all_pkgs ~f:(fun (pkg : Lock_dir.Pkg.t) ->
-      match pkg.info.source with
-      | None -> false
-      | Some _ ->
-        (match Duniverse.classify pkg with
-         | Duniverse.Duniverse -> true
-         | Duniverse.Opam_sandbox -> false))
+  (* Filter to packages with sources (both dune and opam packages) *)
+  let fetchable_pkgs =
+    List.filter all_pkgs ~f:(fun (pkg : Lock_dir.Pkg.t) -> Option.is_some pkg.info.source)
   in
   (* Group by source and filter to groups whose directory is missing *)
-  let source_groups = Duniverse.group_by_source dune_pkgs in
+  let source_groups = Duniverse.group_by_source fetchable_pkgs in
   let missing_groups =
     List.filter source_groups ~f:(fun group ->
       let target = Duniverse.source_group_dir group in
@@ -422,21 +477,17 @@ let auto_fetch_missing ~lock_dir_path ~solver_env () =
     let marker_path =
       Path.source (Path.Source.relative Duniverse.duniverse_dir Duniverse.marker_filename)
     in
-    (* Build map for classifying packages (from all packages, not just dune) *)
-    let all_fetchable =
-      List.filter all_pkgs ~f:(fun (pkg : Lock_dir.Pkg.t) ->
-        Option.is_some pkg.info.source)
-    in
+    (* Build map for classifying packages *)
     let pkg_classifications =
-      List.fold_left all_fetchable ~init:Package_name.Map.empty ~f:(fun acc pkg ->
+      List.fold_left fetchable_pkgs ~init:Package_name.Map.empty ~f:(fun acc pkg ->
         let name = pkg.Lock_dir.Pkg.info.name in
         Package_name.Map.set acc name (Duniverse.classify pkg))
     in
     (* Group all fetchable packages by source for vendor stanza generation *)
-    let all_source_groups = Duniverse.group_by_source all_fetchable in
+    let all_source_groups = Duniverse.group_by_source fetchable_pkgs in
     (* Build map for looking up packages by name *)
     let pkgs_by_name =
-      List.fold_left dune_pkgs ~init:Package_name.Map.empty ~f:(fun acc pkg ->
+      List.fold_left fetchable_pkgs ~init:Package_name.Map.empty ~f:(fun acc pkg ->
         Package_name.Map.add_exn acc pkg.Lock_dir.Pkg.info.name pkg)
     in
     Dune_engine.Progress.reset ();
@@ -444,9 +495,18 @@ let auto_fetch_missing ~lock_dir_path ~solver_env () =
     let* rev_store = Rev_store.get in
     let* platform = Pkg_common.poll_solver_env_from_current_system () in
     let patches_dir = default_patches_dir in
-    let* _ =
+    let* fetch_results =
       Fiber.parallel_map missing_groups ~f:(fun group ->
         fetch_source_group ~rev_store ~platform ~patches_dir ~pkgs_by_name group)
+    in
+    (* Build a map from fetched groups to their actual directory names *)
+    let fetched_dirnames =
+      List.fold_left2
+        missing_groups
+        fetch_results
+        ~init:[]
+        ~f:(fun acc group (_was_fetched, dirname) ->
+          (group.Duniverse.primary_name, dirname) :: acc)
     in
     (* Generate duniverse/dune with vendored_dirs and vendor stanzas *)
     (* Scan all existing directories for libraries *)
@@ -454,13 +514,30 @@ let auto_fetch_missing ~lock_dir_path ~solver_env () =
       let vendor_stanzas =
         List.filter_map all_source_groups ~f:(fun group ->
           let { Duniverse.packages; primary_name; primary_version; _ } = group in
+          (* Use the fetched dirname if available, otherwise compute from project name *)
           let dirname =
-            sprintf
-              "%s.%s"
-              (Package_name.to_string primary_name)
-              (Package_version.to_string primary_version)
+            match List.assoc fetched_dirnames primary_name with
+            | Some d -> d
+            | None ->
+              (* For existing groups, check the actual directory for project name *)
+              let initial_dirname =
+                sprintf
+                  "%s.%s"
+                  (Package_name.to_string primary_name)
+                  (Package_version.to_string primary_version)
+              in
+              let initial_dir =
+                Path.Source.relative Duniverse.duniverse_dir initial_dirname
+              in
+              if Path.exists (Path.source initial_dir)
+              then (
+                match Duniverse.read_project_name initial_dir with
+                | Some proj_name ->
+                  sprintf "%s.%s" proj_name (Package_version.to_string primary_version)
+                | None -> initial_dirname)
+              else initial_dirname
           in
-          let pkg_dir = Duniverse.source_group_dir group in
+          let pkg_dir = Path.Source.relative Duniverse.duniverse_dir dirname in
           (* Check if this is an opam package (needs sandbox) *)
           let is_opam =
             List.for_all packages ~f:(fun (name, _) ->

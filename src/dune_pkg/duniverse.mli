@@ -68,3 +68,20 @@ val get_patches : Lock.Pkg.t -> platform:Solver_env.t -> String_with_vars.t list
     names by parsing all dune files and extracting (public_name ...) from
     library stanzas. *)
 val scan_public_libraries : Path.Source.t -> string list
+
+(** [scan_meta_libraries dir ~pkg_name] scans META files in a vendored directory
+    for library names. Checks both pkg/META and META. *)
+val scan_meta_libraries : Path.Source.t -> pkg_name:string -> string list
+
+(** [scan_opam_libraries dir] scans for .opam files and returns their basenames
+    as library names. *)
+val scan_opam_libraries : Path.Source.t -> string list
+
+(** [scan_libraries dir ~pkg_name] scans a vendored directory for library names.
+    Cascades through: dune files -> META files -> opam files. *)
+val scan_libraries : Path.Source.t -> pkg_name:string -> string list
+
+(** [read_project_name dir] reads the project name from a dune-project file
+    in the given source directory. Returns [None] if the file doesn't exist
+    or doesn't contain a (name ...) stanza. *)
+val read_project_name : Path.Source.t -> string option

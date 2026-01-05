@@ -19,6 +19,7 @@ include struct
   module Slang = Slang
   module Package_variable_name = Package_variable_name
   module Ordered_set_lang = Ordered_set_lang
+  module Lib_name = Lib_name
 end
 
 include struct

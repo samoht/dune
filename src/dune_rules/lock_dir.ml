@@ -295,7 +295,14 @@ let lock_dir_active ctx =
       get_source_path_for_context ctx
       >>= (function
        | None -> Memo.return false
-       | Some source -> Source_tree.find_dir source >>| Option.is_some)
+       | Some source ->
+         (* Check for directory format first *)
+         let* is_dir = Source_tree.find_dir source >>| Option.is_some in
+         if is_dir
+         then Memo.return true
+         else
+           (* Check for single-file format *)
+           Fs_memo.file_exists (Path.Outside_build_dir.In_source_dir source))
 ;;
 
 let source_kind (source : Dune_pkg.Source.t) =

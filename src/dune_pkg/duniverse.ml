@@ -268,3 +268,114 @@ let scan_public_libraries dir =
          List.filter_map sexps ~f:extract_public_name_from_sexp
          |> List.filter ~f:is_valid_lib_name))
 ;;
+
+(* Extract project name from dune-project file *)
+let extract_project_name_from_sexp sexp =
+  let open Dune_sexp.Ast in
+  let atom_to_string = function
+    | Atom (_, a) -> Some (Dune_sexp.Atom.to_string a)
+    | Quoted_string (_, s) -> Some s
+    | _ -> None
+  in
+  match sexp with
+  | List (_, Atom (_, name_atom) :: name_sexp :: _)
+    when String.equal (Dune_sexp.Atom.to_string name_atom) "name" ->
+    atom_to_string name_sexp
+  | _ -> None
+;;
+
+(* Read the project name from a dune-project file in the given directory.
+   Returns None if the file doesn't exist or doesn't have a name. *)
+let read_project_name dir =
+  let dune_project_path = Path.Source.relative dir "dune-project" in
+  let path = Path.source dune_project_path in
+  if not (Path.exists path)
+  then None
+  else (
+    match Io.read_file path with
+    | exception _ -> None
+    | contents ->
+      (match
+         Dune_sexp.Parser.parse_string ~fname:(Path.to_string path) ~mode:Many contents
+       with
+       | exception _ -> None
+       | sexps -> List.find_map sexps ~f:extract_project_name_from_sexp))
+;;
+
+module Meta = Dune_findlib.Findlib.Meta
+
+(* Extract all library names from a META file, including sub-packages *)
+let rec collect_lib_names_from_meta ~prefix (meta : Meta.Simplified.t) =
+  let name =
+    match meta.name with
+    | Some n -> Lib_name.to_string n
+    | None -> prefix
+  in
+  let full_name =
+    if String.is_empty prefix
+    then name
+    else if String.is_empty name
+    then prefix
+    else prefix ^ "." ^ name
+  in
+  let self = if String.is_empty full_name then [] else [ full_name ] in
+  let subs =
+    List.concat_map meta.subs ~f:(collect_lib_names_from_meta ~prefix:full_name)
+  in
+  self @ subs
+;;
+
+(* Scan META file for library names - checks both pkg/META and META *)
+let scan_meta_libraries dir ~pkg_name =
+  let try_path path =
+    if not (Path.exists (Path.source path))
+    then None
+    else (
+      match Io.read_file (Path.source path) with
+      | exception _ -> None
+      | contents ->
+        (match Meta.of_string contents ~name:(Some (Package_name.of_string pkg_name)) with
+         | exception _ -> None
+         | simplified -> Some (collect_lib_names_from_meta ~prefix:"" simplified)))
+  in
+  let pkg_meta = Path.Source.relative dir "pkg/META" in
+  let root_meta = Path.Source.relative dir "META" in
+  match try_path pkg_meta with
+  | Some libs -> libs
+  | None ->
+    (match try_path root_meta with
+     | Some libs -> libs
+     | None -> [])
+;;
+
+(* Scan for .opam files and use their basenames as library names *)
+let scan_opam_libraries dir =
+  let path = Path.source dir in
+  if not (Path.exists path)
+  then []
+  else (
+    match Path.readdir_unsorted path with
+    | Error _ -> []
+    | Ok entries ->
+      List.filter_map entries ~f:(fun name ->
+        if Filename.check_suffix name ".opam"
+        then (
+          let base = Filename.chop_suffix name ".opam" in
+          if is_valid_lib_name base then Some base else None)
+        else None))
+;;
+
+(* Scan a vendored directory for library names.
+   Cascades through: dune files -> META files -> opam files *)
+let scan_libraries dir ~pkg_name =
+  (* Try dune first (most accurate for dune packages) *)
+  match scan_public_libraries dir with
+  | _ :: _ as libs -> libs
+  | [] ->
+    (* Try META file (works for topkg, oasis, etc.) *)
+    (match scan_meta_libraries dir ~pkg_name with
+     | _ :: _ as libs -> libs
+     | [] ->
+       (* Fall back to opam file names *)
+       scan_opam_libraries dir)
+;;

@@ -248,14 +248,7 @@ and find_dir_raw
   let status =
     (* Override status for cram test directories *)
     if Dune_project.cram project && Cram_test.is_cram_suffix basename
-    then
-      Source_dir_status.Data_only
-      (* Auto-detect duniverse directory: if it contains the marker file,
-       treat it as vendored so packages are built in the main context *)
-    else if
-      String.equal basename Dune_pkg.Duniverse.marker_dirname
-      && Filename.Set.mem (Dir_contents.files readdir) Dune_pkg.Duniverse.marker_filename
-    then Source_dir_status.Vendored
+    then Source_dir_status.Data_only
     else status
   in
   let* project =
