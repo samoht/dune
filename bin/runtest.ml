@@ -41,7 +41,7 @@ let runtest_term =
   let common, config = Common.init builder in
   match Dune_util.Global_lock.lock ~timeout:None with
   | Ok () ->
-    Build.run_build_command ~common ~config ~request:(fun setup ->
+    Build.run_build_command ~common ~config ~auto_fetch:true ~request:(fun setup ->
       Runtest_common.make_request
         ~scontexts:setup.scontexts
         ~to_cwd:(Common.root common).to_cwd

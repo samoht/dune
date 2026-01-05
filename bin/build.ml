@@ -30,21 +30,30 @@ let with_metrics ~common f =
     Fiber.return ())
 ;;
 
-let run_build_system ~common ~request =
+let run_build_system ~common ~auto_fetch ~request =
   let run ~(toplevel : unit Memo.Lazy.t) =
     with_metrics ~common (fun () -> build (fun () -> Memo.Lazy.force toplevel))
   in
   let open Fiber.O in
   Fiber.finalize
     (fun () ->
-       (* CR-someday amokhov: Currently we invalidate cached timestamps on every
-         incremental rebuild. This conservative approach helps us to work around
-         some [mtime] resolution problems (e.g. on Mac OS). It would be nice to
-         find a way to avoid doing this. In fact, this may be unnecessary even
-         for the initial build if we assume that the user does not modify files
-         in the [_build] directory. For now, it's unclear if optimising this is
-         worth the effort. *)
        Cached_digest.invalidate_cached_timestamps ();
+       Console.Status_line.set
+         (Live
+            (fun () ->
+              Pp.map_tags (Dune_engine.Progress.pp ~max_width:80) ~f:(fun () ->
+                User_message.Style.Details)));
+       let* () =
+         if not auto_fetch
+         then Fiber.return ()
+         else (
+           let lock_dir_path = Dune_rules.Lock_dir.default_source_path in
+           if Path.exists (Path.source lock_dir_path)
+           then
+             let* solver_env = Pkg.Pkg_common.poll_solver_env_from_current_system () in
+             Pkg.Fetch.auto_fetch_missing ~lock_dir_path ~solver_env ()
+           else Fiber.return ())
+       in
        let* setup = Import.Main.setup () in
        let request =
          Action_builder.bind (Action_builder.of_memo setup) ~f:(fun setup ->
@@ -103,31 +112,27 @@ let poll_handling_rpc_build_requests ~(common : Common.t) =
              ~to_cwd:root.to_cwd
              ~test_paths
        in
-       run_build_system ~common ~request, outcome)
+       run_build_system ~common ~auto_fetch:true ~request, outcome)
 ;;
 
-let run_build_command_poll_eager ~(common : Common.t) ~config ~request : unit =
+let run_build_command_poll_eager ~(common : Common.t) ~config ~auto_fetch ~request : unit =
   Scheduler.go_with_rpc_server_and_console_status_reporting ~common ~config (fun () ->
     let open Fiber.O in
-    (* Run two fibers concurrently. One is responible for rebuilding targets
-       named on the command line in reaction to file system changes. The other
-       is responsible for building targets named in RPC build requests. *)
-    let+ () = Dune_engine.Scheduler.Run.poll (run_build_system ~common ~request)
+    let+ () =
+      Dune_engine.Scheduler.Run.poll (run_build_system ~common ~auto_fetch ~request)
     and+ () = poll_handling_rpc_build_requests ~common in
     ())
 ;;
 
-let run_build_command_poll_passive ~common ~config ~request:_ : unit =
-  (* CR-someday aalekseyev: It would've been better to complain if [request] is
-     non-empty, but we can't check that here because [request] is a function.*)
+let run_build_command_poll_passive ~common ~config ~auto_fetch:_ ~request:_ : unit =
   Scheduler.go_with_rpc_server_and_console_status_reporting ~common ~config (fun () ->
     poll_handling_rpc_build_requests ~common)
 ;;
 
-let run_build_command_once ~(common : Common.t) ~config ~request =
+let run_build_command_once ~(common : Common.t) ~config ~auto_fetch ~request =
   let open Fiber.O in
   let once () =
-    let+ res = run_build_system ~common ~request in
+    let+ res = run_build_system ~common ~auto_fetch ~request in
     match res with
     | Error `Already_reported -> raise Dune_util.Report_error.Already_reported
     | Ok () -> ()
@@ -135,13 +140,14 @@ let run_build_command_once ~(common : Common.t) ~config ~request =
   Scheduler.go_with_rpc_server ~common ~config once
 ;;
 
-let run_build_command ~(common : Common.t) ~config ~request =
+let run_build_command ~(common : Common.t) ~config ~auto_fetch ~request =
   (match Common.watch common with
    | Yes Eager -> run_build_command_poll_eager
    | Yes Passive -> run_build_command_poll_passive
    | No -> run_build_command_once)
     ~common
     ~config
+    ~auto_fetch
     ~request
 ;;
 
@@ -191,6 +197,14 @@ let build =
                  "Build $(docv) in its parent directory only. Equivalent to the build \
                   target $(b,@@)$(docv). Example: $(b,--alias dir/foo) builds the \
                   $(b,foo) alias in $(b,dir/) only. Repeatable."))
+    and+ no_auto_fetch =
+      Arg.(
+        value
+        & flag
+        & info
+            [ "no-auto-fetch" ]
+            ~doc:
+              (Some "Disable automatic fetching of missing dune packages to duniverse."))
     in
     let targets = List.concat [ targets; aliases; aliases_rec ] in
     let targets =
@@ -235,7 +249,8 @@ let build =
         >>| Rpc.Rpc_common.wrap_build_outcome_exn ~print_on_success:true)
     | Ok () ->
       let request setup = Target.interpret_targets (Common.root common) setup targets in
-      run_build_command ~common ~config ~request
+      let auto_fetch = (not no_auto_fetch) && config.auto_fetch in
+      run_build_command ~common ~config ~auto_fetch ~request
   in
   Cmd.v (Cmd.info "build" ~doc ~man ~envs:Common.envs) term
 ;;

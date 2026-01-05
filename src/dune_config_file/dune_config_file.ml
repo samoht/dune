@@ -261,6 +261,7 @@ module Dune_config = struct
       ; project_defaults : Project_defaults.t field
       ; pkg_enabled : Pkg_enabled.t field
       ; auto_lock : bool field
+      ; auto_fetch : bool field
       ; experimental : (string * (Loc.t * string)) list field
       }
   end
@@ -287,6 +288,7 @@ module Dune_config = struct
           ; project_defaults
           ; pkg_enabled
           ; auto_lock
+          ; auto_fetch
           ; experimental
           }
       =
@@ -311,6 +313,7 @@ module Dune_config = struct
       && field Project_defaults.equal t.project_defaults project_defaults
       && field Pkg_enabled.equal t.pkg_enabled pkg_enabled
       && field Bool.equal t.auto_lock auto_lock
+      && field Bool.equal t.auto_fetch auto_fetch
       && field
            (List.equal
               (Tuple.T2.equal String.equal (Tuple.T2.equal Loc.equal String.equal)))
@@ -345,6 +348,7 @@ module Dune_config = struct
       ; project_defaults = field a.project_defaults b.project_defaults
       ; pkg_enabled = field a.pkg_enabled b.pkg_enabled
       ; auto_lock = field a.auto_lock b.auto_lock
+      ; auto_fetch = field a.auto_fetch b.auto_fetch
       ; experimental = field a.experimental b.experimental
       }
     ;;
@@ -371,6 +375,7 @@ module Dune_config = struct
           ; project_defaults
           ; pkg_enabled
           ; auto_lock
+          ; auto_fetch
           ; experimental
           }
       =
@@ -393,6 +398,7 @@ module Dune_config = struct
         ; "project_defaults", field Project_defaults.to_dyn project_defaults
         ; "pkg_enabled", field Pkg_enabled.to_dyn pkg_enabled
         ; "auto_lock", field Dyn.bool auto_lock
+        ; "auto_fetch", field Dyn.bool auto_fetch
         ; ( "experimental"
           , field Dyn.(list (pair string (fun (_, v) -> string v))) experimental )
         ]
@@ -419,6 +425,7 @@ module Dune_config = struct
       ; project_defaults = None
       ; pkg_enabled = None
       ; auto_lock = None
+      ; auto_fetch = None
       ; experimental = None
       }
     ;;
@@ -506,6 +513,7 @@ module Dune_config = struct
         }
     ; pkg_enabled = Unset
     ; auto_lock = false
+    ; auto_fetch = true
     ; experimental = []
     }
   ;;
@@ -575,6 +583,8 @@ module Dune_config = struct
     and+ pkg_enabled = field_o "pkg" (3, 20) Pkg_enabled.decode
     and+ auto_lock =
       field_o "auto_lock" (3, 20) (enum [ "enabled", true; "disabled", false ])
+    and+ auto_fetch =
+      field_o "auto_fetch" (3, 20) (enum [ "enabled", true; "disabled", false ])
     and+ experimental =
       field_o "experimental" (3, 8) (repeat (pair string (located string)))
     in
@@ -598,6 +608,7 @@ module Dune_config = struct
     ; project_defaults
     ; pkg_enabled
     ; auto_lock
+    ; auto_fetch
     ; experimental
     }
   ;;

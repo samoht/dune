@@ -101,6 +101,7 @@ module Dune_config : sig
       ; project_defaults : Project_defaults.t field
       ; pkg_enabled : Pkg_enabled.t field
       ; auto_lock : bool field
+      ; auto_fetch : bool field
       ; experimental : (string * (Loc.t * string)) list field
       }
   end
