@@ -374,17 +374,49 @@ end
 
 let display_term =
   let module Display = Dune_config.Display in
-  one_of
-    (let+ verbose =
-       Arg.(
-         value
-         & flag
-         & info
-             [ "verbose" ]
-             ~docs:copts_sect
-             ~doc:(Some "Same as $(b,--display verbose)"))
-     in
-     Option.some_if verbose Dune_config.Display.verbose)
+  (* -v can be used once for short, twice (-vv) for verbose *)
+  let verbosity_term =
+    let+ count =
+      Arg.(
+        value
+        & flag_all
+        & info
+            [ "v" ]
+            ~docs:copts_sect
+            ~doc:
+              (Some
+                 "Increase verbosity. Use once for short output, twice (-vv) for verbose."))
+    in
+    match List.length count with
+    | 0 -> None
+    | 1 -> Some Display.short
+    | _ -> Some Display.verbose
+  in
+  let verbose_term =
+    let+ verbose =
+      Arg.(
+        value
+        & flag
+        & info
+            [ "verbose" ]
+            ~docs:copts_sect
+            ~doc:(Some "Same as $(b,--display verbose)."))
+    in
+    Option.some_if verbose Display.verbose
+  in
+  let quiet_term =
+    let+ quiet =
+      Arg.(
+        value
+        & flag
+        & info
+            [ "q"; "quiet" ]
+            ~docs:copts_sect
+            ~doc:(Some "Same as $(b,--display quiet)."))
+    in
+    Option.some_if quiet Display.quiet
+  in
+  let display_opt_term =
     Arg.(
       let doc =
         let all = Display.all |> List.map ~f:fst |> String.enumerate_or in
@@ -396,6 +428,42 @@ let display_term =
       value
       & opt (some (enum Display.all)) None
       & info [ "display" ] ~docs:copts_sect ~docv:"MODE" ~doc:(Some doc))
+  in
+  Term.ret
+  @@ let+ verbosity_opt, verbosity_args = Term.with_used_args verbosity_term
+     and+ verbose_opt, verbose_args = Term.with_used_args verbose_term
+     and+ quiet_opt, quiet_args = Term.with_used_args quiet_term
+     and+ display_opt, display_args = Term.with_used_args display_opt_term in
+     let used_args =
+       List.filter_map
+         [ verbosity_args; verbose_args; quiet_args; display_args ]
+         ~f:(function
+         | [] -> None
+         | arg :: _ -> Some arg)
+     in
+     (* Remove duplicates from -v -v (shown as -v appearing twice) *)
+     let unique_args =
+       List.fold_left used_args ~init:[] ~f:(fun acc arg ->
+         if List.mem acc arg ~equal:String.equal then acc else arg :: acc)
+       |> List.rev
+     in
+     match unique_args with
+     | [] | [ _ ] ->
+       (* At most one display option type used, pick the one that's set *)
+       let result =
+         match verbosity_opt with
+         | Some _ -> verbosity_opt
+         | None ->
+           (match verbose_opt with
+            | Some _ -> verbose_opt
+            | None ->
+              (match quiet_opt with
+               | Some _ -> quiet_opt
+               | None -> display_opt))
+       in
+       `Ok result
+     | arg1 :: arg2 :: _ ->
+       `Error (true, sprintf "Cannot use %s and %s simultaneously" arg1 arg2)
 ;;
 
 let shared_with_config_file =
