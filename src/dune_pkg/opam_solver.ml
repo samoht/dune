@@ -289,6 +289,7 @@ module Context = struct
     |> Lock_pkg.add_self_to_filter_env package
     |> Resolve_opam_formula.apply_filter
          ~with_test:package_is_local
+         ~post:true (* Include post deps in solution; they don't affect build order *)
          ~formula:filtered_formula
   ;;
 
@@ -1655,10 +1656,21 @@ let reject_unreachable_packages =
             "package is both local and returned by solver"
             [ "name", Package_name.to_dyn name ]
         | Some (pkg : Lock.Pkg.t), None ->
-          Some
-            (Lock.Conditional_choice.choose_for_platform pkg.depends ~platform:solver_env
-             |> Option.value ~default:[]
-             |> List.map ~f:(fun (depend : Lock.Dependency.t) -> depend.name))
+          (* Include both regular and post deps in reachability calculation.
+             Post deps don't affect build order but need to be reachable. *)
+          let regular_deps =
+            Lock.Conditional_choice.choose_for_platform pkg.depends ~platform:solver_env
+            |> Option.value ~default:[]
+            |> List.map ~f:(fun (depend : Lock.Dependency.t) -> depend.name)
+          in
+          let post_deps =
+            Lock.Conditional_choice.choose_for_platform
+              pkg.post_depends
+              ~platform:solver_env
+            |> Option.value ~default:[]
+            |> List.map ~f:(fun (depend : Lock.Dependency.t) -> depend.name)
+          in
+          Some (regular_deps @ post_deps)
         | None, Some (pkg : Local_package.For_solver.t) ->
           let deps =
             match
@@ -1678,9 +1690,11 @@ let reject_unreachable_packages =
                    ~packages:
                      (Package_name.Map.set pkgs_by_version Dune_dep.name dune_version)
             with
-            | Ok { regular; post = _ (* discard post deps *) } ->
-              (* remove Dune from the formula as we remove it from solutions *)
-              List.filter regular ~f:(fun pkg ->
+            | Ok { regular; post } ->
+              (* Include both regular and post deps in reachability calculation.
+                 Post deps don't affect build order but need to be reachable.
+                 Remove Dune from the formula as we remove it from solutions. *)
+              List.filter (regular @ post) ~f:(fun pkg ->
                 not (Package_name.equal Dune_dep.name pkg))
             | Error (`Formula_could_not_be_satisfied hints) ->
               (match hints with

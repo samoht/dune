@@ -551,6 +551,9 @@ module Pkg = struct
     { build_command : Build_command.t Conditional_choice.t
     ; install_command : Action.t Conditional_choice.t
     ; depends : Dependencies.t Conditional_choice.t
+    ; post_depends : Dependencies.t Conditional_choice.t
+      (* Post deps are installed WITH the package but don't affect build order.
+       They're tracked separately to avoid creating false dependency cycles. *)
     ; depexts : Depexts.t list
     ; info : Pkg_info.t
     ; exported_env : String_with_vars.t Action.Env_update.t list
@@ -561,6 +564,7 @@ module Pkg = struct
         { build_command
         ; install_command
         ; depends
+        ; post_depends
         ; depexts
         ; info
         ; exported_env
@@ -572,6 +576,7 @@ module Pkg = struct
     (* CR-rgrinberg: why do we ignore locations? *)
     && Conditional_choice.equal Action.equal_no_locs install_command t.install_command
     && Conditional_choice.equal Dependencies.equal depends t.depends
+    && Conditional_choice.equal Dependencies.equal post_depends t.post_depends
     && List.equal Depexts.equal depexts t.depexts
     && Pkg_info.equal info t.info
     && List.equal
@@ -585,6 +590,7 @@ module Pkg = struct
         { build_command
         ; install_command
         ; depends
+        ; post_depends
         ; depexts
         ; info
         ; exported_env
@@ -595,6 +601,7 @@ module Pkg = struct
       ( Conditional_choice.hash ~f:Poly.hash build_command
       , Conditional_choice.hash ~f:Poly.hash install_command
       , Conditional_choice.hash ~f:Poly.hash depends
+      , Conditional_choice.hash ~f:Poly.hash post_depends
       , depexts
       , Pkg_info.hash info
       , exported_env
@@ -606,6 +613,7 @@ module Pkg = struct
         { build_command
         ; install_command
         ; depends
+        ; post_depends
         ; depexts
         ; info
         ; exported_env
@@ -615,6 +623,7 @@ module Pkg = struct
     Conditional_choice.digest_feed Digest_feed.generic hasher build_command;
     Conditional_choice.digest_feed Digest_feed.generic hasher install_command;
     Conditional_choice.digest_feed Digest_feed.generic hasher depends;
+    Conditional_choice.digest_feed Digest_feed.generic hasher post_depends;
     Digest_feed.generic hasher depexts;
     Pkg_info.digest_feed hasher info;
     Digest_feed.generic hasher exported_env;
@@ -625,6 +634,7 @@ module Pkg = struct
         { build_command
         ; install_command
         ; depends
+        ; post_depends
         ; depexts
         ; info
         ; exported_env
@@ -635,6 +645,7 @@ module Pkg = struct
     ; exported_env =
         List.map exported_env ~f:(Action.Env_update.map ~f:String_with_vars.remove_locs)
     ; depends = Conditional_choice.map depends ~f:Dependencies.remove_locs
+    ; post_depends = Conditional_choice.map post_depends ~f:Dependencies.remove_locs
     ; depexts = List.map depexts ~f:Depexts.remove_locs
     ; build_command = Conditional_choice.map build_command ~f:Build_command.remove_locs
     ; install_command = Conditional_choice.map install_command ~f:Action.remove_locs
@@ -646,6 +657,7 @@ module Pkg = struct
         { build_command
         ; install_command
         ; depends
+        ; post_depends
         ; depexts
         ; info
         ; exported_env
@@ -656,6 +668,7 @@ module Pkg = struct
       [ "build_command", Conditional_choice.to_dyn Build_command.to_dyn build_command
       ; "install_command", Conditional_choice.to_dyn Action.to_dyn install_command
       ; "depends", Conditional_choice.to_dyn Dependencies.to_dyn depends
+      ; "post_depends", Conditional_choice.to_dyn Dependencies.to_dyn post_depends
       ; "depexts", Dyn.list Depexts.to_dyn depexts
       ; "info", Pkg_info.to_dyn info
       ; ( "exported_env"
@@ -680,6 +693,7 @@ module Pkg = struct
     let build = "build"
     let install = "install"
     let depends = "depends"
+    let post_depends = "post_depends"
     let depexts = "depexts"
     let source = "source"
     let dev = "dev"
@@ -722,6 +736,7 @@ module Pkg = struct
          field ~default:empty_choice Fields.install parse_install_command
        and+ build_command = Build_command.decode_fields ~portable_lock_dir
        and+ depends = field ~default:empty_choice Fields.depends parse_depends
+       and+ post_depends = field ~default:empty_choice Fields.post_depends parse_depends
        and+ depexts = field ~default:[] Fields.depexts parse_depexts
        and+ source = field_o Fields.source Source.decode
        and+ dev = field_b Fields.dev
@@ -758,6 +773,11 @@ module Pkg = struct
              ~solved_for_platforms
              depends
          in
+         let post_depends =
+           Conditional_choice_or_all_platforms.to_conditional_choice
+             ~solved_for_platforms
+             post_depends
+         in
          let info =
            let make_source f =
              lock_dir |> Path.to_absolute_filename |> Path.External.of_string |> f
@@ -775,6 +795,7 @@ module Pkg = struct
          in
          { build_command
          ; depends
+         ; post_depends
          ; depexts
          ; install_command
          ; info
@@ -796,6 +817,7 @@ module Pkg = struct
         { build_command
         ; install_command
         ; depends
+        ; post_depends
         ; depexts
         ; info = { Pkg_info.name = _; extra_sources; version; dev; avoid; source }
         ; exported_env
@@ -803,7 +825,28 @@ module Pkg = struct
         }
     =
     let open Encoder in
-    let install_command, build_command, depends, depexts, enabled_on_platforms =
+    let encode_deps_field name deps =
+      let deps =
+        match deps with
+        | [ { Conditional.value = []; _ } ] ->
+          (* Omit the dependencies field to reduce noise in the case
+             where there is explicitly an empty list of dependencies. *)
+          []
+        | other -> other
+      in
+      Conditional_choice_or_all_platforms.encode_field
+        ~solved_for_platforms
+        name
+        Dependencies.encode
+        deps
+    in
+    let ( install_command
+        , build_command
+        , depends
+        , post_depends
+        , depexts
+        , enabled_on_platforms )
+      =
       if portable_lock_dir
       then (
         let encode_field n v c =
@@ -811,15 +854,8 @@ module Pkg = struct
         in
         ( encode_field Fields.install Action.encode install_command
         , encode_field Fields.build Build_command.encode_portable build_command
-        , (let depends =
-             match depends with
-             | [ { Conditional.value = []; _ } ] ->
-               (* Omit the dependencies field to reduce noise in the case
-                  where there is explictly an empty list of dependencies. *)
-               []
-             | other -> other
-           in
-           encode_field Fields.depends Dependencies.encode depends)
+        , encode_deps_field Fields.depends depends
+        , encode_deps_field Fields.post_depends post_depends
         , field_l Fields.depexts Depexts.encode depexts
         , match
             Enabled_on_platforms.of_solver_env_disjunction
@@ -846,6 +882,12 @@ module Pkg = struct
              |> Option.value ~default:[]
              |> List.map ~f:(fun { Dependency.name; _ } -> name))
         , field_l
+            Fields.post_depends
+            Package_name.encode
+            (Conditional_choice.get_value_ensuring_at_most_one_choice post_depends
+             |> Option.value ~default:[]
+             |> List.map ~f:(fun { Dependency.name; _ } -> name))
+        , field_l
             Fields.depexts
             string
             (match depexts with
@@ -863,6 +905,7 @@ module Pkg = struct
        ; install_command
        ; build_command
        ; depends
+       ; post_depends
        ; depexts
        ; field_o Fields.source Source.encode source
        ; field_b Fields.dev dev
@@ -922,13 +965,33 @@ module Pkg = struct
         a.depends
         b.depends
     in
+    let post_depends =
+      Conditional_choice.merge_combining_conditions
+        ~value_equal:Dependencies.equal
+        a.post_depends
+        b.post_depends
+    in
     let enabled_on_platforms = a.enabled_on_platforms @ b.enabled_on_platforms in
-    let ret = { a with build_command; install_command; depends; enabled_on_platforms } in
+    let ret =
+      { a with
+        build_command
+      ; install_command
+      ; depends
+      ; post_depends
+      ; enabled_on_platforms
+      }
+    in
     if
       not
         (equal
            ret
-           { b with build_command; install_command; depends; enabled_on_platforms })
+           { b with
+             build_command
+           ; install_command
+           ; depends
+           ; post_depends
+           ; enabled_on_platforms
+           })
     then
       Code_error.raise
         "Packages differ in a non-platform-specific field"

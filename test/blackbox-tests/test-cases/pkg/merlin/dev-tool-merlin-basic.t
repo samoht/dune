@@ -21,9 +21,10 @@ a lockdir containing an "ocaml" lockfile.
   $ dune build
 
   $ dune tools exec ocamlmerlin
-  Solution for _build/.dev-tools.locks/merlin (3 packages)
+  Solution for _build/.dev-tools.locks/merlin (4 packages)
   opam:
   - merlin.0.0.1
+  - ocaml.5.2.0
   - ocaml-base-compiler.5.2.0
   - ocaml-compiler.5.2.0
        Running 'ocamlmerlin'

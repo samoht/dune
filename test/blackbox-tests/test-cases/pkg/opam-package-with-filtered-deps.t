@@ -24,13 +24,17 @@ Demonstrate the translation of filtered dependencies
   > EOF
 
   $ solve bar 2>/dev/null
-  Solution for dune.lock (2 packages):
+  Solution for dune.lock (3 packages):
   opam:
   - bar.0.0.1
   - pkg-build.0.0.1
+  - pkg-post.0.0.1
 
   $ cat ${default_lock_dir}/bar.0.0.1.pkg
   (version 0.0.1)
   
   (depends
    (all_platforms (pkg-build)))
+  
+  (post_depends
+   (all_platforms (pkg-post)))

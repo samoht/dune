@@ -18,12 +18,16 @@ Solving for post dependencies:
 We don't need bar, so we skip it
 
   $ solve foo
-  Solution for dune.lock (1 package):
+  Solution for dune.lock (2 packages):
   opam:
+  - bar.0.0.1
   - foo.0.0.1
 
   $ cat ${default_lock_dir}/foo.0.0.1.pkg
   (version 0.0.1)
+  
+  (post_depends
+   (all_platforms (bar)))
 
 We should also skip any artifacts that bar references:
 
@@ -43,6 +47,9 @@ Self dependency
 
   $ cat ${default_lock_dir}/foo.0.0.1.pkg
   (version 0.0.1)
+  
+  (post_depends
+   (all_platforms (foo)))
 
 Using post to break cycle:
 
@@ -62,6 +69,9 @@ Using post to break cycle:
 
   $ cat ${default_lock_dir}/foo.0.0.1.pkg ${default_lock_dir}/bar.0.0.1.pkg
   (version 0.0.1)
+  
+  (post_depends
+   (all_platforms (bar)))
   (version 0.0.1)
   
   (depends
@@ -78,12 +88,16 @@ post "cycle":
   > EOF
 
   $ solve foo
-  Solution for dune.lock (1 package):
+  Solution for dune.lock (2 packages):
   opam:
+  - bar.0.0.1
   - foo.0.0.1
 
   $ cat ${default_lock_dir}/foo.0.0.1.pkg
   (version 0.0.1)
+  
+  (post_depends
+   (all_platforms (bar)))
 
 In depopts:
 

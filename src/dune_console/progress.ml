@@ -15,7 +15,12 @@ module No_flush = struct
       flush stderr)
   ;;
 
-  let show_status_line () = if !status_line_len > 0 then Ansi_color.prerr !status_line
+  let show_status_line () =
+    if !status_line_len > 0
+    then (
+      Ansi_color.prerr !status_line;
+      flush stderr)
+  ;;
 
   let set_status_line = function
     | None ->
@@ -24,11 +29,16 @@ module No_flush = struct
       status_line_len := 0
     | Some line ->
       let line = Pp.map_tags line ~f:User_message.Print_config.default in
-      let line_len = String.length (Format.asprintf "%a" Pp.to_fmt line) in
-      hide_status_line ();
-      status_line := line;
-      status_line_len := line_len;
-      show_status_line ()
+      let line_str = Format.asprintf "%a" Pp.to_fmt line in
+      let line_len = String.length line_str in
+      (* Only update if the content has changed to avoid flickering *)
+      let old_str = Format.asprintf "%a" Pp.to_fmt !status_line in
+      if not (String.equal line_str old_str)
+      then (
+        hide_status_line ();
+        status_line := line;
+        status_line_len := line_len;
+        show_status_line ())
   ;;
 
   let print_if_no_status_line _msg = ()

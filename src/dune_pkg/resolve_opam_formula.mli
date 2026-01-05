@@ -1,9 +1,11 @@
 open Import
 
-(** Evaluate the filters in a filtered formula returning the resulting formula. *)
+(** Evaluate the filters in a filtered formula returning the resulting formula.
+    [post] controls whether post dependencies are included. *)
 val apply_filter
   :  OpamFilter.env
   -> with_test:bool
+  -> post:bool
   -> formula:OpamTypes.filtered_formula
   -> OpamTypes.formula
 

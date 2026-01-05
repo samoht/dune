@@ -1,22 +1,27 @@
 open Import
 module Relop = Dune_lang.Relop
 
-let apply_filter env ~with_test ~(formula : OpamTypes.filtered_formula)
+let apply_filter env ~with_test ~post ~(formula : OpamTypes.filtered_formula)
   : OpamTypes.formula
   =
   OpamFilter.gen_filter_formula
     (OpamFormula.partial_eval (fun (form : _ OpamTypes.filter_or_constraint) ->
        match form with
        | Filter flt ->
-         `Formula (Atom (OpamTypes.Filter (OpamFilter.partial_eval env flt)))
+         (* Evaluate the filter and check if it's a boolean *)
+         (match OpamFilter.partial_eval env flt with
+          | FBool true -> `True
+          | FBool false -> `False
+          | other -> `Formula (Atom (OpamTypes.Filter other)))
        | Constraint (relop, filter) ->
          let filter = OpamFilter.partial_eval env filter in
          `Formula (Atom (Constraint (relop, filter)))))
     formula
   |> OpamFilter.filter_deps
        ~build:true
-       ~post:false
+       ~post
        ~dev:false
+       ~dev_setup:false
        ~default:false
        ~test:with_test
        ~doc:false
@@ -208,15 +213,20 @@ type deps =
 
 let filtered_formula_to_package_names ~env ~with_test ~packages formula =
   let open Result.O in
-  let+ all = apply_filter ~with_test env ~formula |> formula_to_package_names packages in
-  let regular, post =
-    let regular_set =
-      override_post (Some false) env
-      |> apply_filter ~with_test ~formula
-      |> formula_to_package_names_allow_missing packages
-      |> Package_name.Set.of_list
-    in
-    List.partition all ~f:(Package_name.Set.mem regular_set)
+  (* Get all deps including post deps - this validates the formula can be satisfied *)
+  let+ all =
+    apply_filter ~with_test ~post:true env ~formula |> formula_to_package_names packages
   in
+  (* Compute which deps are post-only by comparing with post=false result.
+     Note: We use formula_to_package_names_allow_missing because some packages
+     in the "all" result may not appear when post=false (they're post deps).
+     This is safe because we already validated the formula above. *)
+  let regular_set =
+    override_post (Some false) env
+    |> apply_filter ~with_test ~post:false ~formula
+    |> formula_to_package_names_allow_missing packages
+    |> Package_name.Set.of_list
+  in
+  let regular, post = List.partition all ~f:(Package_name.Set.mem regular_set) in
   { regular; post }
 ;;

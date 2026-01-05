@@ -64,6 +64,9 @@ module Pkg : sig
     { build_command : Build_command.t Conditional_choice.t
     ; install_command : Action.t Conditional_choice.t
     ; depends : Dependency.t list Conditional_choice.t
+    ; post_depends : Dependency.t list Conditional_choice.t
+      (** Post deps are installed WITH the package but don't affect build order.
+        They're tracked separately to avoid creating false dependency cycles. *)
     ; depexts : Depexts.t list
     ; info : Pkg_info.t
     ; exported_env : String_with_vars.t Action.Env_update.t list
@@ -292,6 +295,13 @@ type format =
     Returns [None] if the path doesn't exist or is neither a valid lock directory
     nor a valid lock file. *)
 val detect_format : Path.t -> format option
+
+(** Generate lock file contents as (filename, sexps) pairs.
+    Used internally for cache writes that bypass Write_disk validation. *)
+val file_contents_by_path
+  :  portable_lock_dir:bool
+  -> t
+  -> (string * Dune_sexp.t list) list
 
 module Write_disk : sig
   type lock_dir := t

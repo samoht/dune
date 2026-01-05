@@ -51,5 +51,6 @@ necessary during solving.
   > ]
   > EOF
   $ dune_pkg_lock_normalized
-  Solution for dune.lock (0 packages):
-  (no dependencies to lock)
+  Solution for dune.lock (1 package):
+  opam:
+  - b.0.0.1

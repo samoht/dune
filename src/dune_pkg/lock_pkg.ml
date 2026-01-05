@@ -426,7 +426,7 @@ let opam_package_to_lock_file_pkg
     let avoid = List.mem opam_file.flags Pkgflag_AvoidVersion ~equal:Poly.equal in
     { Lock.Pkg_info.name; version; dev; avoid; source; extra_sources }
   in
-  let depends =
+  let depends, post_depends =
     let resolve what =
       Resolve_opam_formula.filtered_formula_to_package_names
         ~with_test:false
@@ -438,9 +438,13 @@ let opam_package_to_lock_file_pkg
               |> Solver_env.to_env))
         what
     in
-    let depends =
+    let regular_deps, post_deps =
       match resolve opam_file.depends with
-      | Ok { regular; _ } -> regular
+      | Ok { regular; post } ->
+        (* Post deps are tracked separately to avoid creating false dependency
+           cycles. They're installed WITH the package but don't affect build
+           order. *)
+        regular, post
       | Error (`Formula_could_not_be_satisfied hints) ->
         Code_error.raise
           "Dependencies of package can't be satisfied from packages in solution"
@@ -451,10 +455,15 @@ let opam_package_to_lock_file_pkg
     let depopts =
       resolve_depopts ~resolve opam_file.depopts
       |> List.filter ~f:(fun package_name ->
-        not (List.mem depends package_name ~equal:Package_name.equal))
+        not (List.mem regular_deps package_name ~equal:Package_name.equal))
     in
-    depends @ depopts
-    |> List.map ~f:(fun name -> { Lock.Dependency.loc = Loc.none; name })
+    let make_deps names =
+      names
+      (* Filter out dune - it's provided by the build system itself *)
+      |> List.filter ~f:(fun name -> not (Package_name.equal name Dune_dep.name))
+      |> List.map ~f:(fun name -> { Lock.Dependency.loc = Loc.none; name })
+    in
+    make_deps (regular_deps @ depopts), make_deps post_deps
   in
   let build_env action =
     let env_update =
@@ -556,12 +565,14 @@ let opam_package_to_lock_file_pkg
     OpamFile.OPAM.env opam_file |> List.map ~f:opam_env_update_to_env_update
   in
   let depends = lockfile_field_choice depends in
+  let post_depends = lockfile_field_choice post_depends in
   let enabled_on_platforms =
     [ Solver_env.remove_all_except_platform_specific solver_env ]
   in
   { Lock.Pkg.build_command
   ; install_command
   ; depends
+  ; post_depends
   ; depexts
   ; info
   ; exported_env
@@ -573,13 +584,16 @@ let file_to_lock ~loc ~solver_env (file : Lock.File.t) =
   let open Fiber.O in
   let portable_lock_dir = Lock.File.is_portable file in
   let* repos, resolved_packages = Lock.File.derive ~loc file in
-  (* Build version map from the package list *)
+  (* Build version map from the package list. Virtual packages must be
+     included in file.packages because they affect opam variable resolution
+     (for example: pkg:installed). *)
   let version_by_package_name =
+    let dune_version = Package_version.of_opam_package_version Dune_dep.version in
     List.fold_left
       file.packages
-      ~init:Package_name.Map.empty
+      ~init:(Package_name.Map.singleton Dune_dep.name dune_version)
       ~f:(fun acc { Lock.File.Package_entry.name; version; platforms = _ } ->
-        Package_name.Map.add_exn acc name version)
+        Package_name.Map.set acc name version)
   in
   (* Create stats updater for tracking expanded variables *)
   let stats_updater = Solver_stats.Updater.init () in
@@ -668,18 +682,49 @@ module Single_file_cache = struct
 
   let write_cache ~portable_lock_dir cache_path (lock : Lock.t) source_mtime =
     let cache_build_path = Path.build cache_path in
+    (* Remove any existing cache directory unconditionally - this is just a
+       cache, not user data, so we don't need to validate it *)
+    Path.rm_rf cache_build_path;
     (* Create cache directory *)
     Path.mkdir_p cache_build_path;
-    (* Write lock in directory format (same as upstream) *)
-    let files = Package_name.Map.empty in
-    Lock.Write_disk.prepare ~portable_lock_dir ~lock_dir_path:cache_build_path ~files lock
-    |> Lock.Write_disk.commit;
+    (* Write lock files directly without going through Write_disk.prepare
+       (which does validation that can fail on stale caches) *)
+    Lock.file_contents_by_path ~portable_lock_dir lock
+    |> List.iter ~f:(fun (filename, contents) ->
+      let path = Path.relative cache_build_path filename in
+      Option.iter (Path.parent path) ~f:Path.mkdir_p;
+      let cst =
+        List.map contents ~f:(fun sexp ->
+          Dune_sexp.Ast.add_loc ~loc:Loc.none sexp |> Dune_sexp.Cst.concrete)
+      in
+      let pp = Dune_lang.Format.pp_top_sexps ~version:(3, 11) cst in
+      Format.asprintf "%a" Pp.to_fmt pp |> Io.write_file path);
     (* Write source mtime marker *)
     write_mtime cache_path source_mtime
   ;;
 
-  let read_from_cache cache_path = Lock.read_disk_exn (Path.build cache_path)
+  let read_from_cache cache_path =
+    try Some (Lock.read_disk_exn (Path.build cache_path)) with
+    | _ -> None
+  ;;
 end
+
+let derive_and_cache_lock ~solver_env path =
+  let cache_path = Single_file_cache.cache_path_for path in
+  let file =
+    Io.with_lexbuf_from_file path ~f:(fun lexbuf ->
+      Lock.Metadata.parse_contents lexbuf ~f:(fun _lang -> Lock.File.decode))
+  in
+  let portable_lock_dir = Lock.File.is_portable file in
+  let loc = Loc.in_file path in
+  let open Fiber.O in
+  let+ lock = file_to_lock ~loc ~solver_env file in
+  (* Write to cache for next time (same format as upstream lock dir) *)
+  (match Single_file_cache.get_source_mtime path with
+   | Some mtime -> Single_file_cache.write_cache ~portable_lock_dir cache_path lock mtime
+   | None -> ());
+  lock
+;;
 
 let read_disk_fiber ~solver_env path =
   match Lock.detect_format path with
@@ -696,22 +741,13 @@ let read_disk_fiber ~solver_env path =
     (* Single-file format - check cache first, then derive if needed *)
     let cache_path = Single_file_cache.cache_path_for path in
     if Single_file_cache.is_cache_valid path cache_path
-    then (* Cache hit - read from cached directory format *)
-      Fiber.return (Single_file_cache.read_from_cache cache_path)
-    else (
-      (* Cache miss - derive from opam repo and cache result *)
-      let file =
-        Io.with_lexbuf_from_file path ~f:(fun lexbuf ->
-          Lock.Metadata.parse_contents lexbuf ~f:(fun _lang -> Lock.File.decode))
-      in
-      let portable_lock_dir = Lock.File.is_portable file in
-      let loc = Loc.in_file path in
-      let open Fiber.O in
-      let+ lock = file_to_lock ~loc ~solver_env file in
-      (* Write to cache for next time (same format as upstream lock dir) *)
-      (match Single_file_cache.get_source_mtime path with
-       | Some mtime ->
-         Single_file_cache.write_cache ~portable_lock_dir cache_path lock mtime
-       | None -> ());
-      lock)
+    then (
+      (* Cache valid by mtime - try to read from cached directory format *)
+      match Single_file_cache.read_from_cache cache_path with
+      | Some lock -> Fiber.return lock
+      | None ->
+        (* Cache read failed (stale/corrupt) - re-derive *)
+        derive_and_cache_lock ~solver_env path)
+    else (* Cache miss - derive from opam repo and cache result *)
+      derive_and_cache_lock ~solver_env path
 ;;
