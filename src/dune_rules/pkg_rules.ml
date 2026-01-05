@@ -2119,15 +2119,18 @@ module Install_action = struct
           Install_cookie.dump cookie_file cookies)
       in
       (* For toolchain packages, also write cookie to cache location for persistence *)
-      match prefix_outside_build_dir with
-      | None -> Fiber.return ()
-      | Some prefix ->
-        let cache_cookie =
-          Path.outside_build_dir (Path.Outside_build_dir.relative prefix "cookie")
-        in
-        Async.async (fun () ->
-          cache_cookie |> Path.parent_exn |> Path.mkdir_p;
-          Install_cookie.dump cache_cookie cookies)
+      let+ () =
+        match prefix_outside_build_dir with
+        | None -> Fiber.return ()
+        | Some prefix ->
+          let cache_cookie =
+            Path.outside_build_dir (Path.Outside_build_dir.relative prefix "cookie")
+          in
+          Async.async (fun () ->
+            cache_cookie |> Path.parent_exn |> Path.mkdir_p;
+            Install_cookie.dump cache_cookie cookies)
+      in
+      Dune_engine.Progress.finish_target ~name:(Package.Name.to_string package)
     ;;
   end
 
@@ -2428,8 +2431,9 @@ let setup_pkg_install_alias =
         (let open Memo.O in
          let+ db = DB.of_ctx ctx_name ~allow_sharing:true in
          let digests = Pkg_digest.Map.values db.pkg_digest_table in
-         (* Set the total package count for progress reporting *)
-         Pkg_build_progress.Progress.set_total (List.length digests);
+         let num_pkgs = List.length digests in
+         Pkg_build_progress.Progress.set_total num_pkgs;
+         Dune_engine.Progress.set_total num_pkgs;
          List.map digests ~f:(fun { DB.Pkg_table.pkg_digest; _ } -> pkg_digest))
     in
     List.map pkg_digests ~f:(fun pkg_digest ->
@@ -2491,19 +2495,10 @@ let setup_package_rules (db : DB.t) ~package_universe ~dir ~pkg_digest
   then
     (* Duniverse packages are built as normal vendored code, skip .pkg/ rules *)
     Memo.return @@ Gen_rules.make (Memo.return Rules.empty)
-  else if is_dune_pkg && false
-  then (
-    (* TODO: auto-fetch sources to duniverse/ instead of falling through to opam sandbox *)
-    let pkg_name = Package.Name.to_string pkg_digest.name in
-    User_error.raise
-      [ Pp.textf
-          "Package %s uses dune but sources are not in duniverse/. Run 'dune pkg fetch' \
-           first."
-          pkg_name
-      ])
   else (
-    (* Non-dune package (or dune package not yet in duniverse) - use opam sandbox *)
-    let _ = is_dune_pkg in
+    (* Non-dune package or dune package not yet in duniverse - use opam sandbox.
+       TODO: auto-fetch dune packages to duniverse/ instead. *)
+    let (_ : bool) = is_dune_pkg in
     let* pkg = Resolve.resolve db Loc.none pkg_digest package_universe in
     let paths =
       Paths.make pkg.pkg_digest package_universe ~relative:Path.Build.relative

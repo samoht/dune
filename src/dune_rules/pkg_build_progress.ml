@@ -64,14 +64,21 @@ module Message = struct
   ;;
 
   let display t =
+    let pkg_str =
+      sprintf
+        "%s.%s"
+        (Package.Name.to_string t.package_name)
+        (Package_version.to_string t.package_version)
+    in
+    (match t.status with
+     | `Building ->
+       ignore (Progress.increment () : int);
+       Dune_engine.Progress.start_target (Dune_engine.Progress.Target.package pkg_str)
+     | `Downloading ->
+       Dune_engine.Progress.start_target (Dune_engine.Progress.Target.fetch pkg_str));
     match !Dune_engine.Clflags.display with
     | Quiet -> ()
-    | Short | Verbose ->
-      (* Increment counter when displaying building message *)
-      (match t.status with
-       | `Building -> ignore (Progress.increment () : int)
-       | `Downloading -> ());
-      Console.print_user_message (user_message t)
+    | Short | Verbose -> Console.print_user_message (user_message t)
   ;;
 
   let encode { package_name; package_version; status } =

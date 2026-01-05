@@ -108,20 +108,11 @@ end = struct
            | Restarting_current_build
            | Build_succeeded__now_waiting_for_changes
            | Build_failed__now_waiting_for_changes -> Pp.nop
-           | Building
-               { Build_system.Progress.number_of_rules_executed = done_
-               ; number_of_rules_discovered = total
-               ; number_of_rules_failed = failed
-               } ->
-             Pp.verbatim
-               (sprintf
-                  "Done: %u%% (%u/%u, %u left%s) (jobs: %u)"
-                  (if total = 0 then 0 else done_ * 100 / total)
-                  done_
-                  total
-                  (total - done_)
-                  (if failed = 0 then "" else sprintf ", %u failed" failed)
-                  (Dune_engine.Scheduler.running_jobs_count scheduler))));
+           | Building _ ->
+             let jobs = Dune_engine.Scheduler.running_jobs_count scheduler in
+             Dune_engine.Progress.set_jobs jobs;
+             Pp.map_tags (Dune_engine.Progress.pp ~max_width:80) ~f:(fun () ->
+               User_message.Style.Details)));
     Fiber.return (Memo.of_thunk get)
   ;;
 end
