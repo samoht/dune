@@ -9,6 +9,9 @@ end
 type t =
   { name : Package_variable_name.t
   ; scope : Scope.t
+  ; default_if_true : string option
+    (** Opam syntax [var?string] means "if var is true, return string, else empty".
+          This field stores the optional string suffix. *)
   }
 
 val compare : t -> t -> Ordering.t

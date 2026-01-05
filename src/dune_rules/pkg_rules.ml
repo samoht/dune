@@ -789,7 +789,7 @@ module Action_expander = struct
 
     let expand_pkg_macro ~loc (self_paths : _ Paths.t) deps macro_invocation =
       let* deps = deps in
-      let { Package_variable.name = variable_name; scope } =
+      let { Package_variable.name = variable_name; scope; default_if_true } =
         match Package_variable.of_macro_invocation ~loc macro_invocation with
         | Ok package_variable -> package_variable
         | Error `Unexpected_macro ->
@@ -797,6 +797,21 @@ module Action_expander = struct
             "Attempted to treat an unexpected macro invocation as a package variable \
              encoding"
             []
+      in
+      (* Apply opam's var?default semantics: if var is truthy, return default, else "" *)
+      let apply_default_if_true result =
+        match default_if_true with
+        | None -> result
+        | Some default ->
+          Result.map result ~f:(fun values ->
+            let is_truthy =
+              match values with
+              | [ Value.String "true" ] | [ Value.String "1" ] -> true
+              | [ Value.String s ] -> not (String.is_empty s)
+              | _ :: _ -> true
+              | [] -> false
+            in
+            if is_truthy then [ Value.String default ] else [ Value.String "" ])
       in
       let variables, dep_paths =
         let package_name =
@@ -808,49 +823,53 @@ module Action_expander = struct
         | None -> Package_variable_name.Map.empty, None
         | Some (var, paths) -> var, Some paths
       in
-      match Package_variable_name.Map.find variables variable_name with
-      | Some v -> Memo.return @@ Ok (Variable.dune_value v)
-      | None ->
-        let present = Option.is_some dep_paths in
-        (* TODO we should be looking it up in all packages now *)
-        (match Package_variable_name.to_string variable_name with
-         | "pinned" -> Memo.return @@ Ok [ Value.false_ ]
-         | "enable" ->
-           Memo.return @@ Ok [ Value.String (if present then "enable" else "disable") ]
-         | "installed" -> Memo.return @@ Ok [ Value.String (Bool.to_string present) ]
-         | "build-id" ->
-           (* Compute a build-id from the package source directory path.
-              For self-scope, use the current package's paths directly.
-              For other packages, use their paths if available in deps.
-              This is a simplified version of opam's build-id which also includes
-              dependency hashes. *)
-           let pkg_paths =
-             match scope with
-             | Self -> Some self_paths
-             | Package _ -> dep_paths
-           in
-           let build_id =
-             match pkg_paths with
-             | Some paths ->
-               Path.to_string paths.source_dir
-               |> Dune_digest.string
-               |> Dune_digest.to_string
-             | None -> ""
-           in
-           Memo.return @@ Ok [ Value.String build_id ]
-         | _ ->
-           (match dep_paths with
-            | None -> Memo.return (Error (`Undefined_pkg_var variable_name))
-            | Some paths ->
-              (match
-                 Pform.Var.Pkg.Section.of_string
-                   (Package_variable_name.to_string variable_name)
-               with
-               | None -> Memo.return (Error (`Undefined_pkg_var variable_name))
-               | Some section ->
-                 let section = dune_section_of_pform section in
-                 let install_paths = Paths.install_paths paths in
-                 Memo.return @@ Ok [ Value.Dir (Install.Paths.get install_paths section) ])))
+      let+ result =
+        match Package_variable_name.Map.find variables variable_name with
+        | Some v -> Memo.return @@ Ok (Variable.dune_value v)
+        | None ->
+          let present = Option.is_some dep_paths in
+          (* TODO we should be looking it up in all packages now *)
+          (match Package_variable_name.to_string variable_name with
+           | "pinned" -> Memo.return @@ Ok [ Value.false_ ]
+           | "enable" ->
+             Memo.return @@ Ok [ Value.String (if present then "enable" else "disable") ]
+           | "installed" -> Memo.return @@ Ok [ Value.String (Bool.to_string present) ]
+           | "build-id" ->
+             (* Compute a build-id from the package source directory path.
+                For self-scope, use the current package's paths directly.
+                For other packages, use their paths if available in deps.
+                This is a simplified version of opam's build-id which also includes
+                dependency hashes. *)
+             let pkg_paths =
+               match scope with
+               | Self -> Some self_paths
+               | Package _ -> dep_paths
+             in
+             let build_id =
+               match pkg_paths with
+               | Some paths ->
+                 Path.to_string paths.source_dir
+                 |> Dune_digest.string
+                 |> Dune_digest.to_string
+               | None -> ""
+             in
+             Memo.return @@ Ok [ Value.String build_id ]
+           | _ ->
+             (match dep_paths with
+              | None -> Memo.return (Error (`Undefined_pkg_var variable_name))
+              | Some paths ->
+                (match
+                   Pform.Var.Pkg.Section.of_string
+                     (Package_variable_name.to_string variable_name)
+                 with
+                 | None -> Memo.return (Error (`Undefined_pkg_var variable_name))
+                 | Some section ->
+                   let section = dune_section_of_pform section in
+                   let install_paths = Paths.install_paths paths in
+                   Memo.return
+                   @@ Ok [ Value.Dir (Install.Paths.get install_paths section) ])))
+      in
+      apply_default_if_true result
     ;;
 
     let expand_pform

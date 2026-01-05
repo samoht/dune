@@ -59,9 +59,11 @@ struct
     match OpamVariable.Full.scope full_variable with
     | Global ->
       if Package_variable_name.equal Package_variable_name.name name
-      then Variable.Package { Package_variable.scope = Self; name }
+      then
+        Variable.Package { Package_variable.scope = Self; name; default_if_true = None }
       else if Package_variable_name.equal name Package_variable_name.version
-      then Variable.Package { Package_variable.scope = Self; name }
+      then
+        Variable.Package { Package_variable.scope = Self; name; default_if_true = None }
       else Variable.Global name
     | _ ->
       let scope : Package_variable.Scope.t =
@@ -72,7 +74,7 @@ struct
         | None -> Self
         | Some p -> Package p
       in
-      Variable.Package { Package_variable.scope; name }
+      Variable.Package { Package_variable.scope; name; default_if_true = None }
   ;;
 
   let subst env self ~src ~dst =

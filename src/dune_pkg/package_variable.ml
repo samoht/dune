@@ -23,17 +23,25 @@ module T = struct
   type t =
     { name : Package_variable_name.t
     ; scope : Scope.t
+    ; default_if_true : string option
     }
 
-  let compare t { name; scope } =
+  let compare t { name; scope; default_if_true } =
     match Scope.compare t.scope scope with
-    | Eq -> Package_variable_name.compare t.name name
+    | Eq ->
+      (match Package_variable_name.compare t.name name with
+       | Eq -> Option.compare String.compare t.default_if_true default_if_true
+       | x -> x)
     | x -> x
   ;;
 
-  let to_dyn { name; scope } =
+  let to_dyn { name; scope; default_if_true } =
     let open Dyn in
-    record [ "name", Package_variable_name.to_dyn name; "scope", Scope.to_dyn scope ]
+    record
+      [ "name", Package_variable_name.to_dyn name
+      ; "scope", Scope.to_dyn scope
+      ; "default_if_true", option string default_if_true
+      ]
   ;;
 end
 
@@ -41,36 +49,44 @@ include T
 module C = Comparable.Make (T)
 include C
 
-let self_scoped name = { name; scope = Self }
-let package_scoped name package_name = { name; scope = Package package_name }
+(* Parse opam syntax [var?string] into variable name and optional default.
+   [installed?system] means "if installed is true, return 'system', else empty" *)
+let parse_variable_with_default variable_str =
+  match String.lsplit2 variable_str ~on:'?' with
+  | None -> Package_variable_name.of_string variable_str, None
+  | Some (name, default) -> Package_variable_name.of_string name, Some default
+;;
 
 let of_macro_invocation ~loc ({ Pform.Macro_invocation.macro; _ } as macro_invocation) =
   match macro with
   | Pkg_self ->
-    let variable_name = Pform.Macro_invocation.Args.whole macro_invocation in
-    Ok (self_scoped (Package_variable_name.of_string variable_name))
+    let variable_str = Pform.Macro_invocation.Args.whole macro_invocation in
+    let name, default_if_true = parse_variable_with_default variable_str in
+    Ok { name; scope = Self; default_if_true }
   | Pkg ->
-    let package_name, variable_name =
+    let package_name, variable_str =
       Pform.Macro_invocation.Args.lsplit2_exn macro_invocation loc
     in
-    Ok
-      (package_scoped
-         (Package_variable_name.of_string variable_name)
-         (Package_name.of_string package_name))
+    let name, default_if_true = parse_variable_with_default variable_str in
+    Ok { name; scope = Package (Package_name.of_string package_name); default_if_true }
   | _ -> Error `Unexpected_macro
 ;;
 
-let to_macro_invocation { name; scope } =
+let to_macro_invocation { name; scope; default_if_true } =
+  let var_str =
+    let base = Package_variable_name.to_string name in
+    match default_if_true with
+    | None -> base
+    | Some default -> base ^ "?" ^ default
+  in
   match scope with
   | Self ->
     { Pform.Macro_invocation.macro = Pkg_self
-    ; payload = Pform.Payload.of_args [ Package_variable_name.to_string name ]
+    ; payload = Pform.Payload.of_args [ var_str ]
     }
   | Package package_name ->
     { Pform.Macro_invocation.macro = Pkg
-    ; payload =
-        Pform.Payload.of_args
-          [ Package_name.to_string package_name; Package_variable_name.to_string name ]
+    ; payload = Pform.Payload.of_args [ Package_name.to_string package_name; var_str ]
     }
 ;;
 

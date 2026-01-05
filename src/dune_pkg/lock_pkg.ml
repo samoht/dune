@@ -67,7 +67,7 @@ let opam_variable_to_slang ~loc packages variable =
           | None -> Self
           | Some p -> Package (Package_name.of_opam_package_name p)
         in
-        Package_variable.to_pform { Package_variable.name; scope }
+        Package_variable.to_pform { Package_variable.name; scope; default_if_true = None }
       in
       Ok (Slang.pform pform)
   in
