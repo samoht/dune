@@ -450,6 +450,8 @@ module Pkg = struct
     ; files_dir : Path.Build.t option
     ; pkg_digest : Pkg_digest.t
     ; mutable exported_env : string Env_update.t list
+    ; all_package_versions : Package_version.t Package.Name.Map.t
+      (* All packages in the lock, for looking up versions of non-dependencies *)
     }
 
   module Top_closure = Top_closure.Make (Id.Set) (Monad.Id)
@@ -616,6 +618,8 @@ module Expander0 = struct
     ; context : Context_name.t
     ; version : Package_version.t
     ; env : Value.t list Env.Map.t
+    ; all_package_versions : Package_version.t Package.Name.Map.t Memo.t
+      (* All packages in the lock, for looking up versions of non-dependencies *)
     }
 
   let expand_pform_fdecl
@@ -787,8 +791,15 @@ module Action_expander = struct
         Memo.return [ Value.Dir dir ]
     ;;
 
-    let expand_pkg_macro ~loc (self_paths : _ Paths.t) deps macro_invocation =
-      let* deps = deps in
+    let expand_pkg_macro
+          ~loc
+          ~all_package_versions
+          (self_paths : _ Paths.t)
+          deps
+          macro_invocation
+      =
+      let* deps = deps
+      and* all_versions = all_package_versions in
       let { Package_variable.name = variable_name; scope; default_if_true } =
         match Package_variable.of_macro_invocation ~loc macro_invocation with
         | Ok package_variable -> package_variable
@@ -813,12 +824,12 @@ module Action_expander = struct
             in
             if is_truthy then [ Value.String default ] else [ Value.String "" ])
       in
+      let package_name =
+        match scope with
+        | Self -> self_paths.name
+        | Package package_name -> package_name
+      in
       let variables, dep_paths =
-        let package_name =
-          match scope with
-          | Self -> self_paths.name
-          | Package package_name -> package_name
-        in
         match Package.Name.Map.find deps package_name with
         | None -> Package_variable_name.Map.empty, None
         | Some (var, paths) -> var, Some paths
@@ -828,12 +839,22 @@ module Action_expander = struct
         | Some v -> Memo.return @@ Ok (Variable.dune_value v)
         | None ->
           let present = Option.is_some dep_paths in
-          (* TODO we should be looking it up in all packages now *)
           (match Package_variable_name.to_string variable_name with
            | "pinned" -> Memo.return @@ Ok [ Value.false_ ]
            | "enable" ->
              Memo.return @@ Ok [ Value.String (if present then "enable" else "disable") ]
-           | "installed" -> Memo.return @@ Ok [ Value.String (Bool.to_string present) ]
+           | "installed" ->
+             (* Check if package exists in lock file *)
+             let in_lock = Package.Name.Map.mem all_versions package_name in
+             Memo.return @@ Ok [ Value.String (Bool.to_string in_lock) ]
+           | "version" ->
+             (* Look up version from all packages in lock, not just dependencies *)
+             (match Package.Name.Map.find all_versions package_name with
+              | Some version ->
+                Memo.return @@ Ok [ Value.String (Package_version.to_string version) ]
+              | None ->
+                (* Package not in lock file - return empty string *)
+                Memo.return @@ Ok [ Value.String "" ])
            | "build-id" ->
              (* Compute a build-id from the package source directory path.
                 For self-scope, use the current package's paths directly.
@@ -881,6 +902,7 @@ module Action_expander = struct
           ; depends
           ; version = _
           ; depexts = _
+          ; all_package_versions
           }
           ~source
           (pform : Pform.t)
@@ -898,7 +920,7 @@ module Action_expander = struct
         in
         Ok [ Value.Path make ]
       | Macro ({ macro = Pkg | Pkg_self; _ } as macro_invocation) ->
-        expand_pkg_macro ~loc paths depends macro_invocation
+        expand_pkg_macro ~loc ~all_package_versions paths depends macro_invocation
       | _ -> Expander0.isn't_allowed_in_this_position ~source
     ;;
 
@@ -1186,6 +1208,7 @@ module Action_expander = struct
     ; depexts = pkg.depexts
     ; version = pkg.info.version
     ; env
+    ; all_package_versions = Memo.return pkg.all_package_versions
     }
   ;;
 
@@ -1387,12 +1410,23 @@ module DB = struct
     { id : Id.t
     ; pkg_digest_table : Pkg_table.t
     ; system_provided : Package.Name.Set.t
+    ; all_package_versions : Package_version.t Package.Name.Map.t
     }
 
   let equal x y = Id.equal x.id y.id
 
   let create ~pkg_digest_table ~system_provided =
-    { id = Id.gen (); pkg_digest_table; system_provided }
+    (* Extract all package versions from the digest table for variable expansion *)
+    let all_package_versions =
+      Pkg_digest.Map.fold
+        pkg_digest_table
+        ~init:Package.Name.Map.empty
+        ~f:(fun (entry : Pkg_table.entry) acc ->
+          let name = entry.pkg.info.name in
+          let version = entry.pkg.info.version in
+          Package.Name.Map.set acc name version)
+    in
+    { id = Id.gen (); pkg_digest_table; system_provided; all_package_versions }
   ;;
 
   let pkg_digest_of_name lock_dir platform pkg_name ~system_provided =
@@ -1676,6 +1710,7 @@ end = struct
         ; files_dir
         ; pkg_digest
         ; exported_env = []
+        ; all_package_versions = db.all_package_versions
         }
       in
       let+ exported_env =
