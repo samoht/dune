@@ -14,10 +14,12 @@ contains the marker file.
   > let x = Some_pkg.y
   > EOF
 
-Create a duniverse directory with the marker file:
+Create a duniverse directory with vendored_dirs stanza:
 
   $ mkdir -p duniverse
-  $ touch duniverse/.dune-duniverse
+  $ cat > duniverse/dune << EOF
+  > (vendored_dirs *)
+  > EOF
 
 Create a fake package in duniverse with a library:
 

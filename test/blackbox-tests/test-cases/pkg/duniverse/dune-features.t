@@ -20,7 +20,9 @@ Set up a project:
 Create duniverse with a package source:
 
   $ mkdir -p duniverse
-  $ touch duniverse/.dune-duniverse
+  $ cat > duniverse/dune << EOF
+  > (vendored_dirs *)
+  > EOF
 
   $ mkdir -p duniverse/helper.1.0.0
   $ cat >duniverse/helper.1.0.0/dune-project <<EOF

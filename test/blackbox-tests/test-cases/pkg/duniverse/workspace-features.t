@@ -29,7 +29,9 @@ Set up a project with multiple contexts:
 Create duniverse with a package source:
 
   $ mkdir -p duniverse
-  $ touch duniverse/.dune-duniverse
+  $ cat > duniverse/dune << EOF
+  > (vendored_dirs *)
+  > EOF
 
   $ mkdir -p duniverse/test-lib.1.0.0
   $ cat >duniverse/test-lib.1.0.0/dune-project <<EOF

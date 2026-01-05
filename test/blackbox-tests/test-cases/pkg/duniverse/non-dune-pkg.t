@@ -68,21 +68,22 @@ Create a lock file with a source URL pointing to our local directory:
 
 Fetch the package - non-dune packages should also be fetched to duniverse:
 
-  $ dune pkg fetch
+  $ dune pkg fetch -v
   Fetching make-pkg.1.0.0 to duniverse/make-pkg.1.0.0
-  Fetched 1 package(s) to duniverse/
 
 Verify the package was placed in duniverse/:
 
   $ ls duniverse/
+  dune
   make-pkg.1.0.0
   $ ls duniverse/make-pkg.1.0.0/
   Makefile
 
-The duniverse directory should have the marker file:
+The duniverse directory should have the vendored_dirs stanza:
 
-  $ cat duniverse/.dune-duniverse
-  # This directory is managed by dune pkg
+  $ cat duniverse/dune
+  ; This directory is managed by dune pkg
+  (vendored_dirs *)
 
 Now test that the non-dune package in duniverse can be built:
 

@@ -179,6 +179,15 @@ let apply_user_patch ~verbose ~target_dir ~patch_source_path =
     ())
 ;;
 
+(* Two levels of verbosity:
+   - status: one line per package (-v or -vv)
+   - verbose: detailed debug messages (-vv only) *)
+let status msg =
+  match !Dune_engine.Clflags.display with
+  | Verbose | Short -> Console.print_user_message (User_message.make [ Pp.text msg ])
+  | Quiet -> ()
+;;
+
 let verbose msg =
   match !Dune_engine.Clflags.display with
   | Verbose -> Console.print_user_message (User_message.make [ Pp.text msg ])
@@ -192,6 +201,7 @@ let start_fetch ~name ~version =
       (Package_name.to_string name)
       (Dune_pkg.Package_version.to_string version)
   in
+  status (sprintf "Fetching %s to duniverse/%s" pkg_str pkg_str);
   Dune_engine.Progress.start_target (Dune_engine.Progress.Target.fetch pkg_str);
   pkg_str
 ;;
@@ -205,6 +215,13 @@ let fetch_source_group ~rev_store ~platform ~patches_dir ~pkgs_by_name group =
   if Path.exists target
   then (
     (* Already fetched - count all packages as cached *)
+    let pkg_str =
+      sprintf
+        "%s.%s"
+        (Package_name.to_string primary_name)
+        (Package_version.to_string primary_version)
+    in
+    status (sprintf "Cached %s" pkg_str);
     List.iter packages ~f:(fun _ -> Dune_engine.Progress.incr_cached ());
     Fiber.return false)
   else (
@@ -277,18 +294,54 @@ let fetch_duniverse ~lock_dir_path ~solver_env () =
   let fetchable_pkgs =
     List.filter all_pkgs ~f:(fun (pkg : Lock_dir.Pkg.t) -> Option.is_some pkg.info.source)
   in
+  let no_source_count = List.length all_pkgs - List.length fetchable_pkgs in
   if List.is_empty fetchable_pkgs
-  then Fiber.return ()
+  then (
+    if no_source_count > 0
+    then
+      verbose
+        (sprintf
+           "%d package(s) have no source URL (likely local packages)."
+           no_source_count);
+    Fiber.return ())
   else (
     let duniverse_path = Path.source Duniverse.duniverse_dir in
     if not (Path.exists duniverse_path) then Path.mkdir_p duniverse_path;
     let marker_path =
       Path.source (Path.Source.relative Duniverse.duniverse_dir Duniverse.marker_filename)
     in
-    if not (Path.exists marker_path)
-    then Io.write_file marker_path "# This directory is managed by dune pkg\n";
     (* Group packages by source to avoid duplicate fetches *)
     let source_groups = Duniverse.group_by_source fetchable_pkgs in
+    (* Generate duniverse/dune with vendored_dirs and vendor stanzas *)
+    let dune_content =
+      let vendor_stanzas =
+        List.filter_map source_groups ~f:(fun group ->
+          let { Duniverse.packages; primary_name; primary_version; _ } = group in
+          (* Only generate vendor stanza if there are multiple packages in the group *)
+          if List.length packages > 1
+          then (
+            let dirname =
+              sprintf
+                "%s.%s"
+                (Package_name.to_string primary_name)
+                (Package_version.to_string primary_version)
+            in
+            (* Use package names as library names (common convention) *)
+            let libs =
+              List.map packages ~f:(fun (name, _) -> Package_name.to_string name)
+              |> String.concat ~sep:" "
+            in
+            Some (sprintf "(vendor %s (libraries %s))" dirname libs))
+          else None)
+      in
+      let lines =
+        [ "; This directory is managed by dune pkg"; "(vendored_dirs *)" ]
+        @ vendor_stanzas
+      in
+      String.concat ~sep:"\n" lines ^ "\n"
+    in
+    if (not (Path.exists marker_path)) || Io.read_file marker_path <> dune_content
+    then Io.write_file marker_path dune_content;
     (* Build map for looking up packages by name *)
     let pkgs_by_name =
       List.fold_left fetchable_pkgs ~init:Package_name.Map.empty ~f:(fun acc pkg ->
@@ -336,8 +389,34 @@ let auto_fetch_missing ~lock_dir_path ~solver_env () =
     let marker_path =
       Path.source (Path.Source.relative Duniverse.duniverse_dir Duniverse.marker_filename)
     in
-    if not (Path.exists marker_path)
-    then Io.write_file marker_path "# This directory is managed by dune pkg\n";
+    (* Generate duniverse/dune with vendored_dirs and vendor stanzas *)
+    let dune_content =
+      let vendor_stanzas =
+        List.filter_map source_groups ~f:(fun group ->
+          let { Duniverse.packages; primary_name; primary_version; _ } = group in
+          if List.length packages > 1
+          then (
+            let dirname =
+              sprintf
+                "%s.%s"
+                (Package_name.to_string primary_name)
+                (Package_version.to_string primary_version)
+            in
+            let libs =
+              List.map packages ~f:(fun (name, _) -> Package_name.to_string name)
+              |> String.concat ~sep:" "
+            in
+            Some (sprintf "(vendor %s (libraries %s))" dirname libs))
+          else None)
+      in
+      let lines =
+        [ "; This directory is managed by dune pkg"; "(vendored_dirs *)" ]
+        @ vendor_stanzas
+      in
+      String.concat ~sep:"\n" lines ^ "\n"
+    in
+    if (not (Path.exists marker_path)) || Io.read_file marker_path <> dune_content
+    then Io.write_file marker_path dune_content;
     (* Build map for looking up packages by name *)
     let pkgs_by_name =
       List.fold_left dune_pkgs ~init:Package_name.Map.empty ~f:(fun acc pkg ->

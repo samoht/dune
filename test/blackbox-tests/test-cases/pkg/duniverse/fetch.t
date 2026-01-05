@@ -40,10 +40,9 @@ Lock the dependencies:
   dune:
   - dune-pkg.1.0.0
 
-Check that fetch command shows message when duniverse packages have no sources:
+Check that fetch command runs silently when packages have no sources:
 
-  $ dune pkg fetch
-  1 package(s) have no source URL (likely local packages).
+  $ dune pkg fetch -v
 
 Now let's test with a package that has an actual source URL.
 
@@ -70,15 +69,15 @@ Create a lock file with a source URL pointing to our local directory:
   > (source (copy $PWD/pkg-source))
   > EOF
 
-Fetch the package:
+Fetch the package (using -v for one-liner status messages):
 
-  $ dune pkg fetch
+  $ dune pkg fetch -v
   Fetching mypkg.1.0.0 to duniverse/mypkg.1.0.0
-  Fetched 1 package(s) to duniverse/
 
 Verify the package was placed in duniverse/:
 
   $ ls duniverse/
+  dune
   mypkg.1.0.0
   $ ls duniverse/mypkg.1.0.0/
   dune
@@ -87,13 +86,14 @@ Verify the package was placed in duniverse/:
 
 Fetch again - should skip already-fetched package:
 
-  $ dune pkg fetch
-  Package mypkg.1.0.0 already fetched
+  $ dune pkg fetch -v
+  Cached mypkg.1.0.0
 
-The duniverse directory should have the marker file:
+The duniverse directory should have the vendored_dirs stanza:
 
-  $ cat duniverse/.dune-duniverse
-  # This directory is managed by dune pkg
+  $ cat duniverse/dune
+  ; This directory is managed by dune pkg
+  (vendored_dirs *)
 
 Now test the full workflow: build a project that uses the duniverse library.
 

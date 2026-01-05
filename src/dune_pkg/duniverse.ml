@@ -9,7 +9,7 @@ let package_target_to_dyn = function
   | Opam_sandbox -> Dyn.variant "Opam_sandbox" []
 ;;
 
-let marker_filename = ".dune-duniverse"
+let marker_filename = "dune"
 let marker_dirname = "duniverse"
 let duniverse_dir = Path.Source.of_string marker_dirname
 

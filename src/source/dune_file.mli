@@ -25,6 +25,9 @@ val path : t -> Path.Source.t option
 
 val sub_dir_status : t -> Source_dir_status.Spec.t
 
+(** Vendor stanzas parsed from this dune file, keyed by subdirectory name *)
+val vendor : t -> Vendor_stanza.t Filename.Map.t
+
 module Files : sig
   type t
 

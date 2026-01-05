@@ -14,7 +14,7 @@ type package_target =
 
 val package_target_to_dyn : package_target -> Dyn.t
 
-(** The marker file that indicates a directory is a managed duniverse *)
+(** The dune file that marks duniverse contents as vendored *)
 val marker_filename : string
 
 (** The directory name for duniverse (just the basename, not a path) *)

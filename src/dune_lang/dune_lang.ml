@@ -46,6 +46,7 @@ module Lib_mode = Lib_mode
 module Melange = Melange
 module Module_name = Module_name
 module Pin_stanza = Pin_stanza
+module Vendor_stanza = Vendor_stanza
 module Preprocess = Preprocess
 module Link_flags = Link_flags
 module Dune_project = Dune_project

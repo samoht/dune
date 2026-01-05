@@ -125,15 +125,16 @@ Fetch duniverse packages - should fetch only mylib (the dune package):
 
 Verify the duniverse directory structure:
   $ find duniverse -type f | sort
-  duniverse/.dune-duniverse
+  duniverse/dune
   duniverse/makelib.1.0.0/Makefile
   duniverse/mylib.1.0.0/dune
   duniverse/mylib.1.0.0/dune-project
   duniverse/mylib.1.0.0/mylib.ml
 
-Verify the marker file exists:
-  $ cat duniverse/.dune-duniverse
-  # This directory is managed by dune pkg
+Verify the dune file marks packages as vendored:
+  $ cat duniverse/dune
+  ; This directory is managed by dune pkg
+  (vendored_dirs *)
 
 Verify the library code was fetched:
   $ cat duniverse/mylib.1.0.0/mylib.ml
