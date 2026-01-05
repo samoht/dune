@@ -36,7 +36,11 @@ Check the contents of the single-file lock:
   
   (packages foo.0.0.1)
   
-  (platforms linux macos)
+  (platforms
+   (linux
+    (arch arm64 x86_64))
+   (macos
+    (arch arm64 x86_64)))
 
 
 

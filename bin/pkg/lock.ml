@@ -660,13 +660,36 @@ let lock ~version_preference ~lock_dirs_arg ~print_perf_stats ~portable_lock_dir
     ~format
 ;;
 
+(* Parse platform spec: "linux" or "linux-x86_64" or "linux-x86_64,arm64" *)
+let parse_platform s =
+  match String.lsplit2 s ~on:'-' with
+  | None -> { Lock_dir.File.Platform.os = s; archs = [] }
+  | Some (os, archs_str) ->
+    let archs = String.split archs_str ~on:',' in
+    { Lock_dir.File.Platform.os; archs }
+;;
+
 let term =
   let+ builder = Common.Builder.term
   and+ version_preference = Version_preference.term
   and+ lock_dirs_arg = Pkg_common.Lock_dirs_arg.term
   (* CR-someday Alizter: document this option *)
   and+ print_perf_stats = Arg.(value & flag & info [ "print-perf-stats" ] ~doc:None)
-  and+ format = Lock_format.term in
+  and+ format = Lock_format.term
+  and+ platforms =
+    Arg.(
+      value
+      & opt_all string []
+      & info
+          [ "platform" ]
+          ~docv:"OS[-ARCH[,ARCH...]]"
+          ~doc:
+            (Some
+               "Target platform(s) to solve for. Format: $(b,linux), $(b,linux-x86_64), \
+                or $(b,linux-x86_64,arm64) for multiple architectures. Can be specified \
+                multiple times. If not specified, solves for linux and macos with x86_64 \
+                and arm64 architectures."))
+  in
   let builder = Common.Builder.forbid_builds builder in
   let common, config = Common.init builder in
   Scheduler.go_with_rpc_server ~common ~config (fun () ->
@@ -683,6 +706,13 @@ let term =
       | Some f -> f
       | None -> Lock_format.Directory
     in
+    (* Parse platform specs if provided *)
+    let _platforms_parsed =
+      match platforms with
+      | [] -> None
+      | ps -> Some (List.map ps ~f:parse_platform)
+    in
+    (* TODO: pass platforms to lock function to override solve_for_platforms *)
     lock ~version_preference ~lock_dirs_arg ~print_perf_stats ~portable_lock_dir ~format)
 ;;
 

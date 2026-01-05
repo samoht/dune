@@ -1344,10 +1344,69 @@ end
     (ocamlfind.1.9.6 (platforms linux macos)))
    (patches
     (fmt patches/fmt@0.9.0.patch))
+   (platforms
+    (linux (arch x86_64 arm64))
+    (macos (arch x86_64 arm64)))
    v}
 *)
 module File = struct
   type lock = t
+
+  (* Platform specification with OS and optional architectures.
+     Format: (linux (arch x86_64 arm64)) or just linux for all archs *)
+  module Platform = struct
+    type t =
+      { os : string
+      ; archs : string list (* empty means all architectures *)
+      }
+
+    let encode { os; archs } =
+      let open Encoder in
+      if List.is_empty archs
+      then string os
+      else (
+        let arch_sexp = list sexp (string "arch" :: List.map archs ~f:string) in
+        list sexp [ string os; arch_sexp ])
+    ;;
+
+    let decode =
+      let open Decoder in
+      (* Try simple string first (os only), then structured (os (arch ...)) *)
+      let simple =
+        let+ os = string in
+        { os; archs = [] }
+      in
+      let arch_list =
+        enter
+          (let* _ = keyword "arch" in
+           repeat string)
+      in
+      let structured =
+        enter
+          (let+ os = string
+           and+ archs = arch_list in
+           { os; archs })
+      in
+      simple <|> structured
+    ;;
+
+    let to_dyn { os; archs } =
+      Dyn.record [ "os", Dyn.string os; "archs", Dyn.list Dyn.string archs ]
+    ;;
+
+    let equal a b = String.equal a.os b.os && List.equal String.equal a.archs b.archs
+
+    (* Expand a platform to solver_env entries *)
+    let to_solver_envs { os; archs } =
+      let archs = if List.is_empty archs then [ "x86_64"; "arm64" ] else archs in
+      List.map archs ~f:(fun arch ->
+        let env = Solver_env.empty in
+        let env =
+          Solver_env.set env Package_variable_name.os (Variable_value.string os)
+        in
+        Solver_env.set env Package_variable_name.arch (Variable_value.string arch))
+    ;;
+  end
 
   module Repo = struct
     (* Repository source URL and git commit hash *)
@@ -1513,7 +1572,7 @@ module File = struct
     { repos : Repo.t list
     ; packages : Package_entry.t list
     ; patches : Patch_entry.t list
-    ; platforms : string list (* defines :standard; empty = all platforms *)
+    ; platforms : Platform.t list (* defines :standard; empty = all platforms *)
     }
 
   let to_dyn { repos; packages; patches; platforms } =
@@ -1521,7 +1580,7 @@ module File = struct
       [ "repos", Dyn.list Repo.to_dyn repos
       ; "packages", Dyn.list Package_entry.to_dyn packages
       ; "patches", Dyn.list Patch_entry.to_dyn patches
-      ; "platforms", Dyn.list Dyn.string platforms
+      ; "platforms", Dyn.list Platform.to_dyn platforms
       ]
   ;;
 
@@ -1529,7 +1588,7 @@ module File = struct
     List.equal Repo.equal a.repos b.repos
     && List.equal Package_entry.equal a.packages b.packages
     && List.equal Patch_entry.equal a.patches b.patches
-    && List.equal String.equal a.platforms b.platforms
+    && List.equal Platform.equal a.platforms b.platforms
   ;;
 
   let is_portable t = not (List.is_empty t.platforms)
@@ -1548,7 +1607,7 @@ module File = struct
     let platforms_sexp =
       if List.is_empty platforms
       then []
-      else [ list sexp (string "platforms" :: List.map platforms ~f:string) ]
+      else [ list sexp (string "platforms" :: List.map platforms ~f:Platform.encode) ]
     in
     [ repos_sexp; packages_sexp ] @ patches_sexp @ platforms_sexp
   ;;
@@ -1559,7 +1618,7 @@ module File = struct
       (let+ repos = field "repos" ~default:[] (repeat Repo.decode)
        and+ packages = field "packages" ~default:[] (repeat Package_entry.decode)
        and+ patches = field "patches" ~default:[] (repeat Patch_entry.decode)
-       and+ platforms = field "platforms" ~default:[] (repeat string) in
+       and+ platforms = field "platforms" ~default:[] (repeat Platform.decode) in
        { repos; packages; patches; platforms })
   ;;
 
@@ -1624,9 +1683,33 @@ module File = struct
         })
     in
     let _loc, solved_for_platforms = lck.solved_for_platforms in
+    (* Group solver envs by OS, collecting archs for each OS *)
     let platforms =
-      List.filter_map solved_for_platforms ~f:platform_of_solver_env
-      |> List.sort_uniq ~compare:String.compare
+      let os_arch_pairs =
+        List.filter_map solved_for_platforms ~f:(fun solver_env ->
+          let os = platform_of_solver_env solver_env in
+          let arch =
+            Solver_env.get solver_env Package_variable_name.arch
+            |> Option.map ~f:Variable_value.to_string
+          in
+          match os with
+          | Some os -> Some (os, arch)
+          | None -> None)
+      in
+      (* Group by OS *)
+      let by_os =
+        List.fold_left os_arch_pairs ~init:String.Map.empty ~f:(fun acc (os, arch) ->
+          String.Map.update acc os ~f:(function
+            | None -> Some [ arch ]
+            | Some archs -> Some (arch :: archs)))
+      in
+      String.Map.to_list by_os
+      |> List.map ~f:(fun (os, archs) ->
+        let archs =
+          List.filter_map archs ~f:Fun.id |> List.sort_uniq ~compare:String.compare
+        in
+        { Platform.os; archs })
+      |> List.sort ~compare:(fun a b -> String.compare a.Platform.os b.Platform.os)
     in
     { repos; packages; patches = []; platforms }
   ;;

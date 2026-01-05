@@ -201,11 +201,27 @@ module File : sig
     val equal : t -> t -> bool
   end
 
+  (** Platform specification with OS and optional architectures *)
+  module Platform : sig
+    type t =
+      { os : string
+      ; archs : string list (** Empty means all architectures *)
+      }
+
+    val encode : t -> Dune_lang.t
+    val decode : t Decoder.t
+    val to_dyn : t -> Dyn.t
+    val equal : t -> t -> bool
+
+    (** Expand platform to list of solver_env entries (one per arch) *)
+    val to_solver_envs : t -> Solver_env.t list
+  end
+
   type t =
     { repos : Repo.t list
     ; packages : Package_entry.t list
     ; patches : Patch_entry.t list
-    ; platforms : string list
+    ; platforms : Platform.t list
       (** Defines :standard for per-package constraints. Empty = all platforms *)
     }
 
