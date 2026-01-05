@@ -385,6 +385,7 @@ let solve_lock_dir
       ~project_pins
       ~print_perf_stats
       ~portable_lock_dir
+      ~platforms_override
       version_preference
       solver_env_from_current_system
       lock_dir_path
@@ -393,14 +394,17 @@ let solve_lock_dir
   let open Fiber.O in
   let lock_dir = Workspace.find_lock_dir workspace lock_dir_path in
   let project_pins, solve_for_platforms =
-    match lock_dir with
-    | None -> project_pins, Solver_env.popular_platform_envs
-    | Some lock_dir ->
-      let workspace =
-        Pin.DB.Workspace.of_stanza workspace.pins
-        |> Pin.DB.Workspace.extract ~names:lock_dir.pins
-      in
-      Pin.DB.combine_exn workspace project_pins, lock_dir.solve_for_platforms
+    match platforms_override with
+    | Some platforms -> project_pins, platforms
+    | None ->
+      (match lock_dir with
+       | None -> project_pins, Solver_env.popular_platform_envs
+       | Some lock_dir ->
+         let workspace =
+           Pin.DB.Workspace.of_stanza workspace.pins
+           |> Pin.DB.Workspace.extract ~names:lock_dir.pins
+         in
+         Pin.DB.combine_exn workspace project_pins, lock_dir.solve_for_platforms)
   in
   let solver_env_from_context =
     Option.bind lock_dir ~f:(fun lock_dir -> lock_dir.solver_env)
@@ -549,6 +553,7 @@ let solve
       ~lock_dirs
       ~print_perf_stats
       ~portable_lock_dir
+      ~platforms_override
       ~format
   =
   let open Fiber.O in
@@ -573,6 +578,7 @@ let solve
                 ~project_pins
                 ~print_perf_stats
                 ~portable_lock_dir
+                ~platforms_override
                 version_preference
                 solver_env_from_current_system
                 lockdir_path
@@ -631,7 +637,14 @@ let project_pins =
     Pin.DB.combine_exn acc pins)
 ;;
 
-let lock ~version_preference ~lock_dirs_arg ~print_perf_stats ~portable_lock_dir ~format =
+let lock
+      ~version_preference
+      ~lock_dirs_arg
+      ~print_perf_stats
+      ~portable_lock_dir
+      ~platforms_override
+      ~format
+  =
   let open Fiber.O in
   let* solver_env_from_current_system =
     poll_solver_env_from_current_system () >>| Option.some
@@ -657,6 +670,7 @@ let lock ~version_preference ~lock_dirs_arg ~print_perf_stats ~portable_lock_dir
     ~lock_dirs
     ~print_perf_stats
     ~portable_lock_dir
+    ~platforms_override
     ~format
 ;;
 
@@ -706,14 +720,24 @@ let term =
       | Some f -> f
       | None -> Lock_format.Directory
     in
-    (* Parse platform specs if provided *)
-    let _platforms_parsed =
+    (* Convert parsed platforms to solver_envs *)
+    let platforms_override =
       match platforms with
       | [] -> None
-      | ps -> Some (List.map ps ~f:parse_platform)
+      | ps ->
+        let parsed = List.map ps ~f:parse_platform in
+        let solver_envs =
+          List.concat_map parsed ~f:Lock_dir.File.Platform.to_solver_envs
+        in
+        Some solver_envs
     in
-    (* TODO: pass platforms to lock function to override solve_for_platforms *)
-    lock ~version_preference ~lock_dirs_arg ~print_perf_stats ~portable_lock_dir ~format)
+    lock
+      ~version_preference
+      ~lock_dirs_arg
+      ~print_perf_stats
+      ~portable_lock_dir
+      ~platforms_override
+      ~format)
 ;;
 
 let info =

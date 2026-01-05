@@ -18,6 +18,7 @@ val solve
   -> lock_dirs:Path.t list
   -> print_perf_stats:bool
   -> portable_lock_dir:bool
+  -> platforms_override:Dune_pkg.Solver_env.t list option
   -> format:Lock_format.t
   -> unit Fiber.t
 
