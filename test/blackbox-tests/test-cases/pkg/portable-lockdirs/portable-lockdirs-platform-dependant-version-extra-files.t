@@ -67,7 +67,7 @@ Define a project with a package depending on bar:
   > EOF
 
 Solve the project. The solution will contain extra files for both versions of foo:
-  $ dune pkg lock
+  $ dune pkg lock --format=directory
   Solution for dune.lock (3 packages)
   
   Dependencies common to all supported platforms:

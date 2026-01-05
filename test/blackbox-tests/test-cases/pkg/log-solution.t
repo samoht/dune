@@ -16,7 +16,7 @@ log.
 Running the solver explicitely should write the solution into the build log:
 
   $ mkpkg foo 0.0.1
-  $ dune pkg lock --trace-file trace.csexp
+  $ dune pkg lock --format=directory --trace-file trace.csexp
   Solution for dune.lock (1 package)
   
   Dependencies common to all supported platforms:

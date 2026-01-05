@@ -692,7 +692,7 @@ let read_disk_fiber ~solver_env path =
   | Some Lock.Directory ->
     (* Directory format - use sync reader wrapped in Fiber *)
     Fiber.return (Lock.read_disk_exn path)
-  | Some Lock.Single_file ->
+  | Some Lock.File ->
     (* Single-file format - check cache first, then derive if needed *)
     let cache_path = Single_file_cache.cache_path_for path in
     if Single_file_cache.is_cache_valid path cache_path

@@ -44,7 +44,7 @@ Create a custom dune-workspace to solve for openbsd.
   >  (libraries foo))
   > EOF
 
-  $ dune pkg lock
+  $ dune pkg lock --format=directory
   Solution for dune.lock (1 package)
   
   Dependencies common to all supported platforms:
@@ -102,7 +102,7 @@ error case.
   >  (solve_for_platforms))
   > EOF
 
-  $ dune pkg lock
+  $ dune pkg lock --format=directory
   File "dune-workspace", line 7, characters 1-22:
   7 |  (solve_for_platforms))
        ^^^^^^^^^^^^^^^^^^^^^

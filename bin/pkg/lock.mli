@@ -6,7 +6,7 @@ val project_pins : Dune_pkg.Pin.DB.t Memo.t
 module Lock_format : sig
   type t = Dune_pkg.Lock.format =
     | Directory
-    | Single_file
+    | File
 end
 
 val solve

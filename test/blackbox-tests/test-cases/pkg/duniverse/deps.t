@@ -44,7 +44,7 @@ Create a project that depends on pkg-b (which transitively depends on pkg-a):
 
 Lock the dependencies:
 
-  $ dune pkg lock
+  $ dune pkg lock --format=directory
   Solution for dune.lock (2 packages)
   dune:
   - pkg-a.1.0.0

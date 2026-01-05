@@ -254,8 +254,9 @@ module File : sig
 
   (** [derive ~loc file] loads the repos at their pinned hashes and
       looks up each package. Returns the repos and list of resolved packages
-      with their platform constraints.
-      Raises User_error if a package is not found in any repo. *)
+      with their platform constraints. Pinned packages are resolved from
+      their pin URLs. Raises User_error if a non-pinned package is not found
+      in any repo. *)
   val derive
     :  loc:Loc.t
     -> t
@@ -285,7 +286,7 @@ end
 (** Format of the lock on disk *)
 type format =
   | Directory (** dune.lock/ directory with lock.dune and .pkg files *)
-  | Single_file (** Single dune.lock file with repos and versions *)
+  | File (** Single dune.lock file with repos and versions *)
 
 (** [detect_format path] determines whether the path is a directory or single-file lock.
     Returns [None] if the path doesn't exist or is neither a valid lock directory

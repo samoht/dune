@@ -51,7 +51,7 @@ Pin without a prefix:
 
 This should work and display the initial value:
 
-  $ dune pkg lock 2> /dev/null
+  $ dune pkg lock --format=directory 2> /dev/null
   $ dune exec ./main.exe
   initial
 
@@ -80,7 +80,7 @@ Now pin using the file:// prefix
 
 We should be getting the 
 
-  $ dune pkg lock 2> /dev/null
+  $ dune pkg lock --format=directory 2> /dev/null
   $ dune exec ./main.exe
   file:// initial
 
@@ -109,7 +109,7 @@ Now we switch to a git repo:
 
 We should be getting the latest committed version from the git repo:
 
-  $ dune pkg lock 2> /dev/null
+  $ dune pkg lock --format=directory 2> /dev/null
   $ dune exec ./main.exe
   initial
 
@@ -132,6 +132,6 @@ However at the moment immediately getting the HEAD revision of the git repo.
 When we re-lock, we should lock the new revision of the dependency and build
 that:
 
-  $ dune pkg lock 2> /dev/null
+  $ dune pkg lock --format=directory 2> /dev/null
   $ dune exec ./main.exe
   git+file:// updated

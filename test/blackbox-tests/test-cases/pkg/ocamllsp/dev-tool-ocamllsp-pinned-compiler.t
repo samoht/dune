@@ -33,7 +33,7 @@ Set up the dune-project with a pin for the ocaml-base-compiler pointing to our c
 
 Lock the project first to establish the pinned compiler in the lockfile.
 
-  $ dune pkg lock 2>&1 | head -20
+  $ dune pkg lock --format=directory 2>&1 | head -20
   Solution for dune.lock (1 package)
   
   Dependencies common to all supported platforms:

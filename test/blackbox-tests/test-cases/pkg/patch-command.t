@@ -17,7 +17,7 @@ Create a project that depends on foo:
   > EOF
 
 Lock the project:
-  $ dune pkg lock 2>&1 | head -5
+  $ dune pkg lock --format=directory 2>&1 | head -5
   Solution for dune.lock (1 package)
   
   Dependencies common to all supported platforms:

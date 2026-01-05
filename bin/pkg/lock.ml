@@ -11,15 +11,17 @@ module Solver_env = Dune_pkg.Solver_env
 module Lock_format = struct
   type t = Lock_dir.format =
     | Directory
-    | Single_file
+    | File
 
   let term =
-    let all = [ "directory", Directory; "file", Single_file ] in
+    let all = [ "directory", Directory; "file", File ] in
+    let env = Cmd.Env.info "DUNE_CONFIG__LOCK_FORMAT" in
     Arg.(
       value
       & opt (some (enum all)) None
       & info
           [ "format" ]
+          ~env
           ~doc:
             (Some
                "Lock file format. $(b,file) creates a single dune.lock file with repo \
@@ -621,7 +623,7 @@ let solve
     (* All the file IO side effects happen here: *)
     List.iter lock_dirs_with_summaries ~f:(fun (lock_dir_path, lock_dir, files) ->
       match format with
-      | Lock_format.Single_file ->
+      | Lock_format.File ->
         (* Safely remove existing lock (file or directory) before writing *)
         Lock_dir.File.safely_remove_existing ~lock_file_path:lock_dir_path;
         let file = Lock_dir.File.of_lock lock_dir in
@@ -720,7 +722,7 @@ let term =
     let format =
       match format with
       | Some f -> f
-      | None -> Lock_format.Single_file
+      | None -> Lock_format.File
     in
     (* Convert parsed platforms to solver_envs *)
     let platforms_override =

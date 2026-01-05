@@ -23,8 +23,8 @@ Create a project that depends on both:
   >  (depends dune-pkg make-pkg))
   > EOF
 
-Lock the project:
-  $ dune pkg lock 2>&1 | head -6
+Lock the project (using directory format for mock repo compatibility):
+  $ dune pkg lock --format=directory 2>&1 | head -6
   Solution for dune.lock (2 packages)
   
   Dependencies common to all supported platforms:

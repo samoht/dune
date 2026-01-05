@@ -31,7 +31,7 @@ Make a package that is only available on macos.
 
 Solving will still succeed, but there'll be a warning because dune will attempt
 to solve for macos, linux, and windows by default.
-  $ dune pkg lock --trace-file trace.csexp
+  $ dune pkg lock --format=directory --trace-file trace.csexp
   Solution for dune.lock (1 package)
   
   Dependencies common to all supported platforms:

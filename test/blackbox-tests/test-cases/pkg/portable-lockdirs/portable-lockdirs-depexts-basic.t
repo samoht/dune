@@ -20,7 +20,7 @@ Demonstrate various cases representing depexts in lockfiles.
   >  (depends foo))
   > EOF
 
-  $ dune pkg lock
+  $ dune pkg lock --format=directory
   Solution for dune.lock (1 package)
   
   Dependencies common to all supported platforms:

@@ -16,12 +16,33 @@ Make a project that uses the foo library:
   >  (depends foo))
   > EOF
 
-Locking should succeed and not include the "unzip" package
+Locking should succeed and not include the "unzip" package.
+With single-file format (the default), depexts are derived from opam repo:
   $ dune pkg lock 2>&1 | head -n 1
   Solution for dune.lock (1 package)
+  $ cat dune.lock
+  (lang package 0.1)
+  
+  (repos)
+  
+  (packages foo.0.0.1)
+  
+  (platforms
+   (linux
+    (arch arm64 x86_64))
+   (macos
+    (arch arm64 x86_64)))
 
+
+
+
+With directory format, the unknown variable is preserved in the pkg file:
+  $ rm dune.lock
+  $ dune pkg lock --format=directory 2>&1 | head -n 1
+  Solution for dune.lock (1 package)
   $ cat ${default_lock_dir}/foo.0.0.1.pkg
   (version 0.0.1)
   
   (depexts
    ((unzip) %{pkg-self:foobar}))
+

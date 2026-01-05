@@ -66,16 +66,16 @@ all lockdirs portable.
   > EOF
 
 Generate all lockdirs:
-  $ dune pkg lock dune.macos.arm64.lock
+  $ dune pkg lock --format=directory dune.macos.arm64.lock
   Solution for dune.macos.arm64.lock (2 packages)
   opam:
   - arm64-only.0.0.1
   - macos-only.0.0.1
-  $ dune pkg lock dune.macos.lock
+  $ dune pkg lock --format=directory dune.macos.lock
   Solution for dune.macos.lock (1 package)
   opam:
   - macos-only.0.0.1
-  $ dune pkg lock dune.linux.lock
+  $ dune pkg lock --format=directory dune.linux.lock
   Solution for dune.linux.lock (1 package)
   opam:
   - linux-only.0.0.1
@@ -141,7 +141,7 @@ Test that cond statements can have a default value:
   >     (default dune.lock)))))
   > EOF
 
-  $ dune pkg lock dune.lock
+  $ dune pkg lock --format=directory dune.lock
   Solution for dune.lock (1 package)
   opam:
   - linux-only.0.0.1

@@ -27,7 +27,7 @@ Define some local packages.
   > EOF
 
 Solve dependencies:
-  $ dune pkg lock
+  $ dune pkg lock --format=directory
   Solution for dune.lock (5 packages)
   
   Dependencies common to all supported platforms:

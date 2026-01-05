@@ -43,7 +43,7 @@ Create a project that depends on both packages:
 
 Lock the dependencies and verify classification in output:
 
-  $ dune pkg lock
+  $ dune pkg lock --format=directory
   Solution for dune.lock (2 packages)
   dune:
   - dune-pkg.1.0.0

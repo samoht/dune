@@ -36,7 +36,7 @@ Create a project that depends on the non-dune package:
 
 Lock the dependencies:
 
-  $ dune pkg lock
+  $ dune pkg lock --format=directory
   Solution for dune.lock (1 package)
   opam:
   - make-pkg.1.0.0

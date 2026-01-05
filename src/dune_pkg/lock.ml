@@ -1695,26 +1695,45 @@ module File = struct
        | None -> find_in_repos rest ~name ~version)
   ;;
 
-  let derive ~loc { repos; packages; _ } =
+  let derive ~loc { repos; packages; pins; _ } =
     (* Load repos at pinned commits and look up each package *)
     let open Fiber.O in
     let* opam_repos =
       Fiber.parallel_map repos ~f:(fun { Repo.source; hash } ->
         Opam_repo.of_git_repo_at_hash loc ~source ~hash)
     in
+    (* Build a map of pinned packages for quick lookup *)
+    let pinned_map =
+      List.fold_left pins ~init:Package_name.Map.empty ~f:(fun acc pin ->
+        Package_name.Map.add_exn acc pin.Pin_entry.name pin)
+    in
     let+ resolved =
       Fiber.parallel_map packages ~f:(fun { Package_entry.name; version; platforms } ->
-        let+ resolved_opt = find_in_repos opam_repos ~name ~version in
-        match resolved_opt with
-        | Some resolved -> name, version, platforms, resolved
+        match Package_name.Map.find pinned_map name with
+        | Some pin ->
+          (* Pinned packages are resolved from their pin URL *)
+          let local_pin : Local_package.pin =
+            { loc
+            ; version = pin.Pin_entry.version
+            ; url = loc, OpamUrl.of_string pin.Pin_entry.url
+            ; name = pin.Pin_entry.name
+            ; origin = Opam_file
+            }
+          in
+          let+ resolved = Pinned_package.resolve_package local_pin in
+          name, version, platforms, resolved
         | None ->
-          User_error.raise
-            ~loc
-            [ Pp.textf
-                "Package %s.%s not found in any repository"
-                (Package_name.to_string name)
-                (Package_version.to_string version)
-            ])
+          let+ resolved_opt = find_in_repos opam_repos ~name ~version in
+          (match resolved_opt with
+           | Some resolved -> name, version, platforms, resolved
+           | None ->
+             User_error.raise
+               ~loc
+               [ Pp.textf
+                   "Package %s.%s not found in any repository"
+                   (Package_name.to_string name)
+                   (Package_version.to_string version)
+               ]))
     in
     opam_repos, resolved
   ;;
@@ -1845,7 +1864,7 @@ let file_contents_by_path ~portable_lock_dir t =
 
 type format =
   | Directory
-  | Single_file
+  | File
 
 let detect_format path =
   match Path.stat path with
@@ -1866,8 +1885,7 @@ let detect_format path =
            (match Dune_sexp.Ast.remove_locs first with
             | List [ Atom a1; Atom a2; _ ]
               when String.equal (Dune_sexp.Atom.to_string a1) "lang"
-                   && String.equal (Dune_sexp.Atom.to_string a2) "package" ->
-              Some Single_file
+                   && String.equal (Dune_sexp.Atom.to_string a2) "package" -> Some File
             | _ -> None)
          | [] -> None)
      with

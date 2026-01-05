@@ -52,7 +52,7 @@ Create a project that depends on the top-level dune package:
 
 Lock the dependencies - packages should be classified correctly:
 
-  $ dune pkg lock 2>&1 | grep -v "^Dependencies"
+  $ dune pkg lock --format=directory 2>&1 | grep -v "^Dependencies"
   Solution for dune.lock (3 packages)
   
   dune:
@@ -90,7 +90,7 @@ Now test a diamond dependency pattern where both paths have mixed packages:
   > EOF
 
   $ rm -rf dune.lock
-  $ dune pkg lock 2>&1 | grep -v "^Dependencies"
+  $ dune pkg lock --format=directory 2>&1 | grep -v "^Dependencies"
   Solution for dune.lock (3 packages)
   
   dune:
@@ -148,7 +148,7 @@ Create the chain of packages:
 
 Lock the dependencies:
 
-  $ dune pkg lock 2>&1 | grep -v "^Dependencies"
+  $ dune pkg lock --format=directory 2>&1 | grep -v "^Dependencies"
   Solution for dune.lock (3 packages)
   dune:
   - dune-a.1.0.0
@@ -325,7 +325,7 @@ Create the interleaved chain of packages:
 
 Lock the dependencies:
 
-  $ dune pkg lock 2>&1 | grep -v "^Dependencies"
+  $ dune pkg lock --format=directory 2>&1 | grep -v "^Dependencies"
   Solution for dune.lock (4 packages)
   dune:
   - dune-mid2.1.0.0

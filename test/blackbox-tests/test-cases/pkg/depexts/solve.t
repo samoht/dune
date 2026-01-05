@@ -16,8 +16,30 @@ Make a project that uses the foo library:
   >  (depends foo))
   > EOF
 
-locking would add the opam 'depext' field to foo.pkg
-  $ dune_pkg_lock_normalized
+With single-file format, depexts are derived from opam repo:
+  $ dune_pkg_lock_normalized --format=file
+  Solution for dune.lock (1 package):
+  opam:
+  - foo.0.0.1
+  $ cat dune.lock
+  (lang package 0.1)
+  
+  (repos)
+  
+  (packages foo.0.0.1)
+  
+  (platforms
+   (linux
+    (arch arm64 x86_64))
+   (macos
+    (arch arm64 x86_64)))
+
+
+
+
+With directory format, the opam 'depext' field is stored in foo.pkg:
+  $ rm -rf dune.lock
+  $ dune_pkg_lock_normalized --format=directory
   Solution for dune.lock (1 package):
   opam:
   - foo.0.0.1
@@ -26,3 +48,4 @@ locking would add the opam 'depext' field to foo.pkg
   
   (depexts
    (unzip gnupg))
+

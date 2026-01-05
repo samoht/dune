@@ -205,7 +205,16 @@ make_lockpkg_file() {
 
 dune_pkg_lock_normalized() {
   out="$(mktemp)"
-  if dune pkg lock $@ 2>> "${out}"; then
+  # Default to directory format for tests that inspect .pkg files.
+  # Use --format=file to test the single-file format.
+  # If --format is already specified in args, don't add the default.
+  local args="$@"
+  local format_arg=""
+  if ! echo "$args" | grep -q '\-\-format'; then
+    local format="${DUNE_TEST_LOCK_FORMAT:-directory}"
+    format_arg="--format=$format"
+  fi
+  if dune pkg lock $format_arg $@ 2>> "${out}"; then
     processed="$(mktemp)"
     if [ "$DUNE_CONFIG__PORTABLE_LOCK_DIR" = "disabled" ]; then
       cp "${out}" "${processed}"

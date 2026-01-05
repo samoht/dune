@@ -50,7 +50,7 @@ A package that conditionally depends on packages depending on the OS:
   >  (libraries foo))
   > EOF
 
-  $ dune pkg lock
+  $ dune pkg lock --format=directory
   Solution for dune.lock (3 packages)
   
   Dependencies common to all supported platforms:
