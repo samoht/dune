@@ -38,7 +38,7 @@ Note: The output shows "dune:" prefix for dune packages and "opam:" for non-dune
 
 Test fetch command - reports no packages to fetch since mock packages have no source URLs:
   $ dune pkg fetch 2>&1
-  1 dune package(s) have no source URL (likely local packages).
+  2 package(s) have no source URL (likely local packages).
 
 This is expected since our mock packages don't have URLs defined.
 
@@ -119,12 +119,14 @@ Lock the project - should show mylib as "dune:" and makelib as "opam:":
 
 Fetch duniverse packages - should fetch only mylib (the dune package):
   $ dune pkg fetch 2>&1
+  Fetching makelib.1.0.0 to duniverse/makelib.1.0.0
   Fetching mylib.1.0.0 to duniverse/mylib.1.0.0
-  Fetched 1 duniverse package(s) to duniverse/
+  Fetched 2 package(s) to duniverse/
 
 Verify the duniverse directory structure:
   $ find duniverse -type f | sort
   duniverse/.dune-duniverse
+  duniverse/makelib.1.0.0/Makefile
   duniverse/mylib.1.0.0/dune
   duniverse/mylib.1.0.0/dune-project
   duniverse/mylib.1.0.0/mylib.ml
@@ -139,4 +141,5 @@ Verify the library code was fetched:
 
 Running fetch again should skip already-fetched packages:
   $ dune pkg fetch 2>&1
+  Package makelib.1.0.0 already fetched
   Package mylib.1.0.0 already fetched

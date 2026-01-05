@@ -115,3 +115,14 @@ let is_compiler_and_toolchains_enabled name =
 let install_roots ~prefix =
   Install.Roots.make prefix ~relative:Path.Outside_build_dir.relative
 ;;
+
+(* Check if a toolchain is already installed in the cache.
+   We check for the presence of the install cookie file which indicates
+   a successful installation. *)
+let is_installed pkg =
+  let prefix = installation_prefix pkg in
+  let cookie_path =
+    Path.outside_build_dir (Path.Outside_build_dir.relative prefix "cookie")
+  in
+  Path.Untracked.exists cookie_path
+;;

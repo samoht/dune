@@ -59,19 +59,11 @@ A package that conditionally depends on packages depending on the OS:
   
   Additionally, some packages will only be built on specific platforms.
   
-  arch = arm64; os = linux:
+  linux (arm64, x86_64):
   opam:
   - linux-only.0.0.1
   
-  arch = arm64; os = macos:
-  opam:
-  - macos-only.0.0.1
-  
-  arch = x86_64; os = linux:
-  opam:
-  - linux-only.0.0.1
-  
-  arch = x86_64; os = macos:
+  macos (arm64, x86_64):
   opam:
   - macos-only.0.0.1
 

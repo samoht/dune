@@ -29,3 +29,7 @@ val installation_prefix : Lock_dir.Pkg.t -> Path.Outside_build_dir.t
 val install_roots
   :  prefix:Path.Outside_build_dir.t
   -> Path.Outside_build_dir.t Install.Roots.t
+
+(** Check if a toolchain is already installed in the cache. Returns true
+    if the install cookie exists, indicating a successful prior installation. *)
+val is_installed : Lock_dir.Pkg.t -> bool

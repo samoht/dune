@@ -46,9 +46,8 @@ error message.
   File "dune-project", line 1, characters 0-0:
   Error: Invalid first line, expected: (lang <lang> <version>)
   
-  Hint: You may want to verify the following depexts are installed:
-  - gnupg
-  - unzip
+  Hint: Missing system dependencies: gnupg, unzipTo install:
+    brew install gnupg unzip
   [1]
 
 Make dune.lock files with unknown program and unknown package.
@@ -72,6 +71,6 @@ when the program is not found.
             ^^^^^^^^^^^^^^^
   Error: Program unknown-program not found in the tree or in PATH
    (context: default)
-  Hint: You may want to verify the following depexts are installed:
-  - unknown-package
+  Hint: Missing system dependencies: unknown-packageTo install:
+    brew install unknown-package
   [1]

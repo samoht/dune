@@ -76,19 +76,11 @@ Solve the project. The solution will contain extra files for both versions of fo
   
   Additionally, some packages will only be built on specific platforms.
   
-  arch = arm64; os = linux:
+  linux (arm64, x86_64):
   opam:
   - foo.1
   
-  arch = arm64; os = macos:
-  opam:
-  - foo.2
-  
-  arch = x86_64; os = linux:
-  opam:
-  - foo.1
-  
-  arch = x86_64; os = macos:
+  macos (arm64, x86_64):
   opam:
   - foo.2
 

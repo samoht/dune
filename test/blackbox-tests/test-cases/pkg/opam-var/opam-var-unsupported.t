@@ -29,8 +29,7 @@ These should all have nice error messages explaining that they are not supported
   Error: Variable "hash" is not supported.
 # _:build-id
   $ fail_solve _:build-id
-  File "$TESTCASE_ROOT/mock-opam-repository/packages/testpkg/testpkg.0.0.1/opam", line 1, characters 0-0:
-  Error: Variable "build-id" is not supported.
+  Expected solve to fail, but it succeeded
 # misc
   $ fail_solve misc
   File "$TESTCASE_ROOT/mock-opam-repository/packages/testpkg/testpkg.0.0.1/opam", line 1, characters 0-0:

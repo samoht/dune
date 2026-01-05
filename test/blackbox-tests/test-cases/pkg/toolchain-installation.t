@@ -87,6 +87,7 @@ Enumerate the contents of the fake toolchains directory:
   fake-cache/dune/toolchains/ocaml-base-compiler.1-HASH/target
   fake-cache/dune/toolchains/ocaml-base-compiler.1-HASH/target/bin
   fake-cache/dune/toolchains/ocaml-base-compiler.1-HASH/target/bin/ocamlc
+  fake-cache/dune/toolchains/ocaml-base-compiler.1-HASH/target/cookie
 
 Also test that DUNE_CACHE_ROOT is respected.
   $ DUNE_CACHE_ROOT=$PWD/other-fake-cache DUNE_CONFIG__TOOLCHAINS=enabled build_pkg ocaml-base-compiler
@@ -98,3 +99,4 @@ Enumerate the contents of the fake toolchains directory:
   other-fake-cache/toolchains/ocaml-base-compiler.1-HASH/target
   other-fake-cache/toolchains/ocaml-base-compiler.1-HASH/target/bin
   other-fake-cache/toolchains/ocaml-base-compiler.1-HASH/target/bin/ocamlc
+  other-fake-cache/toolchains/ocaml-base-compiler.1-HASH/target/cookie

@@ -1673,9 +1673,14 @@ end = struct
       let install_command = Option.map install_command ~f:relocate in
       let build_command = choose_for_current_platform build_command in
       let build_command = Option.map build_command ~f:relocate_build in
+      let is_toolchain = Pkg_toolchain.is_compiler_and_toolchains_enabled info.name in
+      let is_cached = is_toolchain && Pkg_toolchain.is_installed pkg in
+      (* If toolchain is already cached, skip build and install commands *)
+      let build_command = if is_cached then None else build_command in
+      let install_command = if is_cached then None else install_command in
       let paths =
         let paths = Paths.map_path write_paths ~f:Path.build in
-        match Pkg_toolchain.is_compiler_and_toolchains_enabled info.name with
+        match is_toolchain with
         | false -> paths
         | true ->
           (* Modify the environment as well as build and install commands for
@@ -2108,9 +2113,21 @@ module Install_action = struct
       in
       (* Produce the cookie file in the standard path *)
       let cookie_file = Path.build @@ Paths.install_cookie' target_dir in
-      Async.async (fun () ->
-        cookie_file |> Path.parent_exn |> Path.mkdir_p;
-        Install_cookie.dump cookie_file cookies)
+      let* () =
+        Async.async (fun () ->
+          cookie_file |> Path.parent_exn |> Path.mkdir_p;
+          Install_cookie.dump cookie_file cookies)
+      in
+      (* For toolchain packages, also write cookie to cache location for persistence *)
+      match prefix_outside_build_dir with
+      | None -> Fiber.return ()
+      | Some prefix ->
+        let cache_cookie =
+          Path.outside_build_dir (Path.Outside_build_dir.relative prefix "cookie")
+        in
+        Async.async (fun () ->
+          cache_cookie |> Path.parent_exn |> Path.mkdir_p;
+          Install_cookie.dump cache_cookie cookies)
     ;;
   end
 
@@ -2461,26 +2478,32 @@ let duniverse_status (lock_pkg : Lock_dir.Pkg.t) =
   in_duniverse, is_dune_pkg
 ;;
 
-(* For backwards compatibility - check if package is dune-based in duniverse *)
-let is_duniverse_with_sources (lock_pkg : Lock_dir.Pkg.t) =
-  let+ in_duniverse, is_dune_pkg = duniverse_status lock_pkg in
-  in_duniverse && is_dune_pkg
-;;
-
 let setup_package_rules (db : DB.t) ~package_universe ~dir ~pkg_digest
   : Gen_rules.result Memo.t
   =
   (* First check if this package is in duniverse *)
-  let* is_duniverse =
+  let* in_duniverse, is_dune_pkg =
     match Pkg_digest.Map.find db.pkg_digest_table pkg_digest with
-    | None -> Memo.return false
-    | Some { DB.Pkg_table.pkg; _ } -> is_duniverse_with_sources pkg
+    | None -> Memo.return (false, false)
+    | Some { DB.Pkg_table.pkg; _ } -> duniverse_status pkg
   in
-  if is_duniverse
+  if in_duniverse && is_dune_pkg
   then
     (* Duniverse packages are built as normal vendored code, skip .pkg/ rules *)
     Memo.return @@ Gen_rules.make (Memo.return Rules.empty)
-  else
+  else if is_dune_pkg && false
+  then (
+    (* TODO: auto-fetch sources to duniverse/ instead of falling through to opam sandbox *)
+    let pkg_name = Package.Name.to_string pkg_digest.name in
+    User_error.raise
+      [ Pp.textf
+          "Package %s uses dune but sources are not in duniverse/. Run 'dune pkg fetch' \
+           first."
+          pkg_name
+      ])
+  else (
+    (* Non-dune package (or dune package not yet in duniverse) - use opam sandbox *)
+    let _ = is_dune_pkg in
     let* pkg = Resolve.resolve db Loc.none pkg_digest package_universe in
     let paths =
       Paths.make pkg.pkg_digest package_universe ~relative:Path.Build.relative
@@ -2504,7 +2527,7 @@ let setup_package_rules (db : DB.t) ~package_universe ~dir ~pkg_digest
     in
     let context_name = Package_universe.context_name package_universe in
     let rules = Rules.collect_unit (fun () -> gen_rules context_name pkg) in
-    Gen_rules.make ~directory_targets ~build_dir_only_sub_dirs rules
+    Gen_rules.make ~directory_targets ~build_dir_only_sub_dirs rules)
 ;;
 
 let setup_rules ~components ~dir ctx =
