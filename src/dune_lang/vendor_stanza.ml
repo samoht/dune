@@ -7,10 +7,32 @@ open Import
     Syntax:
     {[
       (vendor fmt.0.9.0 (libraries fmt fmt.tty))
+      (vendor make-pkg.1.0.0 (sandbox opam))
     ]}
 
     The directory is relative to the location of the dune file containing
     the stanza. *)
+
+module Sandbox_mode = struct
+  type t =
+    | None
+    | Opam
+
+  let decode =
+    let open Decoder in
+    enum [ "none", None; "opam", Opam ]
+  ;;
+
+  let to_dyn = function
+    | None -> Dyn.variant "None" []
+    | Opam -> Dyn.variant "Opam" []
+  ;;
+
+  let to_string = function
+    | None -> "none"
+    | Opam -> "opam"
+  ;;
+end
 
 type t =
   { loc : Loc.t
@@ -19,6 +41,8 @@ type t =
     (* None = all libraries, Some [] = none, Some libs = only these *)
   ; packages : Package_name.t list option
     (* None = all packages, Some [] = none, Some pkgs = only these *)
+  ; sandbox : Sandbox_mode.t option
+    (* None = default (no sandbox), Some Opam = build in opam sandbox *)
   }
 
 let decode =
@@ -28,15 +52,17 @@ let decode =
   fields
   @@
   let+ libraries = field_o "libraries" (repeat Lib_name.decode)
-  and+ packages = field_o "packages" (repeat Package_name.decode) in
-  { loc; directory; libraries; packages }
+  and+ packages = field_o "packages" (repeat Package_name.decode)
+  and+ sandbox = field_o "sandbox" Sandbox_mode.decode in
+  { loc; directory; libraries; packages; sandbox }
 ;;
 
-let to_dyn { loc = _; directory; libraries; packages } =
+let to_dyn { loc = _; directory; libraries; packages; sandbox } =
   Dyn.record
     [ "directory", Dyn.string directory
     ; "libraries", Dyn.option (Dyn.list Lib_name.to_dyn) libraries
     ; "packages", Dyn.option (Dyn.list Package_name.to_dyn) packages
+    ; "sandbox", Dyn.option Sandbox_mode.to_dyn sandbox
     ]
 ;;
 

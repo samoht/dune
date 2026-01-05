@@ -154,7 +154,7 @@ We should observe the same behaviour that when running test above.
   dune:
   - app.0.0.1
   - plugin1.0.0.1
-  $ dune build @runtest 2>&1 | dune_cmd sanitize
+  $ dune build --auto-fetch=disabled @runtest 2>&1 | dune_cmd sanitize
   Main app starts...
 
 Should have printed:

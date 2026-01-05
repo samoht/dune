@@ -37,11 +37,27 @@ let runtest_term =
   (* CR-someday Alizter: document this option *)
   let name = Arg.info [] ~docv:"TEST" ~doc:None in
   let+ builder = Common.Builder.term
-  and+ test_paths = Arg.(value & pos_all string [ "." ] name) in
+  and+ test_paths = Arg.(value & pos_all string [ "." ] name)
+  and+ auto_fetch_opt =
+    let toggle = [ "enabled", true; "disabled", false ] in
+    let doc =
+      Printf.sprintf
+        "Enable or disable automatic fetching of missing dune packages to duniverse (%s)."
+        (Arg.doc_alts_enum toggle)
+    in
+    Arg.(
+      value
+      & opt (some (enum toggle)) None
+      & info
+          [ "auto-fetch" ]
+          ~env:(Cmd.Env.info ~doc Common.auto_fetch_env)
+          ~doc:(Some doc))
+  in
   let common, config = Common.init builder in
+  let auto_fetch = Option.value auto_fetch_opt ~default:config.auto_fetch in
   match Dune_util.Global_lock.lock ~timeout:None with
   | Ok () ->
-    Build.run_build_command ~common ~config ~auto_fetch:true ~request:(fun setup ->
+    Build.run_build_command ~common ~config ~auto_fetch ~request:(fun setup ->
       Runtest_common.make_request
         ~scontexts:setup.scontexts
         ~to_cwd:(Common.root common).to_cwd

@@ -26,7 +26,7 @@ let lock_ocamlformat () =
   else Fiber.return ()
 ;;
 
-let run_fmt_command ~common ~config ~preview builder =
+let run_fmt_command ~common ~config ~preview ~auto_fetch builder =
   let open Fiber.O in
   let once () =
     let* () = lock_ocamlformat () in
@@ -35,7 +35,7 @@ let run_fmt_command ~common ~config ~preview builder =
       Alias.in_dir ~name:Dune_rules.Alias.fmt ~recursive:true ~contexts:setup.contexts dir
       |> Alias.request
     in
-    Build.run_build_system ~common ~auto_fetch:true ~request
+    Build.run_build_system ~common ~auto_fetch ~request
     >>| function
     | Ok () -> ()
     | Error `Already_reported -> raise Dune_util.Report_error.Already_reported
@@ -70,12 +70,28 @@ let command =
                  "Just print the changes that would be made without actually applying \
                   them. This takes precedence over auto-promote as that flag is assumed \
                   for this command."))
+    and+ auto_fetch_opt =
+      let toggle = [ "enabled", true; "disabled", false ] in
+      let doc =
+        Printf.sprintf
+          "Enable or disable automatic fetching of missing dune packages to duniverse \
+           (%s)."
+          (Arg.doc_alts_enum toggle)
+      in
+      Arg.(
+        value
+        & opt (some (enum toggle)) None
+        & info
+            [ "auto-fetch" ]
+            ~env:(Cmd.Env.info ~doc Common.auto_fetch_env)
+            ~doc:(Some doc))
     in
     let builder =
       Common.Builder.set_promote builder (if preview then Never else Automatically)
     in
     let common, config = Common.init builder in
-    run_fmt_command ~common ~config ~preview builder
+    let auto_fetch = Option.value auto_fetch_opt ~default:config.auto_fetch in
+    run_fmt_command ~common ~config ~preview ~auto_fetch builder
   in
   Cmd.v (Cmd.info "fmt" ~doc ~man ~envs:Common.envs) term
 ;;

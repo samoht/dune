@@ -57,21 +57,21 @@ let pp ~max_width =
     List.partition_map state.active ~f:(fun (t : Target.t) ->
       if t.is_fetch then Left t.name else Right t.name)
   in
-  (* Format: "Fetching: x | Building: y, z (3/15, 8j)" *)
-  let suffix =
-    if state.total > 0
-    then sprintf " (%d/%d, %dj)" state.completed state.total state.jobs
-    else sprintf " (%dj)" state.jobs
+  (* Format: "[3/15] Fetching: pkg1, pkg2 | Building: lib1 [8j]" *)
+  let prefix =
+    if state.total > 0 then sprintf "[%d/%d] " state.completed state.total else ""
   in
+  let suffix = if state.jobs > 0 then sprintf " [%dj]" state.jobs else "" in
+  let prefix_len = String.length prefix in
   let suffix_len = String.length suffix in
-  let format_targets ~prefix targets available_width =
+  let format_targets ~label targets available_width =
     if List.is_empty targets
     then None
     else (
-      let prefix_len = String.length prefix in
-      let remaining = available_width - prefix_len - suffix_len in
+      let label_len = String.length label in
+      let remaining = available_width - label_len in
       if remaining <= 10
-      then Some (sprintf "%s+%d targets" prefix (List.length targets))
+      then Some (sprintf "%s+%d" label (List.length targets))
       else (
         let rec fit acc len = function
           | [] -> List.rev acc, 0
@@ -86,11 +86,12 @@ let pp ~max_width =
         let shown, remaining_count = fit [] 0 targets in
         let names = String.concat ~sep:", " shown in
         if remaining_count > 0
-        then Some (sprintf "%s%s, +%d more" prefix names remaining_count)
-        else Some (sprintf "%s%s" prefix names)))
+        then Some (sprintf "%s%s, +%d more" label names remaining_count)
+        else Some (sprintf "%s%s" label names)))
   in
-  let fetch_part = format_targets ~prefix:"Fetching: " fetching max_width in
-  let build_part = format_targets ~prefix:"Building: " building max_width in
+  let available = max_width - prefix_len - suffix_len in
+  let fetch_part = format_targets ~label:"Fetching: " fetching available in
+  let build_part = format_targets ~label:"Building: " building available in
   let main_part =
     match fetch_part, build_part with
     | None, None -> "Waiting..."
@@ -98,7 +99,7 @@ let pp ~max_width =
     | None, Some b -> b
     | Some f, Some b -> sprintf "%s | %s" f b
   in
-  Pp.verbatim (main_part ^ suffix)
+  Pp.verbatim (prefix ^ main_part ^ suffix)
 ;;
 
 (* Summary after completion *)

@@ -197,14 +197,21 @@ let build =
                  "Build $(docv) in its parent directory only. Equivalent to the build \
                   target $(b,@@)$(docv). Example: $(b,--alias dir/foo) builds the \
                   $(b,foo) alias in $(b,dir/) only. Repeatable."))
-    and+ no_auto_fetch =
+    and+ auto_fetch_opt =
+      let toggle = [ "enabled", true; "disabled", false ] in
+      let doc =
+        Printf.sprintf
+          "Enable or disable automatic fetching of missing dune packages to duniverse \
+           (%s)."
+          (Arg.doc_alts_enum toggle)
+      in
       Arg.(
         value
-        & flag
+        & opt (some (enum toggle)) None
         & info
-            [ "no-auto-fetch" ]
-            ~doc:
-              (Some "Disable automatic fetching of missing dune packages to duniverse."))
+            [ "auto-fetch" ]
+            ~env:(Cmd.Env.info ~doc Common.auto_fetch_env)
+            ~doc:(Some doc))
     in
     let targets = List.concat [ targets; aliases; aliases_rec ] in
     let targets =
@@ -249,7 +256,7 @@ let build =
         >>| Rpc.Rpc_common.wrap_build_outcome_exn ~print_on_success:true)
     | Ok () ->
       let request setup = Target.interpret_targets (Common.root common) setup targets in
-      let auto_fetch = (not no_auto_fetch) && config.auto_fetch in
+      let auto_fetch = Option.value auto_fetch_opt ~default:config.auto_fetch in
       run_build_command ~common ~config ~auto_fetch ~request
   in
   Cmd.v (Cmd.info "build" ~doc ~man ~envs:Common.envs) term

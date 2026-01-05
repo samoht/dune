@@ -719,14 +719,16 @@ let raise_on_lock_dir_out_of_sync =
       then
         let* path, lock_dir = Lock_dir.get_with_path ctx >>| User_error.ok_exn in
         let+ local_packages =
-          let duniverse_dir = Dune_pkg.Duniverse.marker_dirname in
           Dune_load.packages ()
-          >>| Dune_lang.Package.Name.Map.filter ~f:(fun pkg ->
-            (* Exclude packages in duniverse/ - they are vendored dependencies *)
+          >>= fun pkgs ->
+          (* Exclude vendored packages from lock dir validation *)
+          Dune_lang.Package.Name.Map.to_list pkgs
+          |> Memo.parallel_map ~f:(fun (name, pkg) ->
             let dir = Dune_lang.Package.dir pkg in
-            match Path.Source.explode dir with
-            | first :: _ when String.equal first duniverse_dir -> false
-            | _ -> true)
+            Source_tree.is_vendored dir
+            >>| fun vendored -> if vendored then None else Some (name, pkg))
+          >>| List.filter_map ~f:Fun.id
+          >>| Dune_lang.Package.Name.Map.of_list_exn
           >>| Dune_lang.Package.Name.Map.map ~f:Dune_pkg.Local_package.of_package
         in
         match

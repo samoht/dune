@@ -63,3 +63,8 @@ val classify_all : Lock.Pkg.t Package_name.Map.t -> package_target Package_name.
     build command for the given platform. Patches are returned in the order
     they should be applied. *)
 val get_patches : Lock.Pkg.t -> platform:Solver_env.t -> String_with_vars.t list
+
+(** [scan_public_libraries dir] scans a vendored directory for public library
+    names by parsing all dune files and extracting (public_name ...) from
+    library stanzas. *)
+val scan_public_libraries : Path.Source.t -> string list

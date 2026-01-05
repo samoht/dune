@@ -1544,6 +1544,8 @@ let help_secs =
   ]
 ;;
 
+let auto_fetch_env = "DUNE_CONFIG__AUTO_FETCH"
+
 let envs =
   Cmd.Env.
     [ info
@@ -1558,6 +1560,11 @@ let envs =
     ; info
         ~doc:"If set, determines the location of all the different caches used by dune."
         "DUNE_CACHE_ROOT"
+    ; info
+        ~doc:
+          "If set to $(b,disabled), automatic fetching of missing dune packages to \
+           duniverse is disabled. If set to $(b,enabled), it is enabled (default)."
+        auto_fetch_env
     ]
 ;;
 

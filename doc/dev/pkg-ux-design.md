@@ -1,5 +1,10 @@
 # Dune Package Management UX Design Document
 
+**Related documents:**
+- [vendoring.md](vendoring.md) - Vendor stanza syntax, selective libraries, sandbox modes
+- [patching.md](patching.md) - Patch workflow for modifying dependencies
+- [lock-file-format.md](lock-file-format.md) - Lock file format and derivation
+
 A UX review and improvement roadmap for `dune pkg` CLI, informed by modern package managers (Cargo, Bun, uv) but grounded in principled CLI design.
 
 **Status:** In Progress
@@ -560,6 +565,74 @@ Hint: Run `dune pkg lock` to regenerate
 - `bin/common.ml` — add `--auto-lock` flag
 - `src/dune_pkg/package_universe.ml` — check flag in `validate_dependency_hash`
 - If enabled, call lock regeneration instead of erroring
+
+---
+
+### Version Constraints in Lock Command
+
+**Problem:** Currently `dune pkg lock` solves for the latest compatible versions.
+Users often need to pin specific versions for testing or reproducibility.
+
+**Proposal:** Add `--with` flag for specifying version constraints:
+
+```bash
+dune pkg lock --with ocaml.5.2.0 --with fmt.0.9.0
+dune pkg lock --with "lwt>=5.6.0" --with "yojson<2.0"
+```
+
+**Syntax comparison across package managers:**
+
+| Package Manager | Exact Version | Constraint |
+|-----------------|---------------|------------|
+| opam | `pkg.version` | `"pkg>=version"` |
+| cargo | `pkg@version` | `pkg@>=version` |
+| poetry | `pkg==version` | `pkg@^version` |
+| npm/yarn/pnpm | `pkg@version` | `pkg@>=version` |
+
+**Proposed syntax (follows opam conventions):**
+
+```bash
+# Exact version (dot notation like opam)
+dune pkg lock --with ocaml.5.2.0
+dune pkg lock --with fmt.0.9.0 --with cmdliner.1.3.0
+
+# Version constraints (quoted, opam-style operators)
+dune pkg lock --with "ocaml>=5.0"
+dune pkg lock --with "lwt>=5.6.0" --with "yojson<2.0"
+
+# Multiple constraints on same package
+dune pkg lock --with "ocaml>=5.0" --with "ocaml<5.3"
+```
+
+**Shorthand for common case:**
+
+Since pinning the compiler is very common:
+
+```bash
+dune pkg lock --ocaml 5.2.0
+# Equivalent to: dune pkg lock --with ocaml.5.2.0
+```
+
+**Interaction with dune-project:**
+
+Constraints from `--with` are intersected with constraints in `dune-project`.
+If CLI constraints conflict with `dune-project`, error with clear message:
+
+```bash
+$ dune pkg lock --with ocaml.4.12.0
+Error: Constraint "ocaml.4.12.0" conflicts with (ocaml (>= 4.14)) in dune-project
+```
+
+**Recording:** CLI constraints are **not** recorded in the lock file - they're for
+one-time solving. To persist constraints, edit `dune-project` directly.
+
+**Implementation:**
+1. Parse `--with` arguments into `(Package_name.t * Version_constraint.t) list`
+2. Merge with constraints from `dune-project`
+3. Pass to solver as additional constraints
+4. Fail early if constraints are unsatisfiable
+
+---
 
 ## Larger Initiatives (Needs Justification)
 

@@ -58,6 +58,14 @@ val files_of : Path.Source.t -> Path.Source.Set.t Memo.t
 (** [true] iff the path is a vendored directory *)
 val is_vendored : Path.Source.t -> bool Memo.t
 
+(** [vendor_stanza dir] returns the vendor stanza for [dir] if one exists
+    in a parent directory's dune file. *)
+val vendor_stanza : Path.Source.t -> Vendor_stanza.t option Memo.t
+
+(** [vendor_stanzas dir] returns all vendor stanzas defined in the dune file
+    at [dir], as a list of (subdirectory_name, stanza) pairs. *)
+val vendor_stanzas : Path.Source.t -> (Filename.t * Vendor_stanza.t) list Memo.t
+
 (** [nearest_vcs t fn] returns the version control system with the longest root
     path that is an ancestor of [fn]. *)
 val nearest_vcs : Path.Source.t -> Vcs.t option Memo.t

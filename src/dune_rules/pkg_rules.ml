@@ -16,6 +16,8 @@ include struct
   module Duniverse = Duniverse
 end
 
+module Vendor_stanza = Dune_lang.Vendor_stanza
+
 module Variable = struct
   type value = OpamVariable.variable_contents =
     | B of bool
@@ -2457,6 +2459,24 @@ let setup_pkg_install_alias =
       |> Path.build)
     |> Action_builder.paths
   in
+  let build_vendor_libraries ctx_name =
+    (* Build libraries from vendor stanzas in duniverse.
+       We add a dependency on the build directory to ensure vendor libraries
+       are built. The actual building happens through dune's normal rule
+       generation for vendored directories. *)
+    let open Action_builder.O in
+    let* vendor_dirs =
+      Action_builder.of_memo
+        (let open Memo.O in
+         let duniverse_dir = Duniverse.duniverse_dir in
+         Source_tree.vendor_stanzas duniverse_dir
+         >>| List.map ~f:(fun (subdir, _stanza) ->
+           let vendor_dir = Path.Source.relative duniverse_dir subdir in
+           Path.Build.append_source (Context_name.build_dir ctx_name) vendor_dir))
+    in
+    (* Depend on the directories existing - this triggers dune's normal build *)
+    Action_builder.paths_existing (List.map vendor_dirs ~f:Path.build)
+  in
   fun ~dir ctx_name ->
     let rule =
       (* We only need to build when the build_dir is the root of the context *)
@@ -2471,7 +2491,11 @@ let setup_pkg_install_alias =
         Rules.collect_unit (fun () ->
           let deps =
             match active with
-            | true -> build_packages_of_context ctx_name
+            | true ->
+              (* Build both .pkg packages and vendor stanza libraries *)
+              let open Action_builder.O in
+              let* () = build_packages_of_context ctx_name in
+              build_vendor_libraries ctx_name
             | false -> pkg_alias_disabled
           in
           Rules.Produce.Alias.add_deps alias deps)
@@ -2481,39 +2505,89 @@ let setup_pkg_install_alias =
 ;;
 
 (* Check if a package has sources in the duniverse directory.
-   Returns (in_duniverse, is_dune_pkg) where:
+   Returns (in_duniverse, should_use_opam_sandbox) where:
    - in_duniverse: true if sources exist in duniverse/
-   - is_dune_pkg: true if package uses dune as build system *)
+   - should_use_opam_sandbox: true if package should be built in opam sandbox
+     (either because it's not a dune package, or has (sandbox opam) in vendor stanza) *)
 let duniverse_status (lock_pkg : Lock_dir.Pkg.t) =
   let duniverse_path = Duniverse.package_dir lock_pkg.info.name lock_pkg.info.version in
-  let+ in_duniverse =
+  let* in_duniverse =
     Fs_memo.dir_exists (Path.Outside_build_dir.In_source_dir duniverse_path)
   in
-  let is_dune_pkg =
-    match Duniverse.classify lock_pkg with
-    | Duniverse.Duniverse -> true
-    | Duniverse.Opam_sandbox -> false
+  let duniverse_marker =
+    Path.Source.relative Duniverse.duniverse_dir Duniverse.marker_filename
   in
-  in_duniverse, is_dune_pkg
+  let* marker_exists =
+    Fs_memo.file_exists (Path.Outside_build_dir.In_source_dir duniverse_marker)
+  in
+  (* Only consider it duniverse if both the marker file exists AND the package dir exists *)
+  let in_duniverse = in_duniverse && marker_exists in
+  if not in_duniverse
+  then Memo.return (false, false)
+  else
+    (* Check if vendor stanza has (sandbox opam) *)
+    let+ vendor_stanza = Source_tree.vendor_stanza duniverse_path in
+    let sandbox_opam =
+      match vendor_stanza with
+      | Some { Vendor_stanza.sandbox = Some Vendor_stanza.Sandbox_mode.Opam; _ } -> true
+      | _ -> false
+    in
+    let is_dune_pkg =
+      match Duniverse.classify lock_pkg with
+      | Duniverse.Duniverse -> true
+      | Duniverse.Opam_sandbox -> false
+    in
+    (* Use opam sandbox if not a dune package OR if vendor stanza says sandbox opam *)
+    in_duniverse, (not is_dune_pkg) || sandbox_opam
 ;;
 
 let setup_package_rules (db : DB.t) ~package_universe ~dir ~pkg_digest
   : Gen_rules.result Memo.t
   =
   (* First check if this package is in duniverse *)
-  let* in_duniverse, is_dune_pkg =
+  let* in_duniverse, should_use_opam_sandbox =
     match Pkg_digest.Map.find db.pkg_digest_table pkg_digest with
     | None -> Memo.return (false, false)
     | Some { DB.Pkg_table.pkg; _ } -> duniverse_status pkg
   in
-  if in_duniverse && is_dune_pkg
-  then
-    (* Duniverse packages are built as normal vendored code, skip .pkg/ rules *)
-    Memo.return @@ Gen_rules.make (Memo.return Rules.empty)
-  else (
-    (* Non-dune package or dune package not yet in duniverse - use opam sandbox.
-       TODO: auto-fetch dune packages to duniverse/ instead. *)
-    let (_ : bool) = is_dune_pkg in
+  if in_duniverse && not should_use_opam_sandbox
+  then (
+    (* Duniverse dune packages are built as vendored code in the main context.
+       We create an empty cookie so dependency resolution succeeds.
+       The actual libraries/binaries are found via normal dune install paths. *)
+    let paths = Paths.make pkg_digest package_universe ~relative:Path.Build.relative in
+    let target_dir = paths.target_dir in
+    let cookie_file = Paths.install_cookie' target_dir in
+    let empty_cookie : Install_cookie.t =
+      { Install_cookie.Gen.files = Section.Map.empty; variables = [] }
+    in
+    let cookie_content =
+      Install_cookie.Persistent.to_string
+        { empty_cookie with files = Section.Map.to_list empty_cookie.files }
+    in
+    let rules =
+      Rules.collect_unit (fun () ->
+        (* Create action that makes target directory and writes cookie *)
+        let action =
+          Action.progn
+            [ Action.mkdir target_dir; Action.write_file cookie_file cookie_content ]
+          |> Action.Full.make
+          |> Action_builder.return
+          |> Action_builder.with_targets
+               ~targets:
+                 (Targets.create
+                    ~files:Path.Build.Set.empty
+                    ~dirs:(Path.Build.Set.singleton target_dir))
+        in
+        rule action)
+    in
+    let directory_targets = Path.Build.Map.singleton target_dir Loc.none in
+    let build_dir_only_sub_dirs =
+      Gen_rules.Build_only_sub_dirs.singleton ~dir Subdir_set.empty
+    in
+    Memo.return @@ Gen_rules.make ~directory_targets ~build_dir_only_sub_dirs rules)
+  else
+    (* Use opam sandbox: either not in duniverse, or has (sandbox opam) vendor stanza *)
     let* pkg = Resolve.resolve db Loc.none pkg_digest package_universe in
     let paths =
       Paths.make pkg.pkg_digest package_universe ~relative:Path.Build.relative
@@ -2537,7 +2611,7 @@ let setup_package_rules (db : DB.t) ~package_universe ~dir ~pkg_digest
     in
     let context_name = Package_universe.context_name package_universe in
     let rules = Rules.collect_unit (fun () -> gen_rules context_name pkg) in
-    Gen_rules.make ~directory_targets ~build_dir_only_sub_dirs rules)
+    Gen_rules.make ~directory_targets ~build_dir_only_sub_dirs rules
 ;;
 
 let setup_rules ~components ~dir ctx =

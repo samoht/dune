@@ -192,3 +192,79 @@ let get_patches (pkg : Lock.Pkg.t) ~platform =
   | Some Lock.Build_command.Dune -> []
   | Some (Lock.Build_command.Action action) -> extract_patches_from_action action
 ;;
+
+(* Extract public_name from a library stanza sexp *)
+let extract_public_name_from_sexp sexp =
+  let open Dune_sexp.Ast in
+  let atom_to_string = function
+    | Atom (_, a) -> Some (Dune_sexp.Atom.to_string a)
+    | Quoted_string (_, s) -> Some s
+    | _ -> None
+  in
+  match sexp with
+  | List (_, Atom (_, lib_atom) :: fields)
+    when String.equal (Dune_sexp.Atom.to_string lib_atom) "library" ->
+    List.find_map fields ~f:(function
+      | List (_, [ Atom (_, pn_atom); name_sexp ])
+        when String.equal (Dune_sexp.Atom.to_string pn_atom) "public_name" ->
+        atom_to_string name_sexp
+      | _ -> None)
+  | _ -> None
+;;
+
+(* Find dune files in a directory and immediate subdirectories only.
+   We don't recurse deeply to avoid picking up test fixtures and examples. *)
+let find_dune_files dir =
+  let path = Path.source dir in
+  if not (Path.exists path)
+  then []
+  else (
+    match Path.readdir_unsorted_with_kinds path with
+    | Error _ -> []
+    | Ok entries ->
+      let dune_file = Path.Source.relative dir "dune" in
+      let current = if Path.exists (Path.source dune_file) then [ dune_file ] else [] in
+      (* Only check immediate subdirectories (src/, lib/, etc.), not deep recursion *)
+      let subdir_dune_files =
+        List.filter_map entries ~f:(fun (name, kind) ->
+          match kind with
+          | Unix.S_DIR when not (String.is_prefix name ~prefix:".") ->
+            let subdir = Path.Source.relative dir name in
+            let subdir_dune = Path.Source.relative subdir "dune" in
+            if Path.exists (Path.source subdir_dune) then Some subdir_dune else None
+          | _ -> None)
+      in
+      current @ subdir_dune_files)
+;;
+
+(* Check if a string is a valid library name (may include dots for sub-libraries) *)
+let is_valid_lib_name s =
+  if String.is_empty s
+  then false
+  else (
+    (* Must start with a letter or underscore *)
+    match s.[0] with
+    | 'A' .. 'Z' | 'a' .. 'z' | '_' ->
+      (* Rest can be alphanumeric, underscore, hyphen, or dot (for sub-libs) *)
+      String.for_all s ~f:(function
+        | 'A' .. 'Z' | 'a' .. 'z' | '0' .. '9' | '_' | '-' | '.' -> true
+        | _ -> false)
+    | _ -> false)
+;;
+
+(* Scan a vendored directory for public library names *)
+let scan_public_libraries dir =
+  let dune_files = find_dune_files dir in
+  List.concat_map dune_files ~f:(fun dune_file ->
+    let path = Path.source dune_file in
+    match Io.read_file path with
+    | exception _ -> []
+    | contents ->
+      (match
+         Dune_sexp.Parser.parse_string ~fname:(Path.to_string path) ~mode:Many contents
+       with
+       | exception _ -> []
+       | sexps ->
+         List.filter_map sexps ~f:extract_public_name_from_sexp
+         |> List.filter ~f:is_valid_lib_name))
+;;

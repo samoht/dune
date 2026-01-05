@@ -30,5 +30,6 @@
   spawn
   dune_file_watcher
   dune_digest
-  dune_metrics)
+  dune_metrics
+  re)
  (synopsis "Internal Dune library, do not use!"))

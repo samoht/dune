@@ -1,5 +1,10 @@
 # Lock File Format Redesign
 
+**Related documents:**
+- [vendoring.md](vendoring.md) - Vendor stanza syntax, selective libraries, sandbox modes
+- [patching.md](patching.md) - Patch workflow for modifying dependencies
+- [pkg-ux-design.md](pkg-ux-design.md) - CLI UX design for `dune pkg` commands
+
 ## Philosophy
 
 Package resolution is a deterministic process with three levels of reproducibility:

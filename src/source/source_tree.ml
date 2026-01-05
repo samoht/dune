@@ -419,6 +419,32 @@ let is_vendored dir =
   | Some d -> Dir.status d = Vendored
 ;;
 
+let vendor_stanza dir =
+  (* Look for a vendor stanza in the parent directory's dune file *)
+  match Path.Source.parent dir with
+  | None -> Memo.return None
+  | Some parent_dir ->
+    find_dir parent_dir
+    >>| (function
+     | None -> None
+     | Some parent ->
+       (match Dir.dune_file parent with
+        | None -> None
+        | Some dune_file ->
+          let subdir_name = Path.Source.basename dir in
+          Filename.Map.find (Dune_file.vendor dune_file) subdir_name))
+;;
+
+let vendor_stanzas dir =
+  find_dir dir
+  >>| function
+  | None -> []
+  | Some d ->
+    (match Dir.dune_file d with
+     | None -> []
+     | Some dune_file -> Filename.Map.to_list (Dune_file.vendor dune_file))
+;;
+
 let ancestor_vcs =
   Memo.lazy_ ~name:"ancestor_vcs" (fun () ->
     if Execution_env.inside_dune

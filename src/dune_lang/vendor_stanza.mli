@@ -7,6 +7,7 @@ open Import
     Syntax:
     {[
       (vendor fmt.0.9.0 (libraries fmt fmt.tty))
+      (vendor make-pkg.1.0.0 (sandbox opam))
     ]}
 
     The directory is relative to the location of the dune file containing
@@ -15,11 +16,22 @@ open Import
     [vendor] stanzas can restrict which libraries are exposed from specific
     subdirectories. *)
 
+module Sandbox_mode : sig
+  type t =
+    | None
+    | Opam
+
+  val decode : t Decoder.t
+  val to_dyn : t -> Dyn.t
+  val to_string : t -> string
+end
+
 type t =
   { loc : Loc.t
   ; directory : Filename.t
   ; libraries : Lib_name.t list option
   ; packages : Package_name.t list option
+  ; sandbox : Sandbox_mode.t option
   }
 
 val decode : t Decoder.t

@@ -84,6 +84,7 @@ The duniverse directory should have the vendored_dirs stanza:
   $ cat duniverse/dune
   ; This directory is managed by dune pkg
   (vendored_dirs *)
+  (vendor make-pkg.1.0.0 (sandbox opam))
 
 Now test that the non-dune package in duniverse can be built:
 

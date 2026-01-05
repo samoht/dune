@@ -4,6 +4,7 @@ without using locked dependencies.
 
   $ make_lockdir
   $ make_lockpkg test <<EOF
+  > (version 0.0.1)
   > (build
   >  (run echo "I have not been ignored."))
   > EOF

@@ -54,7 +54,7 @@ Now we set up a lock file with this package and then attempt to use it:
   $ chmod +x .bin/ocaml-index
   $ export PATH="$PWD/.bin:$PATH"
 
-  $ dune build @ocaml-index
+  $ dune build --auto-fetch=disabled @ocaml-index
   File ".foo.objs/_unknown_", line 1, characters 0-0:
   Command exited with code 1.
   [1]

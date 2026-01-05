@@ -38,7 +38,7 @@ Make dune.lock files with known program "dune".
 
 Build the project, when it fails building 'foo' package, it shows the depexts
 error message.
-  $ dune build
+  $ dune build --auto-fetch=disabled
   File "dune.lock/foo.pkg", line 3, characters 6-10:
   3 |  (run dune build))
             ^^^^
@@ -65,7 +65,7 @@ Make dune.lock files with unknown program and unknown package.
 
 Running the same build. It is supposed to show the depexts message at the end,
 when the program is not found.
-  $ dune build
+  $ dune build --auto-fetch=disabled
   File "dune.lock/foo.pkg", line 3, characters 6-21:
   3 |  (run unknown-program))
             ^^^^^^^^^^^^^^^

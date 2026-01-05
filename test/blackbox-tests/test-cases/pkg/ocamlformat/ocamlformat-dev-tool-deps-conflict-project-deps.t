@@ -93,7 +93,7 @@ It shows that the project uses printer.2.0
 
 Format foo.ml, "dune fmt" uses printer.1.0 instead. There is no conflict with different
 versions of the same dependency.
-  $ DUNE_CONFIG__LOCK_DEV_TOOL=enabled dune fmt --preview
+  $ DUNE_CONFIG__LOCK_DEV_TOOL=enabled DUNE_CONFIG__AUTO_FETCH=disabled dune fmt --preview
   Solution for _build/.dev-tools.locks/ocamlformat (2 packages)
   dune:
   - ocamlformat.0.26.2
@@ -122,7 +122,7 @@ Relock the project.
   (no dependencies to lock)
 
 There is no leak here. It is not taking the "printer" lib from dev-tools.
-  $ dune exec -- foo
+  $ DUNE_CONFIG__AUTO_FETCH=disabled dune exec -- foo
   File "dune", line 3, characters 12-19:
   3 |  (libraries printer))
                   ^^^^^^^

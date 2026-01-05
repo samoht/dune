@@ -270,3 +270,12 @@ Allow override via `(compiler-independent true)` in dune-project.
 4. **Binary distribution:** Could this integrate with a binary package repository
    to download pre-built tools instead of building from source?
 
+## TODO: UX Improvements
+
+1. **Transparent tool installation:** When `dune fmt` or `dune ocaml doc` is
+   invoked and the required tool (ocamlformat, odoc) is missing, dune currently
+   shows a confusing error message. Instead, dune should transparently install
+   the tool using the tools infrastructure before running the command. This
+   would provide a much better user experience, similar to how `npx`
+   automatically fetches packages on demand.
+

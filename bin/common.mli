@@ -70,6 +70,7 @@ val command_synopsis : string list -> Cmdliner.Manpage.block list
 
 val help_secs : Cmdliner.Manpage.block list
 val footer : Cmdliner.Manpage.block
+val auto_fetch_env : string
 val envs : Cmdliner.Cmd.Env.info list
 val debug_backtraces : bool Cmdliner.Term.t
 val config_from_config_file : Dune_config.Partial.t Cmdliner.Term.t
