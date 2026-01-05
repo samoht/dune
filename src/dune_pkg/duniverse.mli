@@ -28,6 +28,28 @@ val duniverse_dir : Path.Source.t
     should be placed in the duniverse directory. *)
 val package_dir : Package_name.t -> Package_version.t -> Path.Source.t
 
+(** A group of packages that share the same source. Multiple packages from
+    the same repository (e.g., uri and uri-sexp from ocaml-uri) are grouped
+    together to avoid duplicate fetching. *)
+type source_group =
+  { packages : (Package_name.t * Package_version.t) list
+  ; source : Source.t
+  ; primary_name : Package_name.t
+  ; primary_version : Package_version.t
+  }
+
+(** [group_by_source pkgs] groups packages by their source URL and checksum.
+    Packages with the same source are grouped together, allowing them to be
+    fetched once and placed in a shared directory. *)
+val group_by_source : Lock.Pkg.t list -> source_group list
+
+(** [source_group_dir group] returns the directory path for a source group.
+    Uses the primary (first alphabetically) package name. *)
+val source_group_dir : source_group -> Path.Source.t
+
+(** [source_group_packages group] returns all packages in a source group. *)
+val source_group_packages : source_group -> (Package_name.t * Package_version.t) list
+
 (** [classify pkg] determines whether a package should go to duniverse or
     opam sandbox based on whether it uses dune as its build system. *)
 val classify : Lock.Pkg.t -> package_target

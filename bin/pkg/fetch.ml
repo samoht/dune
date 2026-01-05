@@ -196,69 +196,77 @@ let start_fetch ~name ~version =
   pkg_str
 ;;
 
-let fetch_package ~rev_store ~platform ~patches_dir pkg =
+(* Fetch a source group - packages sharing the same source are fetched once *)
+let fetch_source_group ~rev_store ~platform ~patches_dir ~pkgs_by_name group =
   let open Fiber.O in
-  let { Lock_dir.Pkg_info.name; version; source; extra_sources; _ } =
-    pkg.Lock_dir.Pkg.info
-  in
-  match source with
-  | None -> Fiber.return false
-  | Some source ->
-    let target = Duniverse.package_dir name version |> Path.source in
-    let target_path = Path.to_string target in
-    if Path.exists target
-    then (
-      Dune_engine.Progress.incr_cached ();
-      Fiber.return false)
-    else (
-      let pkg_str = start_fetch ~name ~version in
-      let* result = do_fetch ~rev_store ~source ~target:target_path in
-      let* () = handle_fetch_error ~name ~version result in
-      let* () =
-        Fiber.sequential_iter extra_sources ~f:(fun extra ->
-          let local_path, _ = extra in
-          verbose (sprintf "  extra-source: %s" (Path.Local.to_string local_path));
-          let* result = fetch_extra_source ~rev_store ~target_dir:target extra in
-          match result with
-          | Ok () -> Fiber.return ()
-          | Error (Dune_pkg.Fetch.Unavailable msg) ->
-            let msg_str =
-              match msg with
-              | Some m -> User_message.to_string m
-              | None -> "unavailable"
-            in
-            User_error.raise
-              [ Pp.textf
-                  "Failed to fetch extra source %s: %s"
-                  (Path.Local.to_string local_path)
-                  msg_str
-              ]
-          | Error (Dune_pkg.Fetch.Checksum_mismatch actual) ->
-            User_error.raise
-              [ Pp.textf
-                  "Checksum mismatch for extra source %s (got %s)"
-                  (Path.Local.to_string local_path)
-                  (Dune_pkg.Checksum.to_string actual)
-              ])
-      in
-      let patches = Duniverse.get_patches pkg ~platform in
-      let* () =
-        Fiber.sequential_iter patches ~f:(fun patch_sw ->
-          match Dune_lang.String_with_vars.text_only patch_sw with
-          | None ->
-            User_error.raise
-              [ Pp.text "Patch file path contains variables, which is not supported" ]
-          | Some patch_file ->
-            verbose (sprintf "  patch: %s" patch_file);
-            let patch_local = Path.Local.of_string patch_file in
-            apply_patch ~target_dir:target ~patch_file:patch_local)
-      in
-      let user_patch = user_patch_path ~patches_dir name version in
-      let+ () =
-        apply_user_patch ~verbose ~target_dir:target ~patch_source_path:user_patch
-      in
-      Dune_engine.Progress.finish_target ~name:pkg_str;
-      true)
+  let { Duniverse.packages; source; primary_name; primary_version } = group in
+  let target = Duniverse.source_group_dir group |> Path.source in
+  let target_path = Path.to_string target in
+  if Path.exists target
+  then (
+    (* Already fetched - count all packages as cached *)
+    List.iter packages ~f:(fun _ -> Dune_engine.Progress.incr_cached ());
+    Fiber.return false)
+  else (
+    let pkg_str = start_fetch ~name:primary_name ~version:primary_version in
+    let* result = do_fetch ~rev_store ~source ~target:target_path in
+    let* () = handle_fetch_error ~name:primary_name ~version:primary_version result in
+    (* Apply extra sources and patches for all packages in the group *)
+    let* () =
+      Fiber.sequential_iter packages ~f:(fun (name, _version) ->
+        match Package_name.Map.find pkgs_by_name name with
+        | None -> Fiber.return ()
+        | Some pkg ->
+          let { Lock_dir.Pkg_info.extra_sources; _ } = pkg.Lock_dir.Pkg.info in
+          Fiber.sequential_iter extra_sources ~f:(fun extra ->
+            let local_path, _ = extra in
+            verbose (sprintf "  extra-source: %s" (Path.Local.to_string local_path));
+            let* result = fetch_extra_source ~rev_store ~target_dir:target extra in
+            match result with
+            | Ok () -> Fiber.return ()
+            | Error (Dune_pkg.Fetch.Unavailable msg) ->
+              let msg_str =
+                match msg with
+                | Some m -> User_message.to_string m
+                | None -> "unavailable"
+              in
+              User_error.raise
+                [ Pp.textf
+                    "Failed to fetch extra source %s: %s"
+                    (Path.Local.to_string local_path)
+                    msg_str
+                ]
+            | Error (Dune_pkg.Fetch.Checksum_mismatch actual) ->
+              User_error.raise
+                [ Pp.textf
+                    "Checksum mismatch for extra source %s (got %s)"
+                    (Path.Local.to_string local_path)
+                    (Dune_pkg.Checksum.to_string actual)
+                ]))
+    in
+    (* Apply patches for all packages in the group *)
+    let* () =
+      Fiber.sequential_iter packages ~f:(fun (name, version) ->
+        match Package_name.Map.find pkgs_by_name name with
+        | None -> Fiber.return ()
+        | Some pkg ->
+          let patches = Duniverse.get_patches pkg ~platform in
+          let* () =
+            Fiber.sequential_iter patches ~f:(fun patch_sw ->
+              match Dune_lang.String_with_vars.text_only patch_sw with
+              | None ->
+                User_error.raise
+                  [ Pp.text "Patch file path contains variables, which is not supported" ]
+              | Some patch_file ->
+                verbose (sprintf "  patch: %s" patch_file);
+                let patch_local = Path.Local.of_string patch_file in
+                apply_patch ~target_dir:target ~patch_file:patch_local)
+          in
+          let user_patch = user_patch_path ~patches_dir name version in
+          apply_user_patch ~verbose ~target_dir:target ~patch_source_path:user_patch)
+    in
+    Dune_engine.Progress.finish_target ~name:pkg_str;
+    Fiber.return true)
 ;;
 
 let fetch_duniverse ~lock_dir_path ~solver_env () =
@@ -279,14 +287,21 @@ let fetch_duniverse ~lock_dir_path ~solver_env () =
     in
     if not (Path.exists marker_path)
     then Io.write_file marker_path "# This directory is managed by dune pkg\n";
+    (* Group packages by source to avoid duplicate fetches *)
+    let source_groups = Duniverse.group_by_source fetchable_pkgs in
+    (* Build map for looking up packages by name *)
+    let pkgs_by_name =
+      List.fold_left fetchable_pkgs ~init:Package_name.Map.empty ~f:(fun acc pkg ->
+        Package_name.Map.add_exn acc pkg.Lock_dir.Pkg.info.name pkg)
+    in
     Dune_engine.Progress.reset ();
-    Dune_engine.Progress.set_total (List.length fetchable_pkgs);
+    Dune_engine.Progress.set_total (List.length source_groups);
     let* rev_store = Rev_store.get in
     let* platform = Pkg_common.poll_solver_env_from_current_system () in
     let patches_dir = default_patches_dir in
     let+ _ =
-      Fiber.parallel_map fetchable_pkgs ~f:(fun pkg ->
-        fetch_package ~rev_store ~platform ~patches_dir pkg)
+      Fiber.parallel_map source_groups ~f:(fun group ->
+        fetch_source_group ~rev_store ~platform ~patches_dir ~pkgs_by_name group)
     in
     ())
 ;;
@@ -296,23 +311,24 @@ let auto_fetch_missing ~lock_dir_path ~solver_env () =
   let lock_path = Path.source lock_dir_path in
   let* lock_dir = Lock_pkg.read_disk_fiber ~solver_env lock_path in
   let all_pkgs = Lock_dir.Packages.to_pkg_list lock_dir.packages in
-  let missing_dune_pkgs =
+  (* Filter to dune packages with sources *)
+  let dune_pkgs =
     List.filter all_pkgs ~f:(fun (pkg : Lock_dir.Pkg.t) ->
       match pkg.info.source with
       | None -> false
       | Some _ ->
-        let is_dune =
-          match Duniverse.classify pkg with
-          | Duniverse.Duniverse -> true
-          | Duniverse.Opam_sandbox -> false
-        in
-        if not is_dune
-        then false
-        else (
-          let target = Duniverse.package_dir pkg.info.name pkg.info.version in
-          not (Path.exists (Path.source target))))
+        (match Duniverse.classify pkg with
+         | Duniverse.Duniverse -> true
+         | Duniverse.Opam_sandbox -> false))
   in
-  if List.is_empty missing_dune_pkgs
+  (* Group by source and filter to groups whose directory is missing *)
+  let source_groups = Duniverse.group_by_source dune_pkgs in
+  let missing_groups =
+    List.filter source_groups ~f:(fun group ->
+      let target = Duniverse.source_group_dir group in
+      not (Path.exists (Path.source target)))
+  in
+  if List.is_empty missing_groups
   then Fiber.return ()
   else (
     let duniverse_path = Path.source Duniverse.duniverse_dir in
@@ -322,14 +338,19 @@ let auto_fetch_missing ~lock_dir_path ~solver_env () =
     in
     if not (Path.exists marker_path)
     then Io.write_file marker_path "# This directory is managed by dune pkg\n";
+    (* Build map for looking up packages by name *)
+    let pkgs_by_name =
+      List.fold_left dune_pkgs ~init:Package_name.Map.empty ~f:(fun acc pkg ->
+        Package_name.Map.add_exn acc pkg.Lock_dir.Pkg.info.name pkg)
+    in
     Dune_engine.Progress.reset ();
-    Dune_engine.Progress.set_total (List.length missing_dune_pkgs);
+    Dune_engine.Progress.set_total (List.length missing_groups);
     let* rev_store = Rev_store.get in
     let* platform = Pkg_common.poll_solver_env_from_current_system () in
     let patches_dir = default_patches_dir in
     let+ _ =
-      Fiber.parallel_map missing_dune_pkgs ~f:(fun pkg ->
-        fetch_package ~rev_store ~platform ~patches_dir pkg)
+      Fiber.parallel_map missing_groups ~f:(fun group ->
+        fetch_source_group ~rev_store ~platform ~patches_dir ~pkgs_by_name group)
     in
     ())
 ;;
