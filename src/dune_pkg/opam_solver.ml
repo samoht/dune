@@ -1502,7 +1502,7 @@ module Solver = struct
     | None -> Error req
   ;;
 
-  let pp_rolemap reasons =
+  let pp_rolemap ~verbose reasons =
     let good, bad, unknown =
       Input.Role.Map.to_list reasons
       |> List.partition_three ~f:(fun (role, component) ->
@@ -1513,11 +1513,26 @@ module Solver = struct
            | _, `No_candidates -> `Right role
            | _, _ -> `Middle component))
     in
+    (* Filter out VirtualImpl from selected candidates - they're internal solver
+       constructs that confuse users *)
+    let real_impls =
+      List.filter good ~f:(function
+        | Input.RealImpl _ -> true
+        | Input.VirtualImpl _ | Input.Reject _ | Input.Dummy -> false)
+    in
     let pp_unknown role = Pp.box (Input.Role.pp role) in
     match unknown with
     | [] ->
+      (* Truncate to 10 packages unless verbose *)
+      let max_shown = if verbose then max_int else 10 in
+      let shown, hidden_count =
+        match List.truncate ~max_length:max_shown real_impls with
+        | `Not_truncated shown -> shown, 0
+        | `Truncated shown -> shown, List.length real_impls - max_shown
+      in
       Pp.paragraph "Selected candidates: "
-      ++ Pp.hovbox (Pp.concat_map ~sep:Pp.space good ~f:Input.pp_impl)
+      ++ Pp.hovbox (Pp.concat_map ~sep:Pp.space shown ~f:Input.pp_impl)
+      ++ (if hidden_count > 0 then Pp.textf " ... and %d more" hidden_count else Pp.nop)
       ++ Pp.cut
       ++ Pp.enumerate bad ~f:Diagnostics.Component.pp
     | _ ->
@@ -1534,11 +1549,11 @@ module Solver = struct
     >>= Diagnostics.of_result context
   ;;
 
-  let diagnostics ?verbose:_ context req =
+  let diagnostics ?(verbose = false) context req =
     let+ diag = diagnostics_rolemap context req in
     Pp.paragraph "Couldn't solve the package dependency formula."
     ++ Pp.cut
-    ++ Pp.vbox (pp_rolemap diag)
+    ++ Pp.vbox (pp_rolemap ~verbose diag)
   ;;
 
   let packages_of_result sels =

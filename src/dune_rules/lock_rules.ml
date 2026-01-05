@@ -208,7 +208,10 @@ module Spec = struct
     in
     match solver_result with
     | Error (`Manifest_error diagnostic) -> raise (User_error.E diagnostic)
-    | Error (`Solve_error diagnostic) -> User_error.raise [ diagnostic ]
+    | Error (`Solve_error diagnostic) ->
+      (* Provide a proper location pointing to the lock directory target *)
+      let loc = Loc.in_file (Path.build target) in
+      User_error.raise ~loc [ diagnostic ]
     | Ok { pinned_packages; files; lock_dir; _ } ->
       let lock_dir_path = Path.build target in
       let+ lock_dir = Dune_pkg.Lock.compute_missing_checksums ~pinned_packages lock_dir in
