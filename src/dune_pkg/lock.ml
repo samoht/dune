@@ -1558,6 +1558,56 @@ module File = struct
     ;;
   end
 
+  (* Pin entry: package name with version and URL.
+     Format: (container-image.dev (url git+https://...)) *)
+  module Pin_entry = struct
+    type t =
+      { name : Package_name.t
+      ; version : Package_version.t
+      ; url : string
+      }
+
+    let encode { name; version; url } =
+      let open Encoder in
+      let name_str = Package_name.to_string name in
+      let version_str = Package_version.to_string version in
+      let pkg_str = name_str ^ "." ^ version_str in
+      list sexp [ string pkg_str; list sexp [ string "url"; string url ] ]
+    ;;
+
+    let decode =
+      let open Decoder in
+      (* Format: (container-image.dev (url git+https://...)) *)
+      enter
+        (let+ pkg_str = string
+         and+ url =
+           enter
+             (let* _ = keyword "url" in
+              string)
+         in
+         let opam_pkg = OpamPackage.of_string pkg_str in
+         let name = Package_name.of_opam_package_name (OpamPackage.name opam_pkg) in
+         let version =
+           Package_version.of_opam_package_version (OpamPackage.version opam_pkg)
+         in
+         { name; version; url })
+    ;;
+
+    let to_dyn { name; version; url } =
+      Dyn.record
+        [ "name", Package_name.to_dyn name
+        ; "version", Package_version.to_dyn version
+        ; "url", Dyn.string url
+        ]
+    ;;
+
+    let equal a b =
+      Package_name.equal a.name b.name
+      && Package_version.equal a.version b.version
+      && String.equal a.url b.url
+    ;;
+  end
+
   (* Simple single-file format: repos + package versions.
      Full package info is derived from opam repos.
 
@@ -1567,19 +1617,23 @@ module File = struct
        (packages
         foo.0.9.0
         (bar.1.0.0 (platforms linux))
-        (baz.2.0.0 (platforms (:standard \ macos)))) *)
+        (baz.2.0.0 (platforms (:standard \ macos))))
+       (pins
+        (container-image.dev (url git+https://...))) *)
   type t =
     { repos : Repo.t list
     ; packages : Package_entry.t list
     ; patches : Patch_entry.t list
+    ; pins : Pin_entry.t list
     ; platforms : Platform.t list (* defines :standard; empty = all platforms *)
     }
 
-  let to_dyn { repos; packages; patches; platforms } =
+  let to_dyn { repos; packages; patches; pins; platforms } =
     Dyn.record
       [ "repos", Dyn.list Repo.to_dyn repos
       ; "packages", Dyn.list Package_entry.to_dyn packages
       ; "patches", Dyn.list Patch_entry.to_dyn patches
+      ; "pins", Dyn.list Pin_entry.to_dyn pins
       ; "platforms", Dyn.list Platform.to_dyn platforms
       ]
   ;;
@@ -1588,12 +1642,13 @@ module File = struct
     List.equal Repo.equal a.repos b.repos
     && List.equal Package_entry.equal a.packages b.packages
     && List.equal Patch_entry.equal a.patches b.patches
+    && List.equal Pin_entry.equal a.pins b.pins
     && List.equal Platform.equal a.platforms b.platforms
   ;;
 
   let is_portable t = not (List.is_empty t.platforms)
 
-  let encode { repos; packages; patches; platforms } =
+  let encode { repos; packages; patches; pins; platforms } =
     let open Encoder in
     let repos_sexp = list sexp (string "repos" :: List.map repos ~f:Repo.encode) in
     let packages_sexp =
@@ -1604,12 +1659,17 @@ module File = struct
       then []
       else [ list sexp (string "patches" :: List.map patches ~f:Patch_entry.encode) ]
     in
+    let pins_sexp =
+      if List.is_empty pins
+      then []
+      else [ list sexp (string "pins" :: List.map pins ~f:Pin_entry.encode) ]
+    in
     let platforms_sexp =
       if List.is_empty platforms
       then []
       else [ list sexp (string "platforms" :: List.map platforms ~f:Platform.encode) ]
     in
-    [ repos_sexp; packages_sexp ] @ patches_sexp @ platforms_sexp
+    [ repos_sexp; packages_sexp ] @ patches_sexp @ pins_sexp @ platforms_sexp
   ;;
 
   let decode =
@@ -1618,8 +1678,9 @@ module File = struct
       (let+ repos = field "repos" ~default:[] (repeat Repo.decode)
        and+ packages = field "packages" ~default:[] (repeat Package_entry.decode)
        and+ patches = field "patches" ~default:[] (repeat Patch_entry.decode)
+       and+ pins = field "pins" ~default:[] (repeat Pin_entry.decode)
        and+ platforms = field "platforms" ~default:[] (repeat Platform.decode) in
-       { repos; packages; patches; platforms })
+       { repos; packages; patches; pins; platforms })
   ;;
 
   (* Find the first repo that contains the package *)
@@ -1634,7 +1695,7 @@ module File = struct
        | None -> find_in_repos rest ~name ~version)
   ;;
 
-  let derive ~loc { repos; packages; patches = _; platforms = _ } =
+  let derive ~loc { repos; packages; _ } =
     (* Load repos at pinned commits and look up each package *)
     let open Fiber.O in
     let* opam_repos =
@@ -1682,6 +1743,20 @@ module File = struct
         ; platforms = None
         })
     in
+    (* Extract pins from dev packages with sources *)
+    let pins =
+      Packages.to_pkg_list lck.packages
+      |> List.filter_map ~f:(fun (pkg : Pkg.t) ->
+        if pkg.info.dev
+        then
+          Option.map pkg.info.source ~f:(fun source ->
+            let _loc, url = source.url in
+            { Pin_entry.name = pkg.info.name
+            ; version = pkg.info.version
+            ; url = OpamUrl.to_string url
+            })
+        else None)
+    in
     let _loc, solved_for_platforms = lck.solved_for_platforms in
     (* Group solver envs by OS, collecting archs for each OS *)
     let platforms =
@@ -1711,7 +1786,7 @@ module File = struct
         { Platform.os; archs })
       |> List.sort ~compare:(fun a b -> String.compare a.Platform.os b.Platform.os)
     in
-    { repos; packages; patches = []; platforms }
+    { repos; packages; patches = []; pins; platforms }
   ;;
 
   let write_to_disk ~lock_file_path file =
@@ -1733,6 +1808,25 @@ module File = struct
     let pp = Dune_lang.Format.pp_top_sexps ~version:(3, 11) cst in
     let contents = Format.asprintf "%a" Pp.to_fmt pp in
     Io.write_file lock_file_path contents
+  ;;
+
+  let safely_remove_existing ~lock_file_path =
+    match Path.stat lock_file_path with
+    | Error (Unix.ENOENT, _, _) -> () (* doesn't exist *)
+    | Ok { st_kind = S_DIR; _ } ->
+      (* Check if it's a valid lock directory *)
+      let metadata_path = Path.relative lock_file_path metadata_filename in
+      (match Metadata.load metadata_path ~f:(Fun.const decode_metadata) with
+       | Ok _ -> Path.rm_rf lock_file_path
+       | Error _ -> ())
+      (* Not a valid lock dir, don't remove *)
+    | Ok { st_kind = S_REG; _ } ->
+      (* Check if it's a valid single-file lock *)
+      (match Metadata.load lock_file_path ~f:(Fun.const decode) with
+       | Ok _ -> Path.rm_rf lock_file_path
+       | Error _ -> ())
+      (* Not a valid lock file, don't remove *)
+    | _ -> () (* Other file types, don't touch *)
   ;;
 end
 
@@ -1782,11 +1876,11 @@ let detect_format path =
 ;;
 
 module Write_disk = struct
-  (* Checks whether path refers to a valid lock directory and returns a value
-     indicating the status of the lock directory. [Ok _] values indicate that
-     it's safe to proceed with regenerating the lock directory. [Error _]
-     values indicate that it's unsafe to remove the existing directory and lock
-     directory regeneration should not proceed. *)
+  (* Checks whether path refers to a valid lock directory or single-file lock
+     and returns a value indicating the status. [Ok _] values indicate that
+     it's safe to proceed with regenerating the lock. [Error _] values indicate
+     that it's unsafe to remove the existing lock and regeneration should not
+     proceed. *)
   let check_existing_lock_dir path =
     match Path.stat path with
     | Ok { st_kind = S_DIR; _ } ->
@@ -1797,6 +1891,11 @@ module Write_disk = struct
           | Ok _unused -> Ok `Is_existing_lock_dir
           | Error exn -> Error (`Failed_to_parse_metadata (metadata_path, exn)))
        | _ -> Error `No_metadata_file)
+    | Ok { st_kind = S_REG; _ } ->
+      (* Single-file lock format - check if it's a valid package file *)
+      (match Metadata.load path ~f:(Fun.const File.decode) with
+       | Ok _unused -> Ok `Is_existing_lock_dir
+       | Error exn -> Error (`Failed_to_parse_metadata (path, exn)))
     | Error (Unix.ENOENT, _, _) -> Ok `Non_existant
     | Error _ -> Error `Unreadable
     | Ok _ -> Error `Not_directory

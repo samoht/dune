@@ -14,7 +14,7 @@ module Lock_format = struct
     | Single_file
 
   let term =
-    let all = [ "directory", Directory; "single-file", Single_file ] in
+    let all = [ "directory", Directory; "file", Single_file ] in
     Arg.(
       value
       & opt (some (enum all)) None
@@ -22,9 +22,9 @@ module Lock_format = struct
           [ "format" ]
           ~doc:
             (Some
-               "Lock file format. $(b,directory) creates a dune.lock/ directory with \
-                per-package .pkg files (default). $(b,single-file) creates a single \
-                dune.lock file with repo hashes and package versions."))
+               "Lock file format. $(b,file) creates a single dune.lock file with repo \
+                hashes and package versions (default). $(b,directory) creates a \
+                dune.lock/ directory with per-package .pkg files."))
   ;;
 end
 
@@ -622,6 +622,8 @@ let solve
     List.iter lock_dirs_with_summaries ~f:(fun (lock_dir_path, lock_dir, files) ->
       match format with
       | Lock_format.Single_file ->
+        (* Safely remove existing lock (file or directory) before writing *)
+        Lock_dir.File.safely_remove_existing ~lock_file_path:lock_dir_path;
         let file = Lock_dir.File.of_lock lock_dir in
         Lock_dir.File.write_to_disk ~lock_file_path:lock_dir_path file
       | Lock_format.Directory ->
@@ -718,7 +720,7 @@ let term =
     let format =
       match format with
       | Some f -> f
-      | None -> Lock_format.Directory
+      | None -> Lock_format.Single_file
     in
     (* Convert parsed platforms to solver_envs *)
     let platforms_override =

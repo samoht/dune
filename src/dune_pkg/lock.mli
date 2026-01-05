@@ -201,6 +201,20 @@ module File : sig
     val equal : t -> t -> bool
   end
 
+  (** Pin entry: package with version and source URL *)
+  module Pin_entry : sig
+    type t =
+      { name : Package_name.t
+      ; version : Package_version.t
+      ; url : string
+      }
+
+    val encode : t -> Dune_lang.t
+    val decode : t Decoder.t
+    val to_dyn : t -> Dyn.t
+    val equal : t -> t -> bool
+  end
+
   (** Platform specification with OS and optional architectures *)
   module Platform : sig
     type t =
@@ -221,6 +235,7 @@ module File : sig
     { repos : Repo.t list
     ; packages : Package_entry.t list
     ; patches : Patch_entry.t list
+    ; pins : Pin_entry.t list
     ; platforms : Platform.t list
       (** Defines :standard for per-package constraints. Empty = all platforms *)
     }
@@ -260,6 +275,11 @@ module File : sig
   (** [write_to_disk ~lock_file_path file] writes the single-file lock format
       to the specified path. *)
   val write_to_disk : lock_file_path:Path.t -> t -> unit
+
+  (** [safely_remove_existing ~lock_file_path] removes the existing lock
+      at the given path if it's a valid lock (file or directory format).
+      Does nothing if the path doesn't exist or is not a valid lock. *)
+  val safely_remove_existing : lock_file_path:Path.t -> unit
 end
 
 (** Format of the lock on disk *)
