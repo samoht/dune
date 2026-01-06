@@ -195,6 +195,175 @@ val load_package_at_hash
 - Deprecation warning for directory format
 - Eventually remove directory format support
 
+## Virtual Packages
+
+Some opam packages have no source - they exist only to:
+- Check for system dependencies (`conf-*` packages)
+- **Set opam variables** that other packages depend on
+- Bundle other packages (meta-packages)
+
+### Why Virtual Packages Matter
+
+Virtual packages are **necessary** to resolve opam variables properly. Many packages
+use `%{pkg:installed}%` guards or depend on variables set by virtual packages:
+
+```
+# Example: conditional dependency on base-unix
+depends: [ "base-unix" {os != "win32"} ]
+build: [ ... ] { %{base-unix:installed}% }
+```
+
+Without `base-unix` in the lock, `%{base-unix:installed}%` cannot be resolved.
+
+### Examples
+
+```
+conf-gmp.4        # sets conf-gmp:lib, conf-gmp:installed
+conf-pkg-config.3 # sets conf-pkg-config:installed
+conf-libffi.2.0   # sets libffi paths for ctypes
+base-unix.base    # sets base-unix:installed (stdlib component)
+base-threads.base # sets base-threads:installed
+```
+
+### Representation in Lock File
+
+Virtual packages are listed like regular packages:
+
+```lisp
+(packages
+ fmt.0.9.0
+ zarith.1.14
+ conf-gmp.4           ; virtual - required for zarith's %{conf-gmp:lib}%
+ conf-pkg-config.3)   ; virtual - required for pkg-config detection
+```
+
+### Build Behavior
+
+During `dune pkg fetch` / build:
+
+1. **Has source URL** → fetch to duniverse, build normally
+2. **No source URL** → skip fetch, run build commands to set variables
+
+Virtual packages may have:
+- `depexts` field → system package requirements
+- `build` commands → detect paths, set variables
+- `setenv` / exported variables → consumed by dependent packages
+- No `install` → nothing to install
+
+### Depexts Integration
+
+For `conf-*` packages, dune should:
+
+1. Parse `depexts` from opam file
+2. Check if system package is installed
+3. Suggest installation command if missing
+
+```bash
+$ dune build
+Error: System dependency missing: libgmp-dev
+Hint: apt install libgmp-dev
+```
+
+See `dune show depexts` for listing all system dependencies.
+
+### Special Cases
+
+| Package Type | Source | Build | Notes |
+|--------------|--------|-------|-------|
+| Regular | Yes | Yes | Normal package |
+| Virtual/conf | No | Maybe | System dep check |
+| Meta-package | No | No | Just deps |
+| Compiler | Special | Special | Uses toolchain cache |
+
+## Post Dependencies
+
+### Semantics
+
+Post dependencies (`{post}` in opam) are installed *with* a package but not
+required to *build* it. They break apparent cycles:
+
+```
+A depends on B (regular)
+B post-depends on A
+```
+
+This is **not** a cycle:
+1. Build B first (post dep on A doesn't block B's build)
+2. Build A (needs B, which exists)
+3. Both installed together
+
+### Current Implementation Gaps
+
+**Gap 1: Post deps discarded**
+
+Dune currently **discards** post deps rather than handling them properly:
+
+```ocaml
+(* opam_solver.ml *)
+| Ok { regular; post = _ (* discard post deps *) } ->
+
+(* lock_pkg.ml *)
+(* CR-someday rgrinberg: think about post deps *)
+```
+
+This causes dune to reject valid dependency graphs as "cycles" when post deps
+would break the cycle in opam.
+
+**Note: `:installed` variable resolution**
+
+opam checks if package is **actually installed** at runtime:
+```ocaml
+(* OpamPackageVar.ml *)
+| "installed", Some _ ->
+  Some (bool (OpamPackage.has_name st.installed name))
+```
+
+dune checks if package is **in the lock file**:
+```ocaml
+(* pkg_rules.ml *)
+| "installed" ->
+  let in_lock = Package.Name.Map.mem all_versions package_name in
+  ...
+```
+
+**Simple rule:** Error if a post dependency's `:installed` is referenced.
+
+If B post-depends on A, and B's build checks `%{A:installed}%`, dune should
+fail with an error. This is unusual and likely a mistake - if you post-depend
+on A, you don't need A at build time, so why check `:installed`?
+
+This avoids the semantic mismatch (opam returns `false`, dune would return `true`)
+by rejecting the problematic pattern entirely.
+
+### Variable Resolution
+
+For `B post-depends on A`:
+
+| When | `%{A:installed}%` | `%{B:installed}%` |
+|------|-------------------|-------------------|
+| Building B | `false` | N/A |
+| Building A | `true` | `true` |
+| After both | `true` | `true` |
+
+Post deps are **not installed** when the depending package builds, so
+`:installed` must be `false` for them during that build.
+
+**Note:** This semantics is confusing but dune must follow opam exactly for compatibility.
+
+### Required Fix
+
+Post deps should:
+1. Be included in the lock file / solution
+2. **Not** be required for build order (don't block the package's build)
+3. Have `:installed` = `false` when building the post-depending package
+4. Follow opam semantics exactly
+
+Build order for `B post-depends on A`:
+```
+B builds first (%{A:installed}% = false)
+A builds second (%{B:installed}% = true)
+```
+
 ## Platforms
 
 For portable lock dirs (multi-platform), the version list may differ per platform:
