@@ -73,11 +73,11 @@ Console.finish ~name:"main.exe"
 | Mode     | start/finish                              | log            | message        |
 |----------|-------------------------------------------|----------------|----------------|
 | Quiet    | ignored                                   | ignored        | errors only    |
-| Progress | status line: `[3/42] Fetching: a, b`      | ignored        | print + clear  |
-| Short    | one line: `[3/42] Building mylib`         | ignored        | print          |
+| Progress | status line: `[03/42] Fetching: a, b`     | ignored        | print + clear  |
+| Short    | one line: `[03/42] Building mylib`        | ignored        | print          |
 | Verbose  | one line: `[mylib] Building`              | `[mylib] cmd`  | print          |
 
-Note: `[N/M]` counter at start avoids left/right flickering as target list changes.
+Note: `[NN/MM]` counter is zero-padded to avoid flickering (e.g., `[09/12]` → `[10/12]`).
 
 Counter `[done/total]` is coarse-grained: libs + pkgs + exes (not individual rules/commands).
 
@@ -98,10 +98,11 @@ graph.
 
 Format:
 ```
-[3/15] Building: dune-engine, cmdliner, main
+[03/15] Building: dune-engine, cmdliner, main
 ```
 
-- `[3/15]` at start = 3 completed out of 15 total (avoids left/right flickering)
+- `[03/15]` at start = 3 completed out of 15 total
+- Zero-padded to avoid flickering (`[09/15]` → `[10/15]` same width)
 - Comma-separated target names (libraries, packages, executables)
 
 The count is at library/package granularity, not rules. This is stable (known
@@ -109,25 +110,25 @@ upfront) unlike dynamic rule counts, and matches how users think about builds.
 
 When network I/O is blocking (fetching sources), show it:
 ```
-[3/15] Fetching: ocaml-base-compiler | Building: dune-engine
+[03/15] Fetching: ocaml-base-compiler | Building: dune-engine
 ```
 
 ### Truncation Behavior
 
 When terminal width is insufficient:
 
-1. Keep `[N/M]` prefix fixed
+1. Keep `[NN/MM]` prefix fixed width
 2. Add targets left-to-right until width exceeded
 3. If truncated, append `, +N more`
 
 Example at 60 columns:
 ```
-[3/15] Building: dune-engine, dune-rules, +6 more
+[03/15] Building: dune-engine, dune-rules, +6 more
 ```
 
 If even one target doesn't fit:
 ```
-[3/15] Building: +8 targets
+[03/15] Building: +8 targets
 ```
 
 ### Summary at End
