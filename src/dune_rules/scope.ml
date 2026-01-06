@@ -1,6 +1,8 @@
 open Import
 open Memo.O
 
+module Vendor_stanza = Dune_lang.Vendor_stanza
+
 type t =
   { project : Dune_project.t
   ; db : Lib.DB.t
@@ -70,7 +72,7 @@ module DB = struct
 
   module Library_related_stanza = struct
     type t =
-      | Library of Library.t
+      | Library of Library.t * Lib_name.t option (* library and optional alias *)
       | Library_redirect of Library_redirect.Local.t
       | Deprecated_library_name of Deprecated_library_name.t
   end
@@ -126,12 +128,24 @@ module DB = struct
                     s.new_public_name
                 in
                 None, lib_name, deprecated_lib
-              | Library (conf : Library.t) ->
+              | Library (conf, alias) ->
                 let info =
                   let expander = Expander0.get ~dir in
-                  Library.to_lib_info conf ~expander ~dir ~lib_config |> Lib_info.of_local
+                  let info =
+                    Library.to_lib_info conf ~expander ~dir ~lib_config |> Lib_info.of_local
+                  in
+                  (* Rename the library and wrapper module if an alias is provided *)
+                  match alias with
+                  | Some alias_name -> Lib_info.rename_for_alias info ~alias:alias_name
+                  | None -> info
                 and lib_id = Library.to_lib_id ~src_dir conf in
-                Some lib_id, Library.best_name conf, Found_or_redirect.found info
+                (* Use alias if provided, otherwise use original library name *)
+                let name =
+                  match alias with
+                  | Some alias_name -> alias_name
+                  | None -> Library.best_name conf
+                in
+                Some lib_id, name, Found_or_redirect.found info
             in
             let libname_conflict_map =
               Lib_name.Map.update libname_conflict_map name ~f:(function
@@ -245,7 +259,7 @@ module DB = struct
             ->
             let candidate =
               match stanza with
-              | Library ({ project; visibility = Public p; _ } as conf) ->
+              | Library (({ project; visibility = Public p; _ } as conf), alias) ->
                 let lib_id =
                   let src_dir =
                     Path.drop_optional_build_context_src_exn (Path.build dir)
@@ -258,11 +272,17 @@ module DB = struct
                     Expander0.eval_blang expander conf.enabled_if >>| Toggle.of_bool)
                   |> Memo.Lazy.force
                 in
+                (* Use alias if provided by vendor stanza, otherwise original public name *)
+                let name =
+                  match alias with
+                  | Some alias_name -> alias_name
+                  | None -> Public_lib.name p
+                in
                 Some
-                  ( Public_lib.name p
+                  ( name
                   , Project { project; lib_id; enabled; loc = Public_lib.loc p }
                   , Some lib_id )
-              | Library _ | Library_redirect _ -> None
+              | Library (_, _) | Library_redirect _ -> None
               | Deprecated_library_name s ->
                 Some
                   (Deprecated_library_name.old_public_name s, Name s.new_public_name, None)
@@ -313,7 +333,7 @@ module DB = struct
       List.map stanzas ~f:(fun (dir, stanza) ->
         let project =
           match (stanza : Library_related_stanza.t) with
-          | Library lib -> lib.project
+          | Library (lib, _) -> lib.project
           | Library_redirect x -> x.project
           | Deprecated_library_name x -> x.project
         in
@@ -383,29 +403,74 @@ module DB = struct
   ;;
 
   let create_from_stanzas ~projects_by_root ~(context : Context_name.t) stanzas =
-    let stanzas, coq_stanzas, rocq_stanzas =
-      let build_dir = Context_name.build_dir context in
-      Dune_file.fold_static_stanzas
+    let build_dir = Context_name.build_dir context in
+    (* Collect all stanzas, checking vendor stanza filtering for libraries *)
+    let* stanzas, coq_stanzas, rocq_stanzas =
+      Dune_file.Memo_fold.fold_static_stanzas
         stanzas
         ~init:([], [], [])
         ~f:(fun dune_file stanza (acc, coq_acc, rocq_acc) ->
+          let src_dir = Dune_file.dir dune_file in
+          let ctx_dir = Path.Build.append_source build_dir src_dir in
           match Stanza.repr stanza with
           | Library.T lib ->
-            let ctx_dir = Path.Build.append_source build_dir (Dune_file.dir dune_file) in
-            (ctx_dir, Library_related_stanza.Library lib) :: acc, coq_acc, rocq_acc
+            (* Check if this library is filtered by a vendor stanza and get alias *)
+            let* vs = Source_tree.vendor_stanza src_dir in
+            let result =
+              match vs with
+              | None -> `Include None (* No vendor stanza = include with no alias *)
+              | Some vendor ->
+                let lib_name = Library.best_name lib in
+                let pkg_visible =
+                  match Library.package lib with
+                  | None -> true (* No package = always visible *)
+                  | Some pkg ->
+                    let pkg_name = Package.name pkg in
+                    Vendor_stanza.package_visible vendor ~pkg_name
+                in
+                if not pkg_visible
+                then (
+                  Log.info "vendor stanza: excluding library (package not visible)"
+                    [ "lib", Lib_name.to_dyn lib_name
+                    ; "src_dir", Path.Source.to_dyn src_dir
+                    ];
+                  `Exclude)
+                else (
+                  (* Check for alias - library_exposed_name returns the alias if set *)
+                  match Vendor_stanza.library_exposed_name vendor ~lib_name with
+                  | None ->
+                    Log.info "vendor stanza: excluding library (not in libraries list)"
+                      [ "lib", Lib_name.to_dyn lib_name
+                      ; "src_dir", Path.Source.to_dyn src_dir
+                      ];
+                    `Exclude (* Library not in vendor stanza's list *)
+                  | Some exposed_name ->
+                    if Lib_name.equal exposed_name lib_name
+                    then `Include None (* No alias, use original name *)
+                    else (
+                      Log.info "vendor stanza: aliasing library"
+                        [ "lib", Lib_name.to_dyn lib_name
+                        ; "alias", Lib_name.to_dyn exposed_name
+                        ; "src_dir", Path.Source.to_dyn src_dir
+                        ];
+                      `Include (Some exposed_name)))
+            in
+            Memo.return
+              (match result with
+               | `Exclude -> acc, coq_acc, rocq_acc
+               | `Include alias ->
+                 (ctx_dir, Library_related_stanza.Library (lib, alias)) :: acc, coq_acc, rocq_acc)
           | Deprecated_library_name.T d ->
-            let ctx_dir = Path.Build.append_source build_dir (Dune_file.dir dune_file) in
-            (ctx_dir, Deprecated_library_name d) :: acc, coq_acc, rocq_acc
+            Memo.return
+              ((ctx_dir, Library_related_stanza.Deprecated_library_name d) :: acc, coq_acc, rocq_acc)
           | Library_redirect.Local.T d ->
-            let ctx_dir = Path.Build.append_source build_dir (Dune_file.dir dune_file) in
-            (ctx_dir, Library_redirect d) :: acc, coq_acc, rocq_acc
+            Memo.return
+              ((ctx_dir, Library_related_stanza.Library_redirect d) :: acc, coq_acc, rocq_acc)
           | Coq_stanza.Theory.T coq_lib ->
-            let ctx_dir = Path.Build.append_source build_dir (Dune_file.dir dune_file) in
-            acc, (ctx_dir, coq_lib) :: coq_acc, rocq_acc
+            Memo.return (acc, (ctx_dir, coq_lib) :: coq_acc, rocq_acc)
           | Rocq_stanza.Theory.T rocq_lib ->
-            let ctx_dir = Path.Build.append_source build_dir (Dune_file.dir dune_file) in
-            acc, coq_acc, (ctx_dir, rocq_lib) :: rocq_acc
-          | _ -> acc, coq_acc, rocq_acc)
+            Memo.return (acc, coq_acc, (ctx_dir, rocq_lib) :: rocq_acc)
+          | _ -> Memo.return (acc, coq_acc, rocq_acc))
     in
     create ~projects_by_root ~context stanzas coq_stanzas rocq_stanzas
   ;;

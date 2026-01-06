@@ -307,7 +307,8 @@ let find_origin (t : t) ~libs path =
       | Executables _ | Tests _ | Melange _ -> Memo.return (Some origin)
       | Library lib ->
         let src_dir = Path.drop_optional_build_context_src_exn (Path.build dir) in
-        Lib.DB.available_by_lib_id libs (Local (Library.to_lib_id ~src_dir lib))
+        let lib_id = Library.to_lib_id ~src_dir lib in
+        Lib.DB.available_by_lib_id libs (Local lib_id)
         >>| (function
          | false -> None
          | true -> Some origin))
@@ -482,6 +483,7 @@ let make_lib_modules
       ~modules
       ~include_subdirs:(loc_include_subdirs, (include_subdirs : Include_subdirs.t))
       ~version
+      ~alias
   =
   let open Resolve.Memo.O in
   let* kind, main_module_name, wrapped =
@@ -492,9 +494,14 @@ let make_lib_modules
          the above [match lib.implements with ...], we know that we can't get
          [From _]. That's why we have these [assert false]. *)
       let main_module_name =
-        match Library.main_module_name lib with
-        | This x -> x
-        | From _ -> assert false
+        (* If alias is provided, use it for the wrapper module name *)
+        match alias with
+        | Some alias_name ->
+          Some (Module_name.of_string (Lib_name.Local.to_string (Lib_name.to_local_exn alias_name)))
+        | None ->
+          (match Library.main_module_name lib with
+           | This x -> x
+           | From _ -> assert false)
       in
       let wrapped =
         match lib.wrapped with
@@ -576,7 +583,13 @@ let make_lib_modules
     | _ -> ()
   in
   let implements = Option.is_some lib.implements in
-  let _loc, lib_name = lib.name in
+  let _loc, original_lib_name = lib.name in
+  (* Use alias for wrapper module name if provided by vendor stanza *)
+  let lib_name =
+    match alias with
+    | Some alias_name -> Lib_name.to_local_exn alias_name
+    | None -> original_lib_name
+  in
   Resolve.Memo.return
     ( sources
     , Modules.lib
@@ -780,6 +793,18 @@ let modules_of_stanzas =
               invalid [implements] field, we will get an error immediately even if
               the library is not built. We should change this to carry the
               [Or_exn.t] a bit longer. *)
+             let* alias =
+               (* Look up vendor stanza alias for this library *)
+               let src_dir = Path.Build.drop_build_context_exn dir in
+               let lib_name = Library.best_name lib in
+               Source_tree.vendor_stanza src_dir
+               >>| Option.bind ~f:(fun vendor ->
+                 Dune_lang.Vendor_stanza.library_exposed_name vendor ~lib_name
+                 |> Option.bind ~f:(fun exposed_name ->
+                   if Lib_name.equal exposed_name lib_name
+                   then None (* No alias, use original *)
+                   else Some exposed_name))
+             in
              let+ sources, modules =
                let lookup_vlib = lookup_vlib ~loc:lib.buildable.loc in
                make_lib_modules
@@ -791,6 +816,7 @@ let modules_of_stanzas =
                  ~lib
                  ~include_subdirs
                  ~version:lib.dune_version
+                 ~alias
                >>= Resolve.read_memo
              in
              let obj_dir = Library.obj_dir lib ~dir in

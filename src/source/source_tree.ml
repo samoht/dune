@@ -412,20 +412,31 @@ let is_vendored dir =
   | Some d -> Dir.status d = Vendored
 ;;
 
-let vendor_stanza dir =
-  (* Look for a vendor stanza in the parent directory's dune file *)
-  match Path.Source.parent dir with
-  | None -> Memo.return None
-  | Some parent_dir ->
-    find_dir parent_dir
-    >>| (function
-     | None -> None
-     | Some parent ->
-       (match Dir.dune_file parent with
-        | None -> None
-        | Some dune_file ->
-          let subdir_name = Path.Source.basename dir in
-          Filename.Map.find (Dune_file.vendor dune_file) subdir_name))
+let vendor_stanza =
+  let impl dir =
+    (* Walk up the directory tree looking for a vendor stanza that applies to this dir.
+       A vendor stanza at path P applies to dir D if D starts with P/subdir where
+       subdir is the directory mentioned in the vendor stanza. *)
+    let rec find_vendor_stanza_for current_dir =
+      match Path.Source.parent current_dir with
+      | None -> Memo.return None
+      | Some parent_dir ->
+        find_dir parent_dir
+        >>= (function
+         | None -> Memo.return None
+         | Some parent ->
+           (match Dir.dune_file parent with
+            | None -> find_vendor_stanza_for parent_dir
+            | Some dune_file ->
+              let subdir_name = Path.Source.basename current_dir in
+              (match Filename.Map.find (Dune_file.vendor dune_file) subdir_name with
+               | Some _ as result -> Memo.return result
+               | None -> find_vendor_stanza_for parent_dir)))
+    in
+    find_vendor_stanza_for dir
+  in
+  let memo = Memo.create "vendor-stanza" ~input:(module Path.Source) impl in
+  Memo.exec memo
 ;;
 
 let vendor_stanzas dir =

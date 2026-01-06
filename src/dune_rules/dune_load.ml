@@ -22,6 +22,7 @@ type t =
   ; projects_by_root : Dune_project.t Path.Source.Map.t
   ; dune_file_by_dir : Dune_file_db.t Per_context.t
   ; mask : Only_packages.t
+  ; vendored_packages : Package.Name.Set.t
   }
 
 type status =
@@ -47,7 +48,7 @@ let load () =
     | Vendored -> `Vendored
     | Normal | Data_only -> `Regular
   in
-  let+ projects, dune_files =
+  let* projects, dune_files =
     let f dir : Projects_and_dune_files.t Memo.t =
       let path = Source_tree.Dir.path dir in
       let project = Source_tree.Dir.project dir in
@@ -69,8 +70,8 @@ let load () =
       ~f
   in
   let projects = Appendable_list.to_list_rev projects in
-  let all_packages, vendored_packages =
-    List.fold_left
+  let* all_packages, vendored_packages =
+    Memo.List.fold_left
       projects
       ~init:(Package.Name.Map.empty, Package.Name.Set.empty)
       ~f:(fun (acc_packages, vendored) (status, (project : Dune_project.t)) ->
@@ -81,15 +82,30 @@ let load () =
           | `Vendored ->
             Package.Name.Set.of_keys packages |> Package.Name.Set.union vendored
         in
+        (* For vendored directories with explicit (vendor ...) stanzas,
+           don't add packages to global map - they're managed through
+           the vendor stanza's library exposure instead. This allows
+           multi-version coexistence (e.g., yojson.1.7.0 and yojson.2.0.0
+           both defining a "yojson" package). *)
+        let+ has_vendor_stanza =
+          match status with
+          | `Regular -> Memo.return false
+          | `Vendored ->
+            Source_tree.vendor_stanza (Dune_project.root project)
+            >>| Option.is_some
+        in
         let acc_packages =
-          Package.Name.Map.union acc_packages packages ~f:(fun name a b ->
-            User_error.raise
-              [ Pp.textf
-                  "The package %S is defined more than once:"
-                  (Package.Name.to_string name)
-              ; Pp.textf "- %s" (Loc.to_file_colon_line (Package.loc a))
-              ; Pp.textf "- %s" (Loc.to_file_colon_line (Package.loc b))
-              ])
+          if has_vendor_stanza
+          then acc_packages (* Skip - managed by vendor stanza *)
+          else
+            Package.Name.Map.union acc_packages packages ~f:(fun name a b ->
+              User_error.raise
+                [ Pp.textf
+                    "The package %S is defined more than once:"
+                    (Package.Name.to_string name)
+                ; Pp.textf "- %s" (Loc.to_file_colon_line (Package.loc a))
+                ; Pp.textf "- %s" (Loc.to_file_colon_line (Package.loc b))
+                ])
         in
         acc_packages, vendored)
   in
@@ -131,15 +147,17 @@ let load () =
     |> Staged.unstage
   in
   let dune_file_by_dir = Dune_file_db.per_context dune_files |> Staged.unstage in
-  { dune_files
-  ; mask
-  ; dune_file_by_dir
-  ; packages
-  ; projects
-  ; projects_by_root =
-      Path.Source.Map.of_list_map_exn projects ~f:(fun project ->
-        Dune_project.root project, project)
-  }
+  Memo.return
+    { dune_files
+    ; mask
+    ; dune_file_by_dir
+    ; packages
+    ; projects
+    ; projects_by_root =
+        Path.Source.Map.of_list_map_exn projects ~f:(fun project ->
+          Dune_project.root project, project)
+    ; vendored_packages
+    }
 ;;
 
 let load =
@@ -188,4 +206,9 @@ let projects_by_root () =
 let projects () =
   let+ t = load () in
   t.projects
+;;
+
+let vendored_packages () =
+  let+ t = load () in
+  t.vendored_packages
 ;;

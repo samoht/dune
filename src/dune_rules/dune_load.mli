@@ -12,3 +12,6 @@ val stanzas_in_dir : Path.Build.t -> Dune_file.t option Memo.t
 val mask : unit -> Only_packages.t Memo.t
 val packages : unit -> Package.t Package.Name.Map.t Memo.t
 val projects : unit -> Dune_project.t list Memo.t
+
+(** Returns the set of vendored package names *)
+val vendored_packages : unit -> Package.Name.Set.t Memo.t

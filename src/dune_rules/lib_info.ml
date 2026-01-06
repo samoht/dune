@@ -384,6 +384,23 @@ let local_main_module_name t = t.local_main_module_name
 let orig_src_dir t = t.orig_src_dir
 let best_src_dir t = Option.value ~default:t.src_dir t.orig_src_dir
 let set_version t version = { t with version }
+let set_name t name = { t with name }
+
+let rename_for_alias t ~alias =
+  (* When aliasing a library, change both the library name and the wrapper module name *)
+  let main_module_name =
+    match t.main_module_name with
+    | This None -> Inherited.This None (* unwrapped stays unwrapped *)
+    | This (Some _) ->
+      (* Change wrapper module name to be based on alias *)
+      Inherited.This (Some (Module_name.of_string (Lib_name.Local.to_string (Lib_name.to_local_exn alias))))
+    | From loc -> Inherited.From loc (* inherited stays inherited *)
+  in
+  let local_main_module_name =
+    Some (Module_name.of_string (Lib_name.Local.to_string (Lib_name.to_local_exn alias)))
+  in
+  { t with name = alias; main_module_name; local_main_module_name }
+
 let entry_modules t = t.entry_modules
 let dynlink_supported t = Mode.Dict.get t.plugins Native <> []
 

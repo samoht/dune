@@ -171,6 +171,11 @@ type local = Path.Build.t t
 val of_local : local -> external_
 val as_local_exn : external_ -> local
 val set_version : 'a t -> Package_version.t option -> 'a t
+val set_name : 'a t -> Lib_name.t -> 'a t
+
+(** Rename a library for vendor aliasing. Changes both the library name and
+    the wrapper module name to be based on the alias. *)
+val rename_for_alias : 'a t -> alias:Lib_name.t -> 'a t
 
 val for_dune_package
   :  Path.t t
