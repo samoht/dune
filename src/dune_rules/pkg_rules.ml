@@ -845,6 +845,12 @@ module Action_expander = struct
           let present = Option.is_some dep_paths in
           (match Package_variable_name.to_string variable_name with
            | "pinned" -> Memo.return @@ Ok [ Value.false_ ]
+           | "preinstalled" ->
+             (* Packages managed by dune pkg are never preinstalled *)
+             Memo.return @@ Ok [ Value.false_ ]
+           | "native" ->
+             (* Native code compilation is available (ocamlopt exists) *)
+             Memo.return @@ Ok [ Value.true_ ]
            | "enable" ->
              Memo.return @@ Ok [ Value.String (if present then "enable" else "disable") ]
            | "installed" ->
