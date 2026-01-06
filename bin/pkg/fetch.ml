@@ -228,37 +228,22 @@ let fetch_source_group ~rev_store ~platform ~patches_dir ~pkgs_by_name group =
   let { Duniverse.packages; source; primary_name; primary_version } = group in
   let initial_target = Duniverse.source_group_dir group |> Path.source in
   let initial_target_path = Path.to_string initial_target in
-  (* Check for existing directory with any name by looking for project name *)
+  (* Check for existing directory by looking up in duniverse/dune cache *)
   let find_existing_dir () =
     (* First check the initial target *)
     if Path.exists initial_target
     then Some initial_target
     else (
-      (* Check if there's a directory with the project name instead *)
-      let duniverse_path = Path.source Duniverse.duniverse_dir in
-      match Path.readdir_unsorted duniverse_path with
-      | Error _ -> None
-      | Ok entries ->
-        (* Look for a directory that contains a dune-project with matching packages *)
-        List.find_map entries ~f:(fun entry ->
-          let entry_path = Path.relative duniverse_path entry in
-          if not (Path.is_directory entry_path)
-          then None
-          else (
-            let entry_source = Path.Source.of_string (Path.to_string entry_path) in
-            match Duniverse.read_project_name entry_source with
-            | None -> None
-            | Some _ ->
-              (* Check if any of our packages' libraries are in this directory *)
-              let pkg_name = Package_name.to_string primary_name in
-              let libs = Duniverse.scan_libraries entry_source ~pkg_name in
-              if List.is_empty libs
-              then None
-              else (
-                (* Heuristic: if this dir has libraries and a dune-project, assume it's ours
-                   if the directory name matches our primary name or project name *)
-                let base = Path.basename entry_path in
-                if String.is_prefix base ~prefix:pkg_name then Some entry_path else None))))
+      (* Look up in duniverse/dune's library->directory mapping.
+         Use the primary package name as the expected library name. *)
+      let pkg_name = Package_name.to_string primary_name in
+      match Duniverse.find_dir_for_library pkg_name with
+      | Some dirname ->
+        let dir_path =
+          Path.source (Path.Source.relative Duniverse.duniverse_dir dirname)
+        in
+        if Path.exists dir_path then Some dir_path else None
+      | None -> None)
   in
   match find_existing_dir () with
   | Some existing ->

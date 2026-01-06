@@ -379,3 +379,134 @@ let scan_libraries dir ~pkg_name =
        (* Fall back to opam file names *)
        scan_opam_libraries dir)
 ;;
+
+(* Library -> directory mapping cache stored in _build/.pkg/libs *)
+module Lib_to_dir_cache = struct
+  let cache_dir = Path.Build.relative Path.Build.root ".pkg"
+  let cache_file = Path.Build.relative cache_dir "libs"
+
+  let parse_duniverse_dune () =
+    let dune_path = Path.source (Path.Source.relative duniverse_dir marker_filename) in
+    if not (Path.exists dune_path)
+    then String.Map.empty
+    else (
+      match Io.read_file dune_path with
+      | exception _ -> String.Map.empty
+      | contents ->
+        (match
+           Dune_sexp.Parser.parse_string
+             ~fname:(Path.to_string dune_path)
+             ~mode:Many
+             contents
+         with
+         | exception _ -> String.Map.empty
+         | sexps ->
+           (* Look for (vendor dirname ...) stanzas and extract libraries *)
+           List.fold_left sexps ~init:String.Map.empty ~f:(fun acc sexp ->
+             let open Dune_sexp.Ast in
+             match sexp with
+             | List (_, Atom (_, vendor_atom) :: Atom (_, dirname_atom) :: rest)
+               when String.equal (Dune_sexp.Atom.to_string vendor_atom) "vendor" ->
+               let dirname = Dune_sexp.Atom.to_string dirname_atom in
+               (* Find (libraries ...) in rest *)
+               let libs =
+                 List.find_map rest ~f:(function
+                   | List (_, Atom (_, libs_atom) :: lib_atoms)
+                     when String.equal (Dune_sexp.Atom.to_string libs_atom) "libraries" ->
+                     Some
+                       (List.filter_map lib_atoms ~f:(function
+                          | Atom (_, a) -> Some (Dune_sexp.Atom.to_string a)
+                          | _ -> None))
+                   | _ -> None)
+               in
+               (match libs with
+                | Some lib_list ->
+                  List.fold_left lib_list ~init:acc ~f:(fun acc lib ->
+                    String.Map.set acc lib dirname)
+                | None -> acc)
+             | _ -> acc)))
+  ;;
+
+  (* Encode map as s-expression: ((lib1 dir1) (lib2 dir2) ...) *)
+  let encode_map m =
+    String.Map.to_list m
+    |> List.map ~f:(fun (lib, dir) ->
+      Dune_sexp.List [ Dune_sexp.atom lib; Dune_sexp.atom dir ])
+    |> fun l -> Dune_sexp.List l
+  ;;
+
+  (* Decode map from s-expression *)
+  let decode_map sexp =
+    match sexp with
+    | Dune_sexp.List entries ->
+      List.fold_left entries ~init:String.Map.empty ~f:(fun acc entry ->
+        match entry with
+        | Dune_sexp.List [ Dune_sexp.Atom lib; Dune_sexp.Atom dir ] ->
+          String.Map.set acc (Dune_sexp.Atom.to_string lib) (Dune_sexp.Atom.to_string dir)
+        | _ -> acc)
+    | _ -> String.Map.empty
+  ;;
+
+  let write_cache m =
+    let path = Path.build cache_file in
+    Path.mkdir_p (Path.build cache_dir);
+    let sexp = encode_map m in
+    Io.write_file path (Dune_sexp.to_string sexp)
+  ;;
+
+  let read_cache () =
+    let path = Path.build cache_file in
+    if not (Path.exists path)
+    then None
+    else (
+      match Io.read_file path with
+      | exception _ -> None
+      | contents ->
+        (match
+           Dune_sexp.Parser.parse_string
+             ~fname:(Path.to_string path)
+             ~mode:Single
+             contents
+         with
+         | exception _ -> None
+         | sexp -> Some (decode_map (Dune_sexp.Ast.remove_locs sexp))))
+  ;;
+
+  let is_cache_valid () =
+    let cache_path = Path.build cache_file in
+    let dune_path = Path.source (Path.Source.relative duniverse_dir marker_filename) in
+    if (not (Path.exists cache_path)) || not (Path.exists dune_path)
+    then false
+    else (
+      match Path.stat cache_path, Path.stat dune_path with
+      | Ok cache_stat, Ok dune_stat -> cache_stat.st_mtime >= dune_stat.st_mtime
+      | _ -> false)
+  ;;
+
+  let get () =
+    if is_cache_valid ()
+    then (
+      match read_cache () with
+      | Some m -> m
+      | None ->
+        let m = parse_duniverse_dune () in
+        write_cache m;
+        m)
+    else (
+      let m = parse_duniverse_dune () in
+      write_cache m;
+      m)
+  ;;
+
+  let invalidate () =
+    let path = Path.build cache_file in
+    if Path.exists path then Path.rm_rf path
+  ;;
+end
+
+(* Find which directory in duniverse contains a given library.
+   Returns Some dirname if found, None otherwise. *)
+let find_dir_for_library lib_name = String.Map.find (Lib_to_dir_cache.get ()) lib_name
+
+(* Invalidate the library cache (call after modifying duniverse/dune) *)
+let invalidate_lib_cache () = Lib_to_dir_cache.invalidate ()

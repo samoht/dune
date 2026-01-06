@@ -85,3 +85,13 @@ val scan_libraries : Path.Source.t -> pkg_name:string -> string list
     in the given source directory. Returns [None] if the file doesn't exist
     or doesn't contain a (name ...) stanza. *)
 val read_project_name : Path.Source.t -> string option
+
+(** [find_dir_for_library lib_name] looks up which directory in duniverse
+    contains the given library. Uses a cached mapping from the duniverse/dune
+    file stored in _build/.pkg/lib-cache. Returns [None] if the library is
+    not found in any vendor stanza. *)
+val find_dir_for_library : string -> string option
+
+(** [invalidate_lib_cache ()] removes the cached library->directory mapping.
+    Should be called after modifying duniverse/dune. *)
+val invalidate_lib_cache : unit -> unit
