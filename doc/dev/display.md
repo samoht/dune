@@ -1,7 +1,11 @@
-# Display Backend Redesign
+# Display and Progress
 
 **Related documents:**
-- [pkg-ux-design.md](pkg-ux-design.md) - CLI UX design for `dune pkg` commands
+- [cache.md](cache.md) - Build artifact caching
+- [tool-caching.md](tool-caching.md) - Tool binary caching
+
+This document describes Dune's console output system: backend selection, progress
+display format, and verbosity levels.
 
 ## Design Principle
 
@@ -73,6 +77,8 @@ Console.finish ~name:"main.exe"
 | Short    | one line: `[3/42] Building mylib`         | ignored        | print          |
 | Verbose  | one line: `[mylib] Building`              | `[mylib] cmd`  | print          |
 
+Note: `[N/M]` counter at start avoids left/right flickering as target list changes.
+
 Counter `[done/total]` is coarse-grained: libs + pkgs + exes (not individual rules/commands).
 
 ### Mode Descriptions
@@ -82,7 +88,67 @@ Counter `[done/total]` is coarse-grained: libs + pkgs + exes (not individual rul
 - **Short**: One line per event (Cargo-style) with progress counter
 - **Verbose**: One line per event + log output, prefixed by context name
 
-### Verbose Output Example
+## Progress Format
+
+### During Operations
+
+Everything is just building targets. Whether it's a library in your repo
+(`dune-engine`) or an opam package (`cmdliner`), they're unified in the build
+graph.
+
+Format:
+```
+[3/15] Building: dune-engine, cmdliner, main
+```
+
+- `[3/15]` at start = 3 completed out of 15 total (avoids left/right flickering)
+- Comma-separated target names (libraries, packages, executables)
+
+The count is at library/package granularity, not rules. This is stable (known
+upfront) unlike dynamic rule counts, and matches how users think about builds.
+
+When network I/O is blocking (fetching sources), show it:
+```
+[3/15] Fetching: ocaml-base-compiler | Building: dune-engine
+```
+
+### Truncation Behavior
+
+When terminal width is insufficient:
+
+1. Keep `[N/M]` prefix fixed
+2. Add targets left-to-right until width exceeded
+3. If truncated, append `, +N more`
+
+Example at 60 columns:
+```
+[3/15] Building: dune-engine, dune-rules, +6 more
+```
+
+If even one target doesn't fit:
+```
+[3/15] Building: +8 targets
+```
+
+### Summary at End
+
+After completion, show summary with cache statistics:
+
+```
+Done in 12.3s (38 cached, 4 built)
+```
+
+For package operations:
+```
+Installed 10 packages in 45.2s (3 cached, 7 built)
+```
+
+For failed builds:
+```
+Failed after 5.2s (2 errors)
+```
+
+## Verbose Output Example
 
 With concurrent operations, output is interleaved. The context prefix allows
 understanding which activity each line belongs to:
@@ -141,3 +207,10 @@ end
 - `src/dune_console/verbose.ml` - line-by-line + log
 - `src/dune_console/dune_console.ml` - main API
 - `src/dune_config_file/display.ml` - maps Display.t to backend
+
+## Non-Goals
+
+- Elapsed time during build (only in summary)
+- Download speed/ETA
+- Colors for phases (phases are self-explanatory)
+- Progress bars (discrete operations don't need them)
