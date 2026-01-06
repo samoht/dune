@@ -61,3 +61,13 @@ val filtered_formula_to_package_names
   -> packages:Package_version.t Package_name.Map.t
   -> OpamTypes.filtered_formula
   -> (deps, unsatisfied_formula) result
+
+(** Like [filtered_formula_to_package_names] but silently skips packages that
+    aren't in the solution. This is useful when deriving from a lock file where
+    missing packages are expected (optional deps, virtual packages, etc.). *)
+val filtered_formula_to_package_names_allow_missing
+  :  env:OpamFilter.env
+  -> with_test:bool
+  -> packages:Package_version.t Package_name.Map.t
+  -> OpamTypes.filtered_formula
+  -> deps

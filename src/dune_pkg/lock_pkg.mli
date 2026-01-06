@@ -8,7 +8,11 @@ val add_self_to_filter_env
   -> OpamVariable.variable_contents option
 
 (** Convert a selected opam package to a package that dune can save to the lock
-    directory *)
+    directory.
+
+    @param allow_missing_deps When true, skip dependencies not in the version
+    map instead of failing. Use this when deriving from a lock file where
+    optional/virtual deps may be filtered out. *)
 val opam_package_to_lock_file_pkg
   :  Solver_env.t
   -> Solver_stats.Updater.t
@@ -17,6 +21,7 @@ val opam_package_to_lock_file_pkg
   -> pinned:bool
   -> Resolved_package.t
   -> portable_lock_dir:bool
+  -> allow_missing_deps:bool
   -> (Lock.Pkg.t, User_message.t) result
 
 (** [file_to_lock ~loc ~solver_env file] loads the repos at their pinned hashes,

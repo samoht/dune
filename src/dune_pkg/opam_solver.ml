@@ -1894,7 +1894,8 @@ let solve_lock_dir
                opam_package
                ~pinned:(Package_name.Set.mem pinned_package_names name)
                resolved_package
-               ~portable_lock_dir)
+               ~portable_lock_dir
+               ~allow_missing_deps:false)
            |> Result.List.all
          in
          match Package_name.Map.of_list_map pkgs ~f:(fun pkg -> pkg.info.name, pkg) with

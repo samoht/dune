@@ -178,30 +178,6 @@ let make_action = function
   | actions -> Some (Action.Progn actions)
 ;;
 
-let resolve_depopts ~resolve depopts =
-  let rec collect acc depopts =
-    match (depopts : OpamTypes.filtered_formula) with
-    | Or ((Atom (_, _) as dep), depopts) -> collect (dep :: acc) depopts
-    | Atom (_, _) as dep -> dep :: acc
-    | Empty -> acc
-    | _ ->
-      (* We rely on depopts always being a list of or'ed package names. Opam
-         verifies this for us at parsing time. Packages defined in dune-project
-         files have this restriction for depopts and regular deps *)
-      Code_error.raise "invalid depopts" [ "depopts", Opam_dyn.filtered_formula depopts ]
-  in
-  OpamFormula.ors_to_list depopts
-  |> List.concat_map ~f:(fun x ->
-    collect [] x
-    |> List.rev
-    |> List.concat_map ~f:(fun depopt ->
-      match resolve depopt with
-      | Error _ -> []
-      | Ok { Resolve_opam_formula.post = _; regular } ->
-        (* CR-someday rgrinberg: think about post deps *)
-        regular))
-;;
-
 (* Translate an Opam filter into Dune's "Slang" DSL. The main difference between
    the two languages is in their treatment of undefined package variables. In
    Opam filters, undefined variables take on the value <undefined> which
@@ -384,6 +360,7 @@ let opam_package_to_lock_file_pkg
       ~pinned
       resolved_package
       ~portable_lock_dir
+      ~allow_missing_deps
   =
   let open Result.O in
   let name = Package_name.of_opam_package_name (OpamPackage.name opam_package) in
@@ -427,34 +404,51 @@ let opam_package_to_lock_file_pkg
     { Lock.Pkg_info.name; version; dev; avoid; source; extra_sources }
   in
   let depends, post_depends =
-    let resolve what =
-      Resolve_opam_formula.filtered_formula_to_package_names
-        ~with_test:false
-        ~packages:version_by_package_name
-        ~env:
-          (add_self_to_filter_env
-             opam_package
-             (Solver_env.add_sentinel_values_for_unset_platform_vars solver_env
-              |> Solver_env.to_env))
-        what
+    let env =
+      add_self_to_filter_env
+        opam_package
+        (Solver_env.add_sentinel_values_for_unset_platform_vars solver_env
+         |> Solver_env.to_env)
     in
     let regular_deps, post_deps =
-      match resolve opam_file.depends with
-      | Ok { regular; post } ->
-        (* Post deps are tracked separately to avoid creating false dependency
-           cycles. They're installed WITH the package but don't affect build
-           order. *)
-        regular, post
-      | Error (`Formula_could_not_be_satisfied hints) ->
-        Code_error.raise
-          "Dependencies of package can't be satisfied from packages in solution"
-          [ "package", Dyn.string (opam_package |> OpamPackage.to_string)
-          ; "hints", Dyn.list Resolve_opam_formula.Unsatisfied_formula_hint.to_dyn hints
-          ]
+      if allow_missing_deps
+      then (
+        (* When deriving from a lock file, skip missing deps - they were
+           filtered out during solving (optional deps, virtual packages, etc.) *)
+        let { Resolve_opam_formula.regular; post } =
+          Resolve_opam_formula.filtered_formula_to_package_names_allow_missing
+            ~with_test:false
+            ~packages:version_by_package_name
+            ~env
+            opam_file.depends
+        in
+        regular, post)
+      else (
+        match
+          Resolve_opam_formula.filtered_formula_to_package_names
+            ~with_test:false
+            ~packages:version_by_package_name
+            ~env
+            opam_file.depends
+        with
+        | Ok { regular; post } -> regular, post
+        | Error (`Formula_could_not_be_satisfied hints) ->
+          Code_error.raise
+            "Dependencies of package can't be satisfied from packages in solution"
+            [ "package", Dyn.string (opam_package |> OpamPackage.to_string)
+            ; "hints", Dyn.list Resolve_opam_formula.Unsatisfied_formula_hint.to_dyn hints
+            ])
     in
     let depopts =
-      resolve_depopts ~resolve opam_file.depopts
-      |> List.filter ~f:(fun package_name ->
+      (* For depopts, always use permissive resolution - they're optional *)
+      let { Resolve_opam_formula.regular; post = _ } =
+        Resolve_opam_formula.filtered_formula_to_package_names_allow_missing
+          ~with_test:false
+          ~packages:version_by_package_name
+          ~env
+          opam_file.depopts
+      in
+      List.filter regular ~f:(fun package_name ->
         not (List.mem regular_deps package_name ~equal:Package_name.equal))
     in
     let make_deps names =
@@ -617,6 +611,7 @@ let file_to_lock ~loc ~solver_env (file : Lock.File.t) =
             ~pinned:false
             resolved_package
             ~portable_lock_dir
+            ~allow_missing_deps:true
         with
         | Ok pkg -> Fiber.return pkg
         | Error msg -> User_error.raise [ User_message.pp msg ])

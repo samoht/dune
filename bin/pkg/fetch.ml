@@ -250,17 +250,15 @@ let fetch_source_group ~rev_store ~platform ~patches_dir ~pkgs_by_name group =
             | None -> None
             | Some _ ->
               (* Check if any of our packages' libraries are in this directory *)
-              let libs = Duniverse.scan_public_libraries entry_source in
+              let pkg_name = Package_name.to_string primary_name in
+              let libs = Duniverse.scan_libraries entry_source ~pkg_name in
               if List.is_empty libs
               then None
               else (
                 (* Heuristic: if this dir has libraries and a dune-project, assume it's ours
                    if the directory name matches our primary name or project name *)
                 let base = Path.basename entry_path in
-                let expected_prefix = Package_name.to_string primary_name in
-                if String.is_prefix base ~prefix:expected_prefix
-                then Some entry_path
-                else None))))
+                if String.is_prefix base ~prefix:pkg_name then Some entry_path else None))))
   in
   match find_existing_dir () with
   | Some existing ->
@@ -287,6 +285,8 @@ let fetch_source_group ~rev_store ~platform ~patches_dir ~pkgs_by_name group =
       then initial_target
       else (
         verbose (sprintf "  renaming to %s (from dune-project)" final_dirname);
+        (* Remove existing target if present (stale from previous fetch) *)
+        if Path.exists final_target then Path.rm_rf final_target;
         Unix.rename (Path.to_string initial_target) (Path.to_string final_target);
         final_target)
     in
@@ -413,18 +413,27 @@ let fetch_duniverse ~lock_dir_path ~solver_env () =
               | Some Duniverse.Opam_sandbox -> true
               | _ -> false)
           in
+          (* Scan for libraries using cascading strategy:
+             dune files -> META files -> opam files *)
+          let pkg_name =
+            match packages with
+            | (name, _) :: _ -> Package_name.to_string name
+            | [] -> dirname
+          in
+          let libs = Duniverse.scan_libraries pkg_dir ~pkg_name in
           if is_opam
           then
-            (* Opam package - generate vendor stanza with sandbox *)
-            Some (sprintf "(vendor %s (sandbox opam))" dirname)
-          else (
-            (* Dune package - scan for libraries *)
-            let libs = Duniverse.scan_public_libraries pkg_dir in
+            (* Opam package - needs sandbox, include libraries if found *)
             if List.is_empty libs
-            then None
+            then Some (sprintf "(vendor %s (sandbox opam))" dirname)
             else (
               let libs_str = String.concat ~sep:" " libs in
-              Some (sprintf "(vendor %s (libraries %s))" dirname libs_str))))
+              Some (sprintf "(vendor %s (sandbox opam) (libraries %s))" dirname libs_str))
+          else if List.is_empty libs
+          then None
+          else (
+            let libs_str = String.concat ~sep:" " libs in
+            Some (sprintf "(vendor %s (libraries %s))" dirname libs_str)))
       in
       let lines =
         [ "; This directory is managed by dune pkg"; "(vendored_dirs *)" ]
@@ -545,16 +554,27 @@ let auto_fetch_missing ~lock_dir_path ~solver_env () =
               | Some Duniverse.Opam_sandbox -> true
               | _ -> false)
           in
+          (* Scan for libraries using cascading strategy:
+             dune files -> META files -> opam files *)
+          let pkg_name =
+            match packages with
+            | (name, _) :: _ -> Package_name.to_string name
+            | [] -> dirname
+          in
+          let libs = Duniverse.scan_libraries pkg_dir ~pkg_name in
           if is_opam
-          then Some (sprintf "(vendor %s (sandbox opam))" dirname)
-          else (
-            (* Dune package - scan for libraries if directory exists *)
-            let libs = Duniverse.scan_public_libraries pkg_dir in
+          then
+            (* Opam package - needs sandbox, include libraries if found *)
             if List.is_empty libs
-            then None
+            then Some (sprintf "(vendor %s (sandbox opam))" dirname)
             else (
               let libs_str = String.concat ~sep:" " libs in
-              Some (sprintf "(vendor %s (libraries %s))" dirname libs_str))))
+              Some (sprintf "(vendor %s (sandbox opam) (libraries %s))" dirname libs_str))
+          else if List.is_empty libs
+          then None
+          else (
+            let libs_str = String.concat ~sep:" " libs in
+            Some (sprintf "(vendor %s (libraries %s))" dirname libs_str)))
       in
       let lines =
         [ "; This directory is managed by dune pkg"; "(vendored_dirs *)" ]

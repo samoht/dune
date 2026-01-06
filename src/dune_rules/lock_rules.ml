@@ -19,6 +19,8 @@ include struct
   module Pkg_workspace = Pkg_workspace
   module OpamUrl = OpamUrl
   module Dev_tool = Dev_tool
+  module Lock_pkg = Lock_pkg
+  module Lock = Lock
 end
 
 module Spec = struct
@@ -221,6 +223,85 @@ module Spec = struct
 end
 
 module A = Action_ext.Make (Spec)
+
+(* Action spec for deriving single-file lock format to directory format *)
+module Derive_spec = struct
+  type ('path, 'target) t =
+    { target : 'target
+    ; source_file : 'path
+    ; solver_env_from_context : Solver_env.t
+    ; unset_solver_vars : Package_variable_name.Set.t
+    }
+
+  let name = "derive-lock"
+  let version = 1
+  let bimap t f g = { t with source_file = f t.source_file; target = g t.target }
+  let is_useful_to ~memoize = memoize
+
+  let encode
+        { target; source_file; solver_env_from_context; unset_solver_vars }
+        encode_path
+        encode_target
+    =
+    Sexp.record
+      [ "target", encode_target target
+      ; "source_file", encode_path source_file
+      ; ( "solver_env_from_context"
+        , Atom
+            (Dune_digest.Feed.compute_digest
+               Solver_env.digest_feed
+               solver_env_from_context
+             |> Dune_digest.to_string) )
+      ; ( "unset_solver_vars"
+        , List
+            (Package_variable_name.Set.to_list unset_solver_vars
+             |> List.sort ~compare:Package_variable_name.compare
+             |> List.map ~f:(fun var -> Sexp.Atom (Package_variable_name.to_string var)))
+        )
+      ]
+  ;;
+
+  let action
+        { target; source_file; solver_env_from_context; unset_solver_vars }
+        ~ectx:_
+        ~eenv:{ Action.Ext.Exec.env; _ }
+    =
+    let open Fiber.O in
+    let* () = Fiber.return () in
+    let portable_lock_dir =
+      match Config.get Compile_time.portable_lock_dir with
+      | `Enabled -> true
+      | `Disabled -> false
+    in
+    let* solver_env =
+      let open Fiber.O in
+      let+ solver_env_from_current_system =
+        Sys_poll.make ~path:(Env_path.path env) |> Sys_poll.solver_env_from_current_system
+      in
+      let solver_env =
+        [ solver_env_from_current_system; solver_env_from_context ]
+        |> List.fold_left ~init:Solver_env.with_defaults ~f:Solver_env.extend
+      in
+      Solver_env.unset_multi solver_env unset_solver_vars
+    in
+    (* Read and derive the single-file lock *)
+    let+ lock_dir = Lock_pkg.read_disk_fiber ~solver_env source_file in
+    let lock_dir_path = Path.build target in
+    Lock.Write_disk.prepare
+      ~portable_lock_dir
+      ~lock_dir_path
+      ~files:Package_name.Map.empty
+      lock_dir
+    |> Lock.Write_disk.commit
+  ;;
+end
+
+module Derive_action = Action_ext.Make (Derive_spec)
+
+let derive_lock_action ~target ~source_file ~solver_env_from_context ~unset_solver_vars =
+  Derive_action.action
+    { Derive_spec.target; source_file; solver_env_from_context; unset_solver_vars }
+;;
 
 let lock_action
       ~target
@@ -469,18 +550,80 @@ let setup_copy_rules ~dir:target ~lock_dir =
   Gen_rules.make ~directory_targets (Memo.return rules)
 ;;
 
+(* Set up rules to derive single-file lock format to directory format.
+   This uses the derive action which reads the single-file, fetches opam repo
+   info, and writes the full directory format to the build directory. *)
+let setup_single_file_derive_rules ~dir:target ~lock_file ~lock_dir_local =
+  let rules =
+    let+ workspace = Workspace.workspace () in
+    let lock_dir_path = Path.of_local lock_dir_local in
+    let lock_dir = Workspace.find_lock_dir workspace lock_dir_path in
+    let solver_env_from_context =
+      match lock_dir with
+      | None -> Solver_env.with_defaults
+      | Some { solver_env = None; _ } -> Solver_env.with_defaults
+      | Some { solver_env = Some env; _ } ->
+        Solver_env.extend Solver_env.with_defaults env
+    in
+    let unset_solver_vars =
+      match lock_dir with
+      | None -> Package_variable_name.Set.empty
+      | Some { unset_solver_vars = None; _ } -> Package_variable_name.Set.empty
+      | Some { unset_solver_vars = Some vars; _ } -> vars
+    in
+    let { Action_builder.With_targets.build; targets } =
+      (let open Action_builder.O in
+       (* Depend on the source single-file lock via source file tracking *)
+       let deps =
+         Dep.Set.of_source_files
+           ~files:(Path.Set.singleton lock_file)
+           ~empty_directories:Path.Set.empty
+       in
+       Action_builder.deps deps
+       >>> (derive_lock_action
+              ~target
+              ~source_file:lock_file
+              ~solver_env_from_context
+              ~unset_solver_vars
+            |> Action.Full.make ~can_go_in_shared_cache:false
+            |> Action_builder.return))
+      |> Action_builder.with_no_targets
+      |> Action_builder.With_targets.add_directories ~directory_targets:[ target ]
+    in
+    let rule = Rule.make ~targets build in
+    Rules.of_rules [ rule ]
+  in
+  let directory_targets = Path.Build.Map.singleton target Loc.none in
+  Gen_rules.make ~directory_targets rules
+;;
+
 let setup_lock_rules_with_source (workspace : Workspace.t) ~dir ~lock_dir =
   let* source =
-    let lock_dir = Path.Source.append_local workspace.dir lock_dir in
-    let+ exists = Fs_memo.dir_exists (Path.Outside_build_dir.In_source_dir lock_dir) in
-    match exists with
-    | true -> `Source_tree lock_dir
-    | false -> `Generated
+    let lock_dir_path = Path.Source.append_local workspace.dir lock_dir in
+    (* Check for directory format first *)
+    let* is_dir =
+      Fs_memo.dir_exists (Path.Outside_build_dir.In_source_dir lock_dir_path)
+    in
+    if is_dir
+    then Memo.return (`Source_tree lock_dir_path)
+    else
+      (* Check for single-file format *)
+      let+ is_file =
+        Fs_memo.file_exists (Path.Outside_build_dir.In_source_dir lock_dir_path)
+      in
+      if is_file then `Single_file lock_dir_path else `Generated
   in
   match source with
-  | `Source_tree lock_dir ->
-    let dir = Path.Build.append_source dir lock_dir in
-    setup_copy_rules ~dir ~lock_dir:(Path.source lock_dir)
+  | `Source_tree lock_dir_src ->
+    let dir = Path.Build.append_source dir lock_dir_src in
+    setup_copy_rules ~dir ~lock_dir:(Path.source lock_dir_src)
+  | `Single_file lock_file ->
+    let dir = Path.Build.append_source dir lock_file in
+    Memo.return
+      (setup_single_file_derive_rules
+         ~dir
+         ~lock_file:(Path.source lock_file)
+         ~lock_dir_local:lock_dir)
   | `Generated -> Memo.return (setup_lock_rules ~dir ~lock_dir)
 ;;
 

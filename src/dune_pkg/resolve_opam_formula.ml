@@ -230,3 +230,20 @@ let filtered_formula_to_package_names ~env ~with_test ~packages formula =
   let regular, post = List.partition all ~f:(Package_name.Set.mem regular_set) in
   { regular; post }
 ;;
+
+let filtered_formula_to_package_names_allow_missing ~env ~with_test ~packages formula =
+  (* Get all deps including post deps, skipping missing packages *)
+  let all =
+    apply_filter ~with_test ~post:true env ~formula
+    |> formula_to_package_names_allow_missing packages
+  in
+  (* Compute which deps are post-only by comparing with post=false result *)
+  let regular_set =
+    override_post (Some false) env
+    |> apply_filter ~with_test ~post:false ~formula
+    |> formula_to_package_names_allow_missing packages
+    |> Package_name.Set.of_list
+  in
+  let regular, post = List.partition all ~f:(Package_name.Set.mem regular_set) in
+  { regular; post }
+;;

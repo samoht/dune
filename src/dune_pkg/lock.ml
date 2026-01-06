@@ -1398,7 +1398,7 @@ end
 
    Example:
    {v
-   (lang package 0.2)
+   (lang package 0.1)
    (repos
     (https://github.com/ocaml/opam-repository.git abc123def))
    (packages
