@@ -226,8 +226,10 @@ let build =
       let modes = Dune_config.Auto_lock.all in
       let doc =
         Printf.sprintf
-          "Control automatic locking behavior (%s). $(b,disabled): use system packages. \
-           $(b,enabled): auto-lock if missing. $(b,always): always re-solve."
+          "Control automatic locking behavior (%s). $(b,auto): use workspace config, \
+           then check for lock file (default). $(b,disabled): ignore lock file, use \
+           system packages only. $(b,enabled): enable package management, auto-lock if \
+           missing. $(b,always): always re-solve before building."
           (Arg.doc_alts_enum modes)
       in
       Arg.(
@@ -285,6 +287,9 @@ let build =
       let auto_lock = Option.value auto_lock_opt ~default:config.auto_lock in
       (* Override Clflags.auto_lock if CLI option was provided *)
       Option.iter auto_lock_opt ~f:(fun v -> Dune_rules.Clflags.auto_lock := v);
+      Log.info
+        "Build auto_lock"
+        [ "auto_lock", Dune_config.Auto_lock.to_dyn !Dune_rules.Clflags.auto_lock ];
       run_build_command ~common ~config ~auto_fetch ~auto_lock ~request
   in
   Cmd.v (Cmd.info "build" ~doc ~man ~envs:Common.envs) term

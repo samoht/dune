@@ -2653,6 +2653,8 @@ module Vendor_build = struct
     |> Action_builder.paths
   ;;
 
+  (* Build opam vendor packages using the primitive vendor infrastructure.
+     Vendor infrastructure is the foundation - lock files compile DOWN to this. *)
   let build_opam_sandbox_rule ctx_name ~subdir ~vendor_dir ~opam_path =
     let pkg_name = Package.Name.of_string subdir in
     let opam_contents = Io.read_file ~binary:true (Path.source opam_path) in
@@ -2666,83 +2668,13 @@ module Vendor_build = struct
       | Some v -> Package_version.of_string (OpamPackage.Version.to_string v)
       | None -> Package_version.of_string "dev"
     in
-    let build_cmds = OpamFile.OPAM.build opam_file in
-    let install_cmds = OpamFile.OPAM.install opam_file in
-    let install_dir = Install.Context.dir ~context:ctx_name in
-    let prefix = Path.build install_dir in
-    let ocamlfind_destdir =
-      Path.build (Shared_install.roots_build ~context:ctx_name).lib_root
-    in
-    let cmd_to_args cmd =
-      List.filter_map cmd ~f:(fun (arg, _filter) ->
-        match (arg : OpamTypes.simple_arg) with
-        | CString s -> Some s
-        | CIdent _ -> None)
-    in
-    (* Use the build directory path which mirrors source via vendored_dirs *)
-    let build_dir =
-      Path.Build.append_source (Context_name.build_dir ctx_name) vendor_dir
-    in
-    let system_path = Global.env () |> Env_path.path in
-    let run_cmds cmds =
-      List.filter_map cmds ~f:(fun (args, _filter) ->
-        match cmd_to_args args with
-        | [] -> None
-        | cmd :: cmd_args ->
-          (* Look up command in PATH like we do for package builds *)
-          let prog =
-            match Filename.analyze_program_name cmd with
-            | Absolute -> Ok (Path.of_string cmd)
-            | Relative_to_current_dir -> Ok (Path.relative (Path.build build_dir) cmd)
-            | In_path ->
-              (match Bin.which ~path:system_path cmd with
-               | Some p -> Ok p
-               | None ->
-                 Error
-                   (Action.Prog.Not_found.create
-                      ~program:cmd
-                      ~context:ctx_name
-                      ~loc:None
-                      ()))
-          in
-          let args =
-            Array.Immutable.of_list_map cmd_args ~f:(fun arg ->
-              Array.Immutable.of_list [ Run_with_path.Spec.String arg ])
-          in
-          Some
-            (Run_with_path.action
-               ~pkg:(pkg_name, Loc.none)
-               ~depexts:[]
-               prog
-               args
-               ~prefix
-               ~ocamlfind_destdir))
-    in
-    let progress_building =
-      Pkg_build_progress.progress_action pkg_name pkg_version `Building
-    in
-    let progress_installing =
-      Pkg_build_progress.progress_action pkg_name pkg_version `Installing
-    in
-    let build_actions = run_cmds build_cmds in
-    let install_actions = run_cmds install_cmds in
-    let all_actions =
-      [ progress_building ] @ build_actions @ [ progress_installing ] @ install_actions
-    in
-    let marker_file =
-      Path.Build.relative
-        (Context_name.build_dir ctx_name)
-        (sprintf ".pkg/vendor-%s.marker" subdir)
-    in
-    let action =
-      Action.chdir (Path.build build_dir) (Action.progn all_actions) |> Action.Full.make
-    in
-    let with_targets =
-      Action_builder.return action
-      |> Action_builder.with_no_targets
-      |> Action_builder.With_targets.add ~file_targets:[ marker_file ]
-    in
-    marker_file, with_targets
+    (* Use the primitive vendor infrastructure *)
+    Vendor_rules.build_opam_package
+      ~context:ctx_name
+      ~pkg_name
+      ~pkg_version
+      ~source_dir:vendor_dir
+      ~opam_file
   ;;
 
   let classify_vendor_stanzas ctx_name =
@@ -2798,7 +2730,7 @@ module Vendor_build = struct
   let register_opam_sandbox_rules ctx_name opam_sandbox_pkgs =
     let open Memo.O in
     Memo.parallel_map opam_sandbox_pkgs ~f:(fun (subdir, vendor_dir, opam_path) ->
-      let marker_file, with_targets =
+      let* marker_file, with_targets =
         build_opam_sandbox_rule ctx_name ~subdir ~vendor_dir ~opam_path
       in
       let+ () = rule ~loc:Loc.none with_targets in

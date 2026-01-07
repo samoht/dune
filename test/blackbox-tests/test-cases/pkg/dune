@@ -28,7 +28,7 @@
 
 (cram
  (deps %{bin:make})
- (applies_to make rule-deps))
+ (applies_to make rule-deps duniverse duniverse/non-dune-pkg))
 
 (cram
  (deps %{bin:which})
@@ -45,7 +45,9 @@
   tarball
   pin-depends
   extra-sources
-  broken-symlink-in-dependency))
+  broken-symlink-in-dependency
+  duniverse
+  duniverse/non-dune-pkg))
 
 (cram
  (deps %{bin:md5sum})
@@ -54,7 +56,10 @@
   extra-sources
   ocamlformat-dev-tool
   dev-tool-conflict-test
-  broken-symlink-in-dependency))
+  broken-symlink-in-dependency
+  install-file-tracking
+  duniverse
+  duniverse/non-dune-pkg))
 
 (cram
  (deps %{bin:tar})
@@ -64,7 +69,10 @@
   pin-depends
   extra-sources
   pkg-extract-fail
-  broken-symlink-in-dependency))
+  broken-symlink-in-dependency
+  install-file-tracking
+  duniverse
+  duniverse/non-dune-pkg))
 
 (cram
  (deps %{bin:ocaml_index})

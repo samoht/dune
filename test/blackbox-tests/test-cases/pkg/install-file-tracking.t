@@ -5,7 +5,6 @@ This test verifies the design from doc/dev/tool-caching.md:
 2. The .install file is copied to target/<pkg>.install
 3. This allows tracking which files each package installed
 
-  $ . ./helpers.sh
   $ mkrepo
 
 Create a package that generates a .install file (dune packages do this automatically).
@@ -49,8 +48,11 @@ Set up project.
 
 Lock and build.
 
-  $ dune pkg lock 2>&1 | head -5
-  Solution for dune.lock:
+  $ dune pkg lock --format=directory 2>&1 | head -5
+  Solution for dune.lock (1 package)
+
+  Dependencies common to all supported platforms:
+  dune:
   - test-pkg.0.0.1
 
   $ dune build @install 2>&1 | grep -v "Entering\|Leaving" || true

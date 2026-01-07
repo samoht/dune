@@ -61,6 +61,8 @@ mock_packages="mock-opam-repository/packages"
 
 mkrepo() {
   mkdir -p $mock_packages
+  # Initialize as git repo for single-file lock format (needs commit hashes)
+  (cd mock-opam-repository && git init -q && git config user.email "test@test" && git config user.name "test")
 }
 
 mkpkg() {
@@ -74,6 +76,8 @@ mkpkg() {
   mkdir -p $mock_packages/$name/$name.$version
   echo 'opam-version: "2.0"' > $mock_packages/$name/$name.$version/opam
   cat >>$mock_packages/$name/$name.$version/opam
+  # Commit the package so single-file format can derive from repo hash
+  (cd mock-opam-repository && git add -A && git commit -q -m "Add $name.$version")
 }
 
 mk_ocaml() {
@@ -136,8 +140,8 @@ unset_pkg() {
 }
 
 add_mock_repo_if_needed() {
-  # default, but can be overridden, e.g. if git is required
-  repo="${1:-file://$(pwd)/mock-opam-repository}"
+  # Use git+file:// for single-file lock format (needs repo hash for derivation)
+  repo="${1:-git+file://$(pwd)/mock-opam-repository}"
 
   if [ ! -e dune-workspace ]
   then
@@ -205,14 +209,16 @@ make_lockpkg_file() {
 
 dune_pkg_lock_normalized() {
   out="$(mktemp)"
-  # Default to directory format for tests that inspect .pkg files.
-  # Use --format=file to test the single-file format.
-  # If --format is already specified in args, don't add the default.
+  # Use dune's default format (single-file).
+  # Tests needing directory format should use --format=directory explicitly.
+  # DUNE_TEST_LOCK_FORMAT env var can override for backward compatibility.
   local args="$@"
   local format_arg=""
   if ! echo "$args" | grep -q '\-\-format'; then
-    local format="${DUNE_TEST_LOCK_FORMAT:-directory}"
-    format_arg="--format=$format"
+    local format="${DUNE_TEST_LOCK_FORMAT:-}"
+    if [ -n "$format" ]; then
+      format_arg="--format=$format"
+    fi
   fi
   if dune pkg lock $format_arg $@ 2>> "${out}"; then
     processed="$(mktemp)"

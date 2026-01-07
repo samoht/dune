@@ -5,5 +5,5 @@ let display = Dune_engine.Clflags.display
 let capture_outputs = Dune_engine.Clflags.capture_outputs
 let debug_artifact_substitution = ref false
 let debug_package_logs = ref false
-let auto_lock = ref Dune_config_file.Dune_config.Auto_lock.Disabled
+let auto_lock = ref Dune_config_file.Dune_config.Auto_lock.Auto
 let concurrency = ref 1

@@ -87,6 +87,7 @@ module Dune_config : sig
 
   module Auto_lock : sig
     type t =
+      | Auto
       | Disabled
       | Enabled
       | Always

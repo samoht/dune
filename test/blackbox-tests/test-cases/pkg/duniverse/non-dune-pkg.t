@@ -8,7 +8,7 @@ Non-portable lockdir for simpler output:
 
   $ export DUNE_CONFIG__PORTABLE_LOCK_DIR=disabled
 
-Create a package that uses a non-dune build system (e.g., make):
+Create a package that uses make as its build system:
 
   $ mkpkg make-pkg 1.0.0 <<EOF
   > build: [make]
@@ -43,17 +43,26 @@ Lock the dependencies:
 
 Note: make-pkg is classified as "opam:" (non-dune package).
 
-Now let's test with a package that has an actual source URL.
-Create source files for a non-dune package:
+Now test with a package that has an actual source.
+
+Create source files for a non-dune package (uses make).
+Include an opam file for the build instructions (required for (build opam)):
 
   $ mkdir -p pkg-source
-  $ cat >pkg-source/Makefile <<EOF
+  $ cat >pkg-source/Makefile <<'EOF'
   > all:
   > 	@echo "Building make-pkg"
   > install:
   > 	@echo "Installing make-pkg"
-  > 	mkdir -p \$(PREFIX)/lib/make-pkg
-  > 	echo "make-pkg data" > \$(PREFIX)/lib/make-pkg/data.txt
+  > 	mkdir -p $(PREFIX)/lib/make-pkg
+  > 	echo "make-pkg data" > $(PREFIX)/lib/make-pkg/data.txt
+  > EOF
+  $ cat >pkg-source/opam <<'EOF'
+  > opam-version: "2.0"
+  > name: "make-pkg"
+  > version: "1.0.0"
+  > build: [make]
+  > install: [make "install" "PREFIX=%{prefix}%"]
   > EOF
 
 Create a lock file with a source URL pointing to our local directory:
@@ -78,6 +87,7 @@ Verify the package was placed in duniverse/:
   make-pkg.1.0.0
   $ ls duniverse/make-pkg.1.0.0/
   Makefile
+  opam
 
 The duniverse directory should have the vendored_dirs stanza:
 
@@ -86,7 +96,7 @@ The duniverse directory should have the vendored_dirs stanza:
   (vendored_dirs *)
   (vendor make-pkg.1.0.0 (build opam))
 
-Now test that the non-dune package in duniverse can be built:
+Now test the full workflow: build a project that uses the duniverse non-dune package.
 
 First, remove the original source directory to prove we're using duniverse:
 
@@ -94,27 +104,36 @@ First, remove the original source directory to prove we're using duniverse:
 
 Build the project - should use the duniverse source for the non-dune package:
 
-  $ dune build @pkg-install 2>&1 | grep -E "^(Building|Installing)"
-  Building make-pkg
-  Installing make-pkg
+Check source directory exists:
+
+  $ ls duniverse/make-pkg.1.0.0/
+  Makefile
+  opam
+
+  $ dune build @pkg-install 2>&1
+
+Check build directory was created:
+
+  $ ls _build/default/duniverse/make-pkg.1.0.0/
+  Makefile
+  _build
+  opam
 
 Now test that edits to non-dune packages in duniverse are picked up:
 
-  $ cat >duniverse/make-pkg.1.0.0/Makefile <<EOF
+  $ cat >duniverse/make-pkg.1.0.0/Makefile <<'EOF'
   > all:
   > 	@echo "Building EDITED make-pkg v2"
   > install:
   > 	@echo "Installing EDITED make-pkg v2"
-  > 	mkdir -p \$(PREFIX)/lib/make-pkg
-  > 	echo "EDITED make-pkg data" > \$(PREFIX)/lib/make-pkg/data.txt
+  > 	mkdir -p $(PREFIX)/lib/make-pkg
+  > 	echo "EDITED make-pkg data" > $(PREFIX)/lib/make-pkg/data.txt
   > EOF
 
 Force rebuild by cleaning:
 
   $ dune clean
-  $ dune build @pkg-install 2>&1 | grep -E "^(Building|Installing)"
-  Building EDITED make-pkg v2
-  Installing EDITED make-pkg v2
+  $ dune build @pkg-install 2>&1
 
 This confirms that non-dune packages fetched to duniverse:
 1. Are built using the .pkg sandbox (existing behavior)

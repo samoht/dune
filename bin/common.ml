@@ -1481,6 +1481,11 @@ let init_with_root ~(root : Workspace_root.t) (builder : Builder.t) =
   Log.info
     "Workspace root"
     [ "root", Dyn.string (Path.to_absolute_filename Path.root |> String.maybe_quoted) ];
+  Log.info
+    "Package management"
+    [ "auto_lock", Dune_config.Auto_lock.to_dyn !Dune_rules.Clflags.auto_lock
+    ; "auto_fetch", Dyn.bool config.auto_fetch
+    ];
   Dune_console.separate_messages c.builder.separate_error_messages;
   Dune_trace.always_emit
     (Dune_trace.Event.config

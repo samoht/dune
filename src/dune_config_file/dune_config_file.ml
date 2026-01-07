@@ -247,25 +247,28 @@ module Dune_config = struct
 
   module Auto_lock = struct
     type t =
+      | Auto
       | Disabled
       | Enabled
       | Always
 
-    let all = [ "disabled", Disabled; "enabled", Enabled; "always", Always ]
+    let all = [ "auto", Auto; "disabled", Disabled; "enabled", Enabled; "always", Always ]
 
     let equal a b =
       match a, b with
-      | Disabled, Disabled | Enabled, Enabled | Always, Always -> true
+      | Auto, Auto | Disabled, Disabled | Enabled, Enabled | Always, Always -> true
       | _, _ -> false
     ;;
 
     let to_string = function
+      | Auto -> "auto"
       | Disabled -> "disabled"
       | Enabled -> "enabled"
       | Always -> "always"
     ;;
 
     let to_dyn = function
+      | Auto -> Dyn.variant "Auto" []
       | Disabled -> Dyn.variant "Disabled" []
       | Enabled -> Dyn.variant "Enabled" []
       | Always -> Dyn.variant "Always" []
@@ -541,7 +544,7 @@ module Dune_config = struct
         ; license = Some [ "LICENSE" ]
         }
     ; pkg_enabled = Unset
-    ; auto_lock = Auto_lock.Disabled
+    ; auto_lock = Auto_lock.Auto
     ; auto_fetch = true
     ; experimental = []
     }

@@ -247,25 +247,34 @@ let lock_dirs_of_workspace (workspace : Workspace.t) =
 
 let lock_dir_active ctx =
   let open Memo.O in
+  let check_lock_file_exists () =
+    get_source_path_for_context ctx
+    >>= function
+    | None -> Memo.return false
+    | Some source ->
+      (* Check for directory format first *)
+      let* is_dir = Source_tree.find_dir source >>| Option.is_some in
+      if is_dir
+      then Memo.return true
+      else
+        (* Check for single-file format *)
+        Fs_memo.file_exists (Path.Outside_build_dir.In_source_dir source)
+  in
   match !Clflags.auto_lock with
   | Disabled -> Memo.return false
   | Enabled | Always ->
+    (* CLI flag overrides workspace config - always enable package management.
+       The difference between Enabled and Always is in lock file generation:
+       - Enabled: use existing lock file, auto-lock if missing
+       - Always: always re-solve before building *)
+    Memo.return true
+  | Auto ->
+    (* Default behavior: check workspace config first, then lock file existence *)
     let* workspace = Workspace.workspace () in
     (match workspace.config.pkg_enabled with
      | Set (_, `Enabled) -> Memo.return true
      | Set (_, `Disabled) -> Memo.return false
-     | Unset ->
-       get_source_path_for_context ctx
-       >>= (function
-        | None -> Memo.return false
-        | Some source ->
-          (* Check for directory format first *)
-          let* is_dir = Source_tree.find_dir source >>| Option.is_some in
-          if is_dir
-          then Memo.return true
-          else
-            (* Check for single-file format *)
-            Fs_memo.file_exists (Path.Outside_build_dir.In_source_dir source)))
+     | Unset -> check_lock_file_exists ())
 ;;
 
 let source_kind (source : Dune_pkg.Source.t) =

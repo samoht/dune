@@ -38,6 +38,48 @@ This enables:
 - **Unified view**: One place for all dependency sources
 - **Appropriate build method**: Dune packages in main context, others sandboxed
 
+## Architecture
+
+The vendor infrastructure is the **primitive foundation** for building external
+packages. Lock files are a higher-level abstraction that **compiles to** the
+vendor infrastructure:
+
+```
+Lock file → compiles to → Vendor stanzas → builds packages
+                              ↑
+         Manual vendor stanzas also work directly
+```
+
+This layered design means:
+
+1. **Vendor infrastructure is the foundation**
+   - Can be anywhere in the workspace (not just `duniverse/`)
+   - Scans directories for opam files (packages) and dune files (libraries)
+   - Handles variable expansion (`%{prefix}%`, `%{lib}%`, etc.)
+   - Builds packages using opam-style or dune-style methods
+
+2. **Lock files compile to vendor infrastructure**
+   - `dune pkg lock` resolves dependencies and generates lock file
+   - `dune pkg fetch` fetches sources to `duniverse/` and generates vendor stanzas
+   - The generated stanzas use the same vendor infrastructure as manual stanzas
+   - Lock files just provide metadata; the vendor layer does the actual building
+
+3. **Single code path for variable expansion**
+   (see https://opam.ocaml.org/doc/Manual.html#Variables)
+   - Both lock file packages and manual vendor stanzas use the same expansion logic
+   - Global: `%{make}%`, `%{jobs}%`, `%{arch}%`, `%{os}%`, `%{os-family}%`,
+     `%{os-distribution}%`, `%{os-version}%`
+   - Switch: `%{prefix}%`, `%{lib}%`, `%{bin}%`, `%{sbin}%`, `%{share}%`,
+     `%{doc}%`, `%{etc}%`, `%{man}%`, `%{toplevel}%`, `%{stublibs}%`
+   - Package: `%{name}%`, `%{version}%`, `%{pkg:installed}%`, `%{pkg:enable}%`,
+     `%{pkg:lib}%`, `%{pkg:share}%`, `%{pkg:etc}%`, `%{pkg:doc}%`
+   - Build: `%{_:name}%`, `%{_:lib}%`, `%{_:share}%`, `%{_:etc}%` for current package
+
+This means you can:
+- Use vendor stanzas directly without a lock file (for manual dependency management)
+- Let `dune pkg` generate vendor stanzas from lock files (for automated management)
+- Mix both approaches in the same workspace
+
 ## The Vendor Stanza
 
 The `vendor` stanza declares a vendored dependency directory:

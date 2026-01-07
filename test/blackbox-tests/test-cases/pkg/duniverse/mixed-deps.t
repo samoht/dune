@@ -349,6 +349,13 @@ opam-leaf: creates a simple data file
   > 	mkdir -p $(PREFIX)/lib/opam-leaf
   > 	echo "leaf-value" > $(PREFIX)/lib/opam-leaf/data.txt
   > EOF
+  $ cat >opam-leaf-src/opam <<'EOF'
+  > opam-version: "2.0"
+  > name: "opam-leaf"
+  > version: "1.0.0"
+  > build: [make]
+  > install: [make "install" "PREFIX=%{prefix}%"]
+  > EOF
 
 dune-mid2: a dune library (can't directly use opam-leaf at code level)
 
@@ -374,6 +381,14 @@ opam-mid1: depends on dune-mid2 at package level
   > 	@echo "Installing opam-mid1"
   > 	mkdir -p $(PREFIX)/lib/opam-mid1
   > 	echo "mid1-value" > $(PREFIX)/lib/opam-mid1/data.txt
+  > EOF
+  $ cat >opam-mid1-src/opam <<'EOF'
+  > opam-version: "2.0"
+  > name: "opam-mid1"
+  > version: "1.0.0"
+  > depends: ["dune-mid2"]
+  > build: [make]
+  > install: [make "install" "PREFIX=%{prefix}%"]
   > EOF
 
 dune-top: uses dune-mid2 at code level
@@ -457,11 +472,7 @@ Create project that uses dune-top:
 
 Build all pkg dependencies first:
 
-  $ dune build @pkg-install 2>&1 | grep -E "^(Building|Installing)" | sort
-  Building opam-leaf
-  Building opam-mid1
-  Installing opam-leaf
-  Installing opam-mid1
+  $ dune build @pkg-install 2>&1
 
 Build the project:
 

@@ -124,9 +124,11 @@ Verify the duniverse directory structure:
   duniverse/.gitignore
   duniverse/dune
   duniverse/makelib.1.0.0/Makefile
+  duniverse/makelib.1.0.0/opam
   duniverse/mylib.1.0.0/dune
   duniverse/mylib.1.0.0/dune-project
   duniverse/mylib.1.0.0/mylib.ml
+  duniverse/mylib.1.0.0/opam
 
 Verify the dune file marks packages as vendored:
   $ cat duniverse/dune

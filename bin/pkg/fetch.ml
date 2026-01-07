@@ -386,7 +386,9 @@ let fetch_duniverse ~lock_dir_path ~solver_env () =
       List.map2 source_groups fetch_results ~f:(fun group (_was_fetched, dirname) ->
         group, dirname)
     in
-    (* Write opam files for each package in duniverse *)
+    (* Write opam files for each package in duniverse.
+       For single-file format, opam_files comes from repo derivation.
+       For directory format, opam_files is empty - tests should use single-file format. *)
     let opam_files_by_name =
       List.fold_left
         opam_files
