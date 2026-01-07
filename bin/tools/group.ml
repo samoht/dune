@@ -12,10 +12,12 @@ module Exec = struct
          ; Ocamllsp
          ; Ocamlearlybird
          ; Odig
+         ; Odoc
          ; Opam_publish
          ; Dune_release
          ; Ocaml_index
          ; Merlin
+         ; Utop
          ]
          ~f:Tools_common.exec_command)
   ;;
