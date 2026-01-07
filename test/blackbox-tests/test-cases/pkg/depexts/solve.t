@@ -21,13 +21,12 @@ With single-file format, depexts are derived from opam repo:
   Solution for dune.lock (1 package):
   opam:
   - foo.0.0.1
-  $ cat dune.lock
+  $ cat dune.lock | strip_sandbox | dune_cmd subst '[a-f0-9]{40}' 'COMMIT_HASH' | grep -v "^$" | head -10
   (lang package 0.1)
-  
-  (repos)
-  
+  (repos
+   $SANDBOX/default/test/blackbox-tests/test-cases/pkg/depexts/mock-opam-repository
+    COMMIT_HASH))
   (packages foo.0.0.1)
-  
   (platforms
    (linux
     (arch arm64 x86_64))
