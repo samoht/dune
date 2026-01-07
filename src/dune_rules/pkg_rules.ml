@@ -2797,37 +2797,6 @@ let setup_pkg_context_rules ctx ~dir ~components =
     Memo.return @@ Gen_rules.redirect_to_parent Gen_rules.Rules.empty
 ;;
 
-let setup_rules ~components ~dir ctx =
-  match components with
-  | [ ".pkg" ] ->
-    Gen_rules.make
-      ~build_dir_only_sub_dirs:
-        (Gen_rules.Build_only_sub_dirs.singleton ~dir Subdir_set.all)
-      (Memo.return Rules.empty)
-    |> Memo.return
-  | [ ".pkg"; pkg_digest_string ] ->
-    let pkg_digest = Pkg_digest.of_string pkg_digest_string in
-    (match Dev_tool.of_context_name ctx with
-     | Some dev_tool ->
-       let* db, _ = DB.of_dev_tool dev_tool in
-       setup_package_rules db ~package_universe:(Dependencies ctx) ~dir ~pkg_digest
-     | None ->
-       let* lock_dir_active = Lock_dir.lock_dir_active ctx in
-       (match lock_dir_active with
-        | false -> Memo.return @@ Gen_rules.make (Memo.return Rules.empty)
-        | true ->
-          let* db = DB.of_ctx ctx in
-          setup_package_rules db ~package_universe:(Dependencies ctx) ~dir ~pkg_digest))
-  | ".pkg" :: _ :: _ -> Memo.return @@ Gen_rules.redirect_to_parent Gen_rules.Rules.empty
-  | [] ->
-    let sub_dirs = [ ".pkg" ] in
-    let build_dir_only_sub_dirs =
-      Gen_rules.Build_only_sub_dirs.singleton ~dir @@ Subdir_set.of_list sub_dirs
-    in
-    Memo.return @@ Gen_rules.make ~build_dir_only_sub_dirs (Memo.return Rules.empty)
-  | _ -> Memo.return @@ Gen_rules.rules_here Gen_rules.Rules.empty
-;;
-
 let resolve_pkg_dep context (loc, package_name) =
   let* db, pkg_digest = DB.of_project_pkg context package_name in
   Resolve.resolve db loc pkg_digest (Dependencies context)

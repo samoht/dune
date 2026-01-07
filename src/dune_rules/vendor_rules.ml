@@ -131,9 +131,11 @@ let read_project_name dir =
   else None
 ;;
 
+(* Lib-cache for looking up library→directory mappings during dune pkg fetch.
+   The cache maps library names to directory names in duniverse/. *)
 let lib_cache_file =
   lazy
-    (let pkg_dir = Path.build (Path.Build.relative Path.Build.root "_build/.pkg") in
+    (let pkg_dir = Path.build (Path.Build.relative Path.Build.root "pkg") in
      Path.relative pkg_dir "lib-cache")
 ;;
 

@@ -5,26 +5,12 @@ open Import
 val context : Build_context.t
 val build_dir : Context_name.t -> Path.Build.t
 
-(** The package management rules setup two rules for every package:
-
-    - A rule for fetching the source to produce .pkg/$package/source
-
-    - A rule to build the package and produce the artifacts in
-      .pkg/$package/target.
-
-    It setups an alias rules to trigger the fetch and build of the
-    package universe. *)
-
+(** Set up package build rules for a directory under _build/pkg/<ctx>/...
+    Handles both vendor packages and lock file packages. *)
 val setup_pkg_context_rules
   :  Context_name.t
   -> dir:Path.Build.t
   -> components:string list
-  -> Build_config.Gen_rules.t Memo.t
-
-val setup_rules
-  :  components:string list
-  -> dir:Path.Build.t
-  -> Context_name.t
   -> Build_config.Gen_rules.t Memo.t
 
 val lock_dir_path : Context_name.t -> Path.t option Memo.t

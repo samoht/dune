@@ -811,4 +811,4 @@ install commands are read from the package's opam file.
 Non-dune packages with (build opam) should be built in opam sandbox:
 
   $ dune build @pkg-install 2>&1
-  $ cat _build/default/.pkg/vendor-make-pkg.1.0.0.marker 2>&1 || echo "no marker file"
+  $ cat _build/pkg/default/make-pkg.1.0.0/target/cookie 2>&1 || echo "no cookie file"
