@@ -22,6 +22,9 @@ val scan_opam_libraries : Path.Source.t -> string list
 val scan_libraries : Path.Source.t -> pkg_name:string -> string list
 val read_project_name : Path.Source.t -> string option
 
+(** Find opam file in a directory. Checks both "opam" and "<name>.opam". *)
+val find_opam_file : pkg_name:string -> pkg_dir:Path.Source.t -> Path.Source.t option
+
 (** {2 Library Cache}
     Maps library names to directory names in duniverse/. Used by dune pkg fetch. *)
 

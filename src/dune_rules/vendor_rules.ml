@@ -98,6 +98,16 @@ let scan_opam_libraries dir =
       else None)
 ;;
 
+(* Find opam file in a directory. Checks both "opam" and "<name>.opam". *)
+let find_opam_file ~pkg_name ~pkg_dir =
+  let candidates =
+    [ Path.Source.relative pkg_dir "opam"
+    ; Path.Source.relative pkg_dir (pkg_name ^ ".opam")
+    ]
+  in
+  List.find candidates ~f:(fun p -> Path.Untracked.exists (Path.source p))
+;;
+
 let scan_libraries dir ~pkg_name =
   match scan_public_libraries dir with
   | [] ->
@@ -229,17 +239,16 @@ end
 (* Scan a vendor package directory and extract package info *)
 let scan_vendor_package ~pkg_name ~pkg_dir =
   let version =
-    let opam_file = Path.Source.relative pkg_dir (pkg_name ^ ".opam") in
-    if Path.Untracked.exists (Path.source opam_file)
-    then (
+    match find_opam_file ~pkg_name ~pkg_dir with
+    | None -> Package_version.of_string "dev"
+    | Some opam_file ->
       let contents = Io.read_file ~binary:true (Path.source opam_file) in
-      match OpamFile.OPAM.read_from_string contents with
-      | exception _ -> Package_version.of_string "dev"
-      | opam ->
-        (match OpamFile.OPAM.version_opt opam with
-         | Some v -> Package_version.of_string (OpamPackage.Version.to_string v)
-         | None -> Package_version.of_string "dev"))
-    else Package_version.of_string "dev"
+      (match OpamFile.OPAM.read_from_string contents with
+       | exception _ -> Package_version.of_string "dev"
+       | opam ->
+         (match OpamFile.OPAM.version_opt opam with
+          | Some v -> Package_version.of_string (OpamPackage.Version.to_string v)
+          | None -> Package_version.of_string "dev"))
   in
   let libraries = scan_libraries pkg_dir ~pkg_name in
   version, libraries
@@ -496,14 +505,16 @@ let build_opam_package ~context ~pkg_name ~pkg_version ~source_dir ~opam_file =
   (* _build/pkg/<ctx>/<name>.<version>/target/cookie *)
   let root = pkg_build_root ~context ~pkg_name ~pkg_version in
   let paths = Paths.of_root pkg_name ~root ~relative:Path.Build.relative in
-  let marker_file = Paths.install_cookie' (Paths.target_dir paths) in
+  let target_dir = Paths.target_dir paths in
+  let marker_file = Paths.install_cookie' target_dir in
+  let mkdir_action = Action.mkdir target_dir in
   let marker_action = Action.write_file marker_file "" in
   let all_actions =
     [ progress_building ]
     @ build_actions
     @ [ progress_installing ]
     @ install_actions
-    @ [ marker_action ]
+    @ [ mkdir_action; marker_action ]
   in
   let action =
     Action.chdir build_path (Action.progn all_actions)
@@ -519,7 +530,8 @@ let build_opam_package ~context ~pkg_name ~pkg_version ~source_dir ~opam_file =
     Action_builder.with_no_targets deps
     >>> (Action_builder.return action
          |> Action_builder.with_no_targets
-         |> Action_builder.With_targets.add ~file_targets:[ marker_file ])
+         |> Action_builder.With_targets.add_directories ~directory_targets:[ target_dir ]
+        )
   in
   Memo.return (marker_file, with_targets)
 ;;
@@ -540,27 +552,23 @@ let setup_vendor_package_rules ~context ~pkg_dir =
     (* Only handle opam-sandboxed packages here *)
     (match info.build_method with
      | Some Vendor_stanza.Build_method.Opam_sandboxed ->
-       (* Find the opam file in the source directory *)
-       let opam_file_path =
-         Path.Source.relative info.source_dir (Package.Name.to_string pkg_name ^ ".opam")
-       in
-       let full_path = Path.source opam_file_path in
-       if Path.Untracked.exists full_path
-       then (
-         let contents = Io.read_file ~binary:true full_path in
-         match OpamFile.OPAM.read_from_string contents with
-         | exception _ -> Memo.return None
-         | opam_file ->
-           let+ _marker, action =
-             build_opam_package
-               ~context
-               ~pkg_name
-               ~pkg_version:info.version
-               ~source_dir:info.source_dir
-               ~opam_file
-           in
-           Some action)
-       else Memo.return None
+       let pkg_name_str = Package.Name.to_string pkg_name in
+       (match find_opam_file ~pkg_name:pkg_name_str ~pkg_dir:info.source_dir with
+        | None -> Memo.return None
+        | Some opam_file_path ->
+          let contents = Io.read_file ~binary:true (Path.source opam_file_path) in
+          (match OpamFile.OPAM.read_from_string contents with
+           | exception _ -> Memo.return None
+           | opam_file ->
+             let+ _marker, action =
+               build_opam_package
+                 ~context
+                 ~pkg_name
+                 ~pkg_version:info.version
+                 ~source_dir:info.source_dir
+                 ~opam_file
+             in
+             Some action))
      | Some Dune_native | None ->
        (* Native dune packages don't need special rules here *)
        Memo.return None)

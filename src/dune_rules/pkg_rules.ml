@@ -79,66 +79,48 @@ module Pkg_digest = struct
            the package's dependencies. *)
       }
 
-    let equal { name; version; lockfile_and_dependency_digest } t =
-      Package.Name.equal name t.name
-      && Package_version.equal version t.version
-      && Dune_digest.equal lockfile_and_dependency_digest t.lockfile_and_dependency_digest
+    let equal { name; version; _ } t =
+      Package.Name.equal name t.name && Package_version.equal version t.version
     ;;
 
-    let compare { name; version; lockfile_and_dependency_digest } t =
+    let compare { name; version; _ } t =
       let open Ordering.O in
       let= () = Package.Name.compare name t.name in
-      let= () = Package_version.compare version t.version in
-      Dune_digest.compare lockfile_and_dependency_digest t.lockfile_and_dependency_digest
+      Package_version.compare version t.version
     ;;
 
-    let to_dyn { name; version; lockfile_and_dependency_digest } =
+    let to_dyn { name; version; _ } =
       Dyn.record
-        [ "name", Package.Name.to_dyn name
-        ; "version", Package_version.to_dyn version
-        ; ( "lockfile_and_dependency_digest"
-          , Dune_digest.to_dyn lockfile_and_dependency_digest )
-        ]
+        [ "name", Package.Name.to_dyn name; "version", Package_version.to_dyn version ]
     ;;
 
-    let hash { name; version; lockfile_and_dependency_digest } =
-      Tuple.T3.hash
-        Package.Name.hash
-        Package_version.hash
-        Dune_digest.hash
-        (name, version, lockfile_and_dependency_digest)
+    let hash { name; version; _ } =
+      Tuple.T2.hash Package.Name.hash Package_version.hash (name, version)
     ;;
   end
 
   include T
   include Comparable.Make (T)
 
-  let to_string { name; version; lockfile_and_dependency_digest } =
-    sprintf
-      "%s.%s-%s"
-      (Package.Name.to_string name)
-      (Package_version.to_string version)
-      (Dune_digest.to_string lockfile_and_dependency_digest)
+  let to_string { name; version; lockfile_and_dependency_digest = _ } =
+    sprintf "%s.%s" (Package.Name.to_string name) (Package_version.to_string version)
   ;;
 
   let of_string s =
-    let parse_error msg =
-      User_error.raise [ Pp.textf "Failed to parse %S as a package pkg digest." s; msg ]
-    in
-    match String.lsplit2 s ~on:'.' with
-    | None -> parse_error (Pp.text "Missing '.' between name and version.")
-    | Some (name, rest) ->
-      (match String.rsplit2 rest ~on:'-' with
-       | None -> parse_error (Pp.text "Missing '-' between version and lockfile digest.")
-       | Some (version, lockfile_and_dependency_digest) ->
-         (match Dune_digest.from_hex lockfile_and_dependency_digest with
-          | None ->
-            parse_error
-              (Pp.textf "Failed to parse %S as digest" lockfile_and_dependency_digest)
-          | Some lockfile_and_dependency_digest ->
-            let name = Package.Name.of_string name in
-            let version = Package_version.of_string version in
-            { name; version; lockfile_and_dependency_digest }))
+    (* Parse "<name>.<version>" using OpamPackage for proper handling. *)
+    match OpamPackage.of_string_opt s with
+    | Some pkg ->
+      let name =
+        Package.Name.of_string (OpamPackage.Name.to_string (OpamPackage.name pkg))
+      in
+      let version =
+        Package_version.of_string
+          (OpamPackage.Version.to_string (OpamPackage.version pkg))
+      in
+      (* Digest is not used for identity - only name and version matter *)
+      let lockfile_and_dependency_digest = Dune_digest.string "" in
+      { name; version; lockfile_and_dependency_digest }
+    | None -> User_error.raise [ Pp.textf "Failed to parse %S as <name>.<version>" s ]
   ;;
 
   let digest_feed =
@@ -2773,9 +2755,28 @@ let setup_pkg_context_rules ctx ~dir ~components =
        (* This is a vendor package - generate rules for it *)
        let rules = Rules.collect_unit (fun () -> rule action) in
        let build_dir_only_sub_dirs =
-         Gen_rules.Build_only_sub_dirs.singleton ~dir Subdir_set.all
+         Gen_rules.Build_only_sub_dirs.singleton ~dir Subdir_set.empty
        in
-       Memo.return (Gen_rules.make ~build_dir_only_sub_dirs rules)
+       (* Parse pkg_dir to get name.version for Paths computation *)
+       let pkg_name, pkg_version =
+         match OpamPackage.of_string_opt pkg_dir_string with
+         | Some pkg ->
+           ( Package.Name.of_string (OpamPackage.Name.to_string (OpamPackage.name pkg))
+           , Package_version.of_string
+               (OpamPackage.Version.to_string (OpamPackage.version pkg)) )
+         | None -> Package.Name.of_string pkg_dir_string, Package_version.of_string "dev"
+       in
+       let paths =
+         Paths.make
+           { name = pkg_name
+           ; version = pkg_version
+           ; lockfile_and_dependency_digest = Dune_digest.string ""
+           }
+           (Dependencies ctx)
+           ~relative:Path.Build.relative
+       in
+       let directory_targets = Path.Build.Map.singleton paths.target_dir Loc.none in
+       Memo.return (Gen_rules.make ~directory_targets ~build_dir_only_sub_dirs rules)
      | None ->
        (* Not a vendor package - try lock file package *)
        let pkg_digest = Pkg_digest.of_string pkg_dir_string in
