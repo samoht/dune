@@ -2653,28 +2653,55 @@ module Vendor_build = struct
     |> Action_builder.paths
   ;;
 
-  (* Build opam vendor packages using the primitive vendor infrastructure.
-     Vendor infrastructure is the foundation - lock files compile DOWN to this. *)
-  let build_opam_sandbox_rule ctx_name ~subdir ~vendor_dir ~opam_path =
-    let pkg_name = Package.Name.of_string subdir in
+  (* Get the marker path for a vendor package without building rules.
+     The actual rules are generated from the pkg context via setup_pkg_context_rules. *)
+  let marker_path_for_vendor ~ctx_name ~subdir ~opam_path =
     let opam_contents = Io.read_file ~binary:true (Path.source opam_path) in
     let opam_file =
       Dune_pkg.Opam_file.read_from_string_exn
         ~contents:opam_contents
         (Path.source opam_path)
     in
+    (* Get package name from opam file, fallback to parsing directory name with OpamPackage *)
+    let pkg_name =
+      match OpamFile.OPAM.name_opt opam_file with
+      | Some n -> Package.Name.of_string (OpamPackage.Name.to_string n)
+      | None ->
+        (* Use OpamPackage to parse "name.version" format *)
+        (match OpamPackage.of_string_opt subdir with
+         | Some pkg ->
+           Package.Name.of_string (OpamPackage.Name.to_string (OpamPackage.name pkg))
+         | None -> Package.Name.of_string subdir)
+    in
     let pkg_version =
       match OpamFile.OPAM.version_opt opam_file with
       | Some v -> Package_version.of_string (OpamPackage.Version.to_string v)
       | None -> Package_version.of_string "dev"
     in
-    (* Use the primitive vendor infrastructure *)
-    Vendor_rules.build_opam_package
-      ~context:ctx_name
-      ~pkg_name
-      ~pkg_version
-      ~source_dir:vendor_dir
-      ~opam_file
+    (* Marker is at _build/pkg/<ctx>/<name>.<version>/target/cookie *)
+    Vendor_rules.marker_for_package ~context:ctx_name pkg_name
+    >>| function
+    | Some marker -> marker
+    | None ->
+      (* Fallback: compute the path directly if not in vendored map yet *)
+      let pkg_dir =
+        sprintf
+          "%s.%s"
+          (Package.Name.to_string pkg_name)
+          (Package_version.to_string pkg_version)
+      in
+      let pkg_context =
+        Vendor_rules.Paths.of_root
+          pkg_name
+          ~root:
+            (Path.Build.relative
+               (Path.Build.relative
+                  (Path.Build.of_string "_build/pkg")
+                  (Context_name.to_string ctx_name))
+               pkg_dir)
+          ~relative:Path.Build.relative
+      in
+      Vendor_rules.Paths.install_cookie' (Vendor_rules.Paths.target_dir pkg_context)
   ;;
 
   let classify_vendor_stanzas ctx_name =
@@ -2696,11 +2723,11 @@ module Vendor_build = struct
         then Memo.return (`Dune_package build_dir)
         else (
           (* Look for opam files. Priority: opam, then <name>.opam
-             where <name> is extracted from dir name (e.g. make-pkg.1.0.0 -> make-pkg) *)
+             where <name> is extracted using OpamPackage parsing *)
           let dir_name = Path.Source.basename subdir_path in
           let pkg_name =
-            match String.lsplit2 dir_name ~on:'.' with
-            | Some (name, _version) -> name
+            match OpamPackage.of_string_opt dir_name with
+            | Some pkg -> OpamPackage.Name.to_string (OpamPackage.name pkg)
             | None -> dir_name
           in
           let candidates =
@@ -2727,14 +2754,11 @@ module Vendor_build = struct
       | _ -> Memo.return (`Dune_package build_dir))
   ;;
 
-  let register_opam_sandbox_rules ctx_name opam_sandbox_pkgs =
-    let open Memo.O in
-    Memo.parallel_map opam_sandbox_pkgs ~f:(fun (subdir, vendor_dir, opam_path) ->
-      let* marker_file, with_targets =
-        build_opam_sandbox_rule ctx_name ~subdir ~vendor_dir ~opam_path
-      in
-      let+ () = rule ~loc:Loc.none with_targets in
-      marker_file)
+  (* Get marker paths for vendor packages. Rules are NOT registered here -
+     they are generated from the pkg context via setup_pkg_context_rules. *)
+  let get_opam_sandbox_markers ctx_name opam_sandbox_pkgs =
+    Memo.parallel_map opam_sandbox_pkgs ~f:(fun (subdir, _vendor_dir, opam_path) ->
+      marker_path_for_vendor ~ctx_name ~subdir ~opam_path)
   ;;
 
   let build_vendor_deps dune_dirs opam_markers =
@@ -2772,7 +2796,7 @@ let setup_pkg_install_alias ~dir ctx_name =
             | `Opam_sandbox info -> Right info)
         in
         let* opam_markers =
-          Vendor_build.register_opam_sandbox_rules ctx_name opam_sandbox_pkgs
+          Vendor_build.get_opam_sandbox_markers ctx_name opam_sandbox_pkgs
         in
         let* deps =
           match active with
@@ -2843,22 +2867,36 @@ let setup_pkg_context_rules ctx ~dir ~components =
         (Gen_rules.Build_only_sub_dirs.singleton ~dir Subdir_set.all)
       (Memo.return Rules.empty)
     |> Memo.return
-  | [ pkg_digest_string ] ->
-    (* _build/pkg/<ctx>/{digest}/ - set up package build rules *)
-    let pkg_digest = Pkg_digest.of_string pkg_digest_string in
-    (match Dev_tool.of_context_name ctx with
-     | Some dev_tool ->
-       (* Dev tool context - use the dev tool's lock dir *)
-       let* db, _ = DB.of_dev_tool dev_tool in
-       setup_package_rules db ~package_universe:(Dependencies ctx) ~dir ~pkg_digest
+  | [ pkg_dir_string ] ->
+    (* _build/pkg/<ctx>/<pkg_dir>/ - set up package build rules.
+       First check if this is a vendor package, then try lock file packages. *)
+    let* vendor_rules =
+      Vendor_rules.setup_vendor_package_rules ~context:ctx ~pkg_dir:pkg_dir_string
+    in
+    (match vendor_rules with
+     | Some action ->
+       (* This is a vendor package - generate rules for it *)
+       let rules = Rules.collect_unit (fun () -> rule action) in
+       let build_dir_only_sub_dirs =
+         Gen_rules.Build_only_sub_dirs.singleton ~dir Subdir_set.all
+       in
+       Memo.return (Gen_rules.make ~build_dir_only_sub_dirs rules)
      | None ->
-       (* Regular context - check for project lock dir *)
-       let* lock_dir_active = Lock_dir.lock_dir_active ctx in
-       (match lock_dir_active with
-        | false -> Memo.return @@ Gen_rules.make (Memo.return Rules.empty)
-        | true ->
-          let* db = DB.of_ctx ctx in
-          setup_package_rules db ~package_universe:(Dependencies ctx) ~dir ~pkg_digest))
+       (* Not a vendor package - try lock file package *)
+       let pkg_digest = Pkg_digest.of_string pkg_dir_string in
+       (match Dev_tool.of_context_name ctx with
+        | Some dev_tool ->
+          (* Dev tool context - use the dev tool's lock dir *)
+          let* db, _ = DB.of_dev_tool dev_tool in
+          setup_package_rules db ~package_universe:(Dependencies ctx) ~dir ~pkg_digest
+        | None ->
+          (* Regular context - check for project lock dir *)
+          let* lock_dir_active = Lock_dir.lock_dir_active ctx in
+          (match lock_dir_active with
+           | false -> Memo.return @@ Gen_rules.make (Memo.return Rules.empty)
+           | true ->
+             let* db = DB.of_ctx ctx in
+             setup_package_rules db ~package_universe:(Dependencies ctx) ~dir ~pkg_digest)))
   | _ :: _ ->
     (* Subdirectories within a package build - redirect to parent *)
     Memo.return @@ Gen_rules.redirect_to_parent Gen_rules.Rules.empty
