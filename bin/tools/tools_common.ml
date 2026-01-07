@@ -78,6 +78,24 @@ let read_project_ocaml_version_sync ~workspace_root =
            Package_version.to_string pkg.info.version)))
 ;;
 
+(* Create a symlink in _build/install/default/bin/ pointing to the cached binary. *)
+let create_install_symlink ~workspace_root dev_tool ~cached_exe_path =
+  let exe_name = Dune_pkg.Dev_tool.exe_name dev_tool in
+  let install_bin_dir_str =
+    Filename.concat
+      (Path.to_string workspace_root)
+      (String.concat ~sep:Filename.dir_sep [ "_build"; "install"; "default"; "bin" ])
+  in
+  let install_bin_dir = Path.of_string install_bin_dir_str in
+  Path.mkdir_p install_bin_dir;
+  let symlink_path = Path.relative install_bin_dir exe_name in
+  (* Remove existing file/symlink if present *)
+  (try Unix.unlink (Path.to_string symlink_path) with
+   | Unix.Unix_error (Unix.ENOENT, _, _) -> ());
+  (* Create symlink to cached binary *)
+  Unix.symlink (Path.to_string cached_exe_path) (Path.to_string symlink_path)
+;;
+
 (* Populate the global cache after a successful dev tool build. *)
 let populate_cache_sync ~workspace_root dev_tool =
   (* Get the source directory where the tool was built.
@@ -106,7 +124,13 @@ let populate_cache_sync ~workspace_root dev_tool =
         then read_project_ocaml_version_sync ~workspace_root
         else None
       in
-      Dev_tool_cache.populate_cache ~dev_tool ~version ~ocaml_version ~source_dir)
+      Dev_tool_cache.populate_cache ~dev_tool ~version ~ocaml_version ~source_dir;
+      (* Create symlink in _build/install/default/bin/ pointing to cached binary *)
+      let cached_exe_path =
+        Dev_tool_cache.exe_path ~dev_tool ~version ~ocaml_version
+        |> Path.outside_build_dir
+      in
+      create_install_symlink ~workspace_root dev_tool ~cached_exe_path)
 ;;
 
 let build_dev_tool_directly common dev_tool =
@@ -308,26 +332,76 @@ let lock_and_build_dev_tool_with_version ~common ~config builder dev_tool versio
       build_dev_tool_with_version_directly common dev_tool version)
 ;;
 
+(* Parse a tool specification like "ocamlformat" or "ocamlformat.0.27.0" into
+   (tool_name, optional_version). *)
+let parse_tool_spec spec =
+  (* Find the dev tool that matches the beginning of the spec *)
+  let find_matching_tool () =
+    List.find_opt Dune_pkg.Dev_tool.all ~f:(fun tool ->
+      let name = Dune_pkg.Dev_tool.exe_name tool in
+      String.is_prefix spec ~prefix:name
+      && (String.length spec = String.length name
+          || String.get spec (String.length name) = '.'))
+  in
+  match find_matching_tool () with
+  | None -> None
+  | Some tool ->
+    let name = Dune_pkg.Dev_tool.exe_name tool in
+    let version =
+      if String.length spec > String.length name
+      then (
+        (* Skip the '.' after the tool name *)
+        let version_str = String.drop_prefix spec ~prefix:(name ^ ".") in
+        Option.map version_str ~f:Package_version.of_string)
+      else None
+    in
+    Some (tool, version)
+;;
+
 let install_command dev_tool =
   let exe_name = Pkg_dev_tool.exe_name dev_tool in
   let term =
     let+ builder = Common.Builder.term
-    and+ version =
-      Arg.(
-        value
-        & opt (some string) None
-        & info
-            [ "pkg-version" ]
-            ~docv:"VERSION"
-            ~doc:(Some (sprintf "Install a specific version of %s" exe_name)))
+    and+ version_suffix =
+      Arg.(value & pos 0 (some string) None & info [] ~docv:"VERSION" ~doc:None)
     in
     let common, config = Common.init builder in
-    let version = Option.map version ~f:Package_version.of_string in
+    (* Version can be specified as positional arg: ocamlformat 0.27.0 *)
+    let version = Option.map version_suffix ~f:Package_version.of_string in
     lock_and_build_dev_tool_with_version ~common ~config builder dev_tool version
   in
   let info =
-    let doc = sprintf "Install %s as a dev tool" exe_name in
+    let doc = sprintf "Install %s as a dev tool. Optionally specify VERSION." exe_name in
     Cmd.info exe_name ~doc
+  in
+  Cmd.v info term
+;;
+
+(* Unified install command that accepts tool.version syntax *)
+let install_unified_command =
+  let term =
+    let+ builder = Common.Builder.term
+    and+ tool_spec =
+      Arg.(
+        required
+        & pos 0 (some string) None
+        & info [] ~docv:"TOOL[.VERSION]" ~doc:(Some "Tool name, optionally with version (e.g., ocamlformat.0.27.0)"))
+    in
+    let common, config = Common.init builder in
+    match parse_tool_spec tool_spec with
+    | None ->
+      User_error.raise
+        [ Pp.textf "Unknown dev tool: %s" tool_spec
+        ; Pp.text "Available tools:"
+        ; Pp.enumerate Dune_pkg.Dev_tool.all ~f:(fun t ->
+            Pp.text (Dune_pkg.Dev_tool.exe_name t))
+        ]
+    | Some (dev_tool, version) ->
+      lock_and_build_dev_tool_with_version ~common ~config builder dev_tool version
+  in
+  let info =
+    let doc = "Install a dev tool. Use TOOL.VERSION syntax to install a specific version." in
+    Cmd.info "install" ~doc
   in
   Cmd.v info term
 ;;

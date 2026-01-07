@@ -44,7 +44,14 @@ Cache key for compiler-independent tools: {package_name}.{version}
   $ find fake-cache/dune/tools -type f 2>/dev/null | sort
   fake-cache/dune/tools/ocamlformat.0.26.2/bin/ocamlformat
 
-=== Test 2: Running tool from cache ===
+=== Test 2: Symlink in _build/install/bin/ ===
+
+A symlink should be created in _build/install/default/bin/ pointing to the cache.
+
+  $ readlink _build/install/default/bin/ocamlformat
+  $TESTCASE_ROOT/fake-cache/dune/tools/ocamlformat.0.26.2/bin/ocamlformat
+
+=== Test 3: Running tool from cache ===
 
 After using the tool, it should run from the cache.
 
@@ -52,7 +59,7 @@ After using the tool, it should run from the cache.
        Running 'ocamlformat'
   formatted with version 0.26.2
 
-=== Test 3: Fast reinstall after dune clean ===
+=== Test 4: Fast reinstall after dune clean ===
 
 The global cache should survive dune clean.
 
@@ -69,12 +76,12 @@ No "Solution for" message should appear.
   $ dune tools exec ocamlformat 2>&1 | grep -v "Running"
   formatted with version 0.26.2
 
-=== Test 4: dune tools which shows cache path ===
+=== Test 5: dune tools which shows cache path ===
 
   $ dune tools which ocamlformat
   $TESTCASE_ROOT/fake-cache/dune/tools/ocamlformat.0.26.2/bin/ocamlformat
 
-=== Test 5: No lock files written outside _build ===
+=== Test 6: No lock files written outside _build ===
 
 Per design doc: "No lock file written. No files outside `_build/` in user's repo."
 The dev tool should use the global cache without creating lock directories.
@@ -85,16 +92,16 @@ The dev tool should use the global cache without creating lock directories.
   $ find . -maxdepth 1 -name "*.lock" -o -name "*lock*" -type d 2>/dev/null | grep -v _build || echo "No lock files outside _build"
   No lock files outside _build
 
-=== Test 6: Install specific version with --pkg-version ===
+=== Test 7: Install specific version with tool.version syntax ===
 
 Create another version of ocamlformat.
 
   $ make_fake_ocamlformat "0.27.0"
   $ make_ocamlformat_opam_pkg "0.27.0"
 
-Install a specific version using the --pkg-version flag.
+Install a specific version using the tool.version syntax.
 
-  $ dune tools install ocamlformat --pkg-version 0.27.0
+  $ dune tools install ocamlformat.0.27.0
   Solution for _build/.dev-tools.locks/ocamlformat (1 package)
   dune:
   - ocamlformat.0.27.0
