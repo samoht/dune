@@ -295,7 +295,7 @@ A package needs `(sandbox opam)` if its lock file entry contains:
 - Non-dune build commands (`make`, `./configure`, etc.)
 - Install commands that reference opam paths
 
-Example lock entry triggering opam sandbox:
+Example lock entry triggering opam build:
 
 ```lisp
 ; dune.lock/opam-state.2.2.0.pkg

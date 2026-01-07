@@ -237,7 +237,7 @@ When building, dune:
 
 1. **Fetches opam-repo at pinned hash** (cached in ~/.cache/dune)
 2. **Looks up each package** → gets source URL, checksum, build commands, deps
-3. **Classifies** → duniverse (dune-built) or opam sandbox
+3. **Classifies** → duniverse (dune-built) or opam
 4. **Applies patches** → from opam repo + user patches
 5. **Builds** → as today
 
@@ -335,7 +335,7 @@ module File : sig
 end
 
 (* Derive full Lock.t from File.t + repo *)
-val derive_from_file
+val derive
   :  File.t
   -> repos:Opam_repo.t list
   -> Lock.t Fiber.t
@@ -358,8 +358,8 @@ val load_package_at_hash
 
 ### Phase 2: Add Derivation from Repo
 - Modify `Opam_repo` to support lookup by hash
-- Add `derive_from_file` function
-- Cache derived Lock.t in `_build/pkg/<context>/.lock-cache/`
+- Add `derive` function
+- Cache derived Lock.t in `_build/lock/<context>/`
 
 ### Phase 3: Integration
 - Modify `Write_disk.prepare` to use file format

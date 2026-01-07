@@ -126,42 +126,42 @@ they're built by dune's context-aware build system.
 For **non-dune packages**: The build command runs as-is, without
 cross-compilation environment variables.
 
-## Opam Sandbox Directory Structure
+## Opam Build Directory Structure
 
-Non-dune packages are built in `_build/_private/<context>/.pkg/` using context names:
+Non-dune packages are built in `_build/pkg/<context>/` using context names:
 
 ```
-_build/_private/
-  default/.pkg/
-    <pkg-name>.<version>-<hash>/
+_build/pkg/
+  default/
+    <pkg-name>.<version>-<digest>/
       source/     # extracted source
       target/     # install prefix
-  ocaml414/.pkg/
-    <pkg-name>.<version>-<hash>/
+  ocaml414/
+    <pkg-name>.<version>-<digest>/
       source/
       target/
-  default.windows/.pkg/
-    <pkg-name>.<version>-<hash>/
+  default.windows/
+    <pkg-name>.<version>-<digest>/
       source/
       target/
 ```
 
 Each context has its own copy of sources and build artifacts.
 
-### Per-Context Opam Sandbox Builds
+### Per-Context Opam Builds
 
-When building non-dune packages (opam sandbox), each context builds separately:
+When building non-dune packages (opam), each context builds separately:
 
-1. **Per-context isolation**: Each context has its own `_build/_private/<context>/.pkg/` directory
+1. **Per-context isolation**: Each context has its own `_build/pkg/<context>/` directory
 2. **Compiler injection**: Each context uses its `(compiler ...)` package
 3. **Environment**: `OCAMLFIND_TOOLCHAIN`, `CC`, etc. set per context
 
 ```
 # Building zarith (non-dune) for multiple contexts:
 
-_build/_private/default/.pkg/zarith.1.14-<hash>/source/          # built with ocaml.5.2.0
-_build/_private/ocaml414/.pkg/zarith.1.14-<hash>/source/         # built with ocaml.4.14.2
-_build/_private/default.windows/.pkg/zarith.1.14-<hash>/source/  # built with ocaml-windows
+_build/pkg/default/zarith.1.14-<digest>/source/          # built with ocaml.5.2.0
+_build/pkg/ocaml414/zarith.1.14-<digest>/source/         # built with ocaml.4.14.2
+_build/pkg/default.windows/zarith.1.14-<digest>/source/  # built with ocaml-windows
 ```
 
 ### Implementation: pkg_rules.ml Changes
@@ -195,9 +195,9 @@ Running `dune pkg lock` with this workspace solves for all specified compilers
 and platforms, creating a single dune.lock with appropriate package filters.
 
 This creates:
-- `_build/default/` and `_build/_private/default/.pkg/` (OCaml 5.4)
-- `_build/ocaml414/` and `_build/_private/ocaml414/.pkg/` (OCaml 4.14)
-- `_build/default.windows/` and `_build/_private/default.windows/.pkg/` (cross-compiled)
+- `_build/default/` and `_build/pkg/default/` (OCaml 5.4)
+- `_build/ocaml414/` and `_build/pkg/ocaml414/` (OCaml 4.14)
+- `_build/default.windows/` and `_build/pkg/default.windows/` (cross-compiled)
 
 Each context has its own copy of sources and build artifacts.
 

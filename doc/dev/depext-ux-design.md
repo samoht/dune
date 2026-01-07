@@ -167,8 +167,6 @@ brew bundle check
 #   gnupg
 ```
 
-**Recommendation:** Add `dune pkg check-depexts` or `dune doctor` command.
-
 ---
 
 ### 4. Platform Detection Could Be More Helpful

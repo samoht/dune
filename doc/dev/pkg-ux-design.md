@@ -48,14 +48,14 @@ The following improvements have been implemented:
 - **Before:** `bar 0.0.1 < 0.0.2`
 - **After:** `bar 0.0.1 -> 0.0.2`
 
-### 2. Simplified "opam sandbox" terminology
+### 2. Simplified "opam" terminology
 - **File:** `bin/pkg/pkg_common.ml:151`
-- **Before:** `opam sandbox:` and `duniverse (dune-built):`
+- **Before:** `opam:` and `duniverse (dune-built):`
 - **After:** `opam:` and `dune:`
 
 ### 3. Updated fetch messages to use simpler terminology
 - **File:** `bin/pkg/fetch.ml`
-- **Before:** "all packages use opam sandbox"
+- **Before:** "all packages use opam"
 - **After:** "all packages use opam"
 
 ### 4. Added package count to lock output
@@ -147,13 +147,13 @@ cargo update              # Update lock file
 Solution for dune.lock
 
 Dependencies common to all supported platforms:
-opam sandbox:
+opam:
 - foo.0.0.1
 - bar.0.0.2
 ```
 
 **Issues:**
-- "opam sandbox" is cryptic - what does it mean to users?
+- "opam" is cryptic - what does it mean to users?
 - No indication of what's new vs already locked
 - No download progress or timing info
 - No distinction between direct and transitive deps
@@ -175,7 +175,7 @@ installed serde@1.0.152
 ```
 
 **Recommendations:**
-- ✅ Replace "opam sandbox" with clearer terminology (done)
+- ✅ Replace "opam" with clearer terminology (done)
 - ✅ Add package count (done)
 - Consider showing direct vs transitive deps separately
 - Show "Added:", "Updated:" sections only when re-locking (not first lock)
@@ -420,11 +420,11 @@ Cargo's coloured output is scannable *without* colours because it uses consisten
 
 More intuitive "upgrade path" visualization.
 
-#### 2. Replace "opam sandbox" with clearer terminology
-**Current:** `opam sandbox:\n- foo.0.0.1`
+#### 2. Replace "opam" with clearer terminology
+**Current:** `opam:\n- foo.0.0.1`
 **Proposed:** `- foo.0.0.1` (just list packages) or use "Packages:" header
 
-The "opam sandbox" label is OCaml-ecosystem jargon that's confusing to newcomers.
+The "opam" label is OCaml-ecosystem jargon that's confusing to newcomers.
 
 #### 3. Add package count to lock output
 **Current:**
@@ -432,7 +432,7 @@ The "opam sandbox" label is OCaml-ecosystem jargon that's confusing to newcomers
 Solution for dune.lock
 
 Dependencies common to all supported platforms:
-opam sandbox:
+opam:
 - foo.0.0.1
 - bar.0.0.2
 ```
@@ -464,13 +464,13 @@ Solution for dune.lock (2 packages)
 - `test/blackbox-tests/test-cases/pkg/outdated.t`
 - `bin/pkg/outdated.ml` (man page example on line 98)
 
-### Change 2: Simplify "opam sandbox" terminology
+### Change 2: Simplify "opam" terminology
 
 **File:** `bin/pkg/pkg_common.ml:151`
 
 ```ocaml
 (* Current *)
-[ "duniverse (dune-built)", duniverse_pkgs; "opam sandbox", opam_pkgs ]
+[ "duniverse (dune-built)", duniverse_pkgs; "opam", opam_pkgs ]
 
 (* Option A: Remove category labels entirely - just list packages *)
 (* Option B: Use clearer labels *)
@@ -478,10 +478,10 @@ Solution for dune.lock (2 packages)
 ```
 
 **Also update:**
-- `bin/pkg/fetch.ml:279` - "all packages use opam sandbox" message
+- `bin/pkg/fetch.ml:279` - "all packages use opam" message
 
 **Tests to update:**
-- Multiple tests reference "opam sandbox:" in output
+- Multiple tests reference "opam:" in output
 
 ### Change 3: Add package count to lock output
 
@@ -657,7 +657,7 @@ These don't fit Dune's scope or principles:
 **To modify now:**
 - `src/dune_pkg/outdated.ml` - Change `<` to `->`
 - `bin/pkg/outdated.ml` - Update man page example
-- `bin/pkg/pkg_common.ml` - Simplify "opam sandbox" label
+- `bin/pkg/pkg_common.ml` - Simplify "opam" label
 - `bin/pkg/fetch.ml` - Update related message
 - `bin/pkg/lock.ml` - Add package count to solution header
 
