@@ -11,20 +11,25 @@ of the main project, with selective library exposure and sandbox modes.
 ## Overview
 
 **All locked dependencies are fetched to `duniverse/`** - both dune-buildable and
-non-dune packages. The `_build/.pkg/` directory is used only as a **sandbox for
-building** non-dune packages, not for storing sources.
+non-dune packages. Non-dune packages are built in a sandbox under `_build/pkg/`.
 
 ```
 project/
   dune.lock                   # Lock file (single-file or directory format)
-  duniverse/                  # ALL package sources
+  duniverse/                  # ALL package sources (editable)
     ppxlib.0.33.0/            # Dune package → built in main context
-    zarith.1.14/              # Non-dune package → built in .pkg sandbox
+    zarith.1.14/              # Non-dune package → built in pkg sandbox
     dune                      # Generated vendor stanzas
   _build/
-    .pkg/                     # Sandbox for building non-dune packages
-      <digest>/               # Build artifacts (NOT sources)
+    pkg/default/              # Package builds
+      zarith.1.14-<digest>/   # <name>.<version>-<lockfile+deps digest>
+        source/               # Linked/copied from duniverse/ (rule inputs)
+        target/               # Build artifacts (rule outputs)
+    install/default/          # Shared install prefix
 ```
+
+Sources are always in `_build/pkg/<ctx>/<digest>/source/` for proper rule
+input/output tracking. For vendored packages, this is linked from `duniverse/`.
 
 This enables:
 
@@ -328,7 +333,7 @@ This approach:
 
 ### Current Behavior
 
-Currently `@pkg-install` builds and installs locked packages into `_build/_private/default/.pkg`.
+Currently `@pkg-install` builds and installs locked packages into `_build/pkg/default/`.
 This is used to prebuild dependencies before building the main project.
 
 ### New Behavior
@@ -355,7 +360,7 @@ Keep `@pkg-install` rather than removing it because:
 
 | Scenario | `@pkg-install` builds |
 |----------|----------------------|
-| Lock dir only (no duniverse) | Packages in `_build/_private/.pkg` |
+| Lock dir only (no duniverse) | Packages in `_build/pkg/<ctx>/` |
 | Duniverse only | All libraries in `duniverse/` |
 | Both | Both (lock packages + duniverse) |
 | Additional vendor dirs | Includes all vendor stanza directories |

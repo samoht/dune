@@ -40,26 +40,28 @@ isolated context. The only difference is a promotion step at the end.
 
 ```
 _build/
-├── tools-ocamlformat/              # Build context (isolated from project)
-├── pkg/tools-ocamlformat/          # Package builds
-│   ├── ocamlformat.0.26.2/
-│   │   ├── source/                 # Extracted source + build
+├── pkg/tools-ocamlformat/            # Package builds (context = tools-ocamlformat)
+│   ├── ocamlformat.0.26.2-<digest>/  # <name>.<version>-<lockfile+deps digest>
+│   │   ├── source/                   # Fetched & extracted source
 │   │   └── target/
-│   │       ├── cookie              # Dune rule tracking
-│   │       └── ocamlformat.install # Copied from source (file tracking)
-│   └── base.0.16.0/
+│   │       ├── cookie                # Dune rule tracking
+│   │       └── ocamlformat.install   # Copied from source (file tracking)
+│   └── base.0.16.0-<digest>/
 │       ├── source/
 │       └── target/
 │           ├── cookie
 │           └── base.install
-├── lock/tools-ocamlformat/         # Lock directory (auto-generated)
+├── lock/tools-ocamlformat/           # Lock directory (auto-generated)
 └── install/
-    ├── tools-ocamlformat/          # Shared install prefix (OPAM_SWITCH_PREFIX)
-    │   ├── bin/ocamlformat         # All packages install here
+    ├── tools-ocamlformat/            # Shared install prefix (OPAM_SWITCH_PREFIX)
+    │   ├── bin/ocamlformat           # All packages install here
     │   └── lib/...
     └── default/
-        └── bin/ocamlformat         # Promoted from tools-ocamlformat
+        └── bin/ocamlformat           # Promoted from tools-ocamlformat
 ```
+
+The `<digest>` is a hash of the package's lockfile content plus all dependency
+digests. This ensures rebuilds when dependencies change.
 
 **Package Installation:**
 All packages install to the shared prefix `_build/install/<ctx>/` (like opam's
@@ -155,7 +157,7 @@ When user runs `dune fmt`:
 5. **Cache miss**:
    - Generate lock dir at `_build/lock/tools-ocamlformat/`
    - Build packages in `_build/pkg/tools-ocamlformat/`
-   - Promote `_build/pkg/tools-ocamlformat/ocamlformat.0.26.2/target/bin/*`
+   - Promote `_build/pkg/tools-ocamlformat/ocamlformat.0.26.2-<digest>/target/bin/*`
      to `_build/install/default/bin/`
    - Copy binary to global cache
    - Replace with symlink pointing to cache
