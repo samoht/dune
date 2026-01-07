@@ -121,13 +121,13 @@ let unset_solver_vars_of_workspace workspace ~lock_dir_path =
 
 let find_local_packages =
   let open Memo.O in
-  let duniverse_dir = Dune_pkg.Duniverse.marker_dirname in
+  let vendor_dir = Dune_pkg.Vendor.default_dir_name in
   Dune_rules.Dune_load.packages ()
   >>| Package.Name.Map.filter ~f:(fun pkg ->
-    (* Exclude packages in duniverse/ - they are vendored dependencies, not local packages *)
+    (* Exclude packages in vendor dir - they are vendored dependencies, not local packages *)
     let dir = Package.dir pkg in
     match Path.Source.explode dir with
-    | first :: _ when String.equal first duniverse_dir -> false
+    | first :: _ when String.equal first vendor_dir -> false
     | _ -> true)
   >>| Package.Name.Map.map ~f:Dune_pkg.Local_package.of_package
 ;;
@@ -147,15 +147,15 @@ let pp_package { Lock_dir.Pkg.info = { Lock_dir.Pkg_info.name; version; avoid; _
 let pp_packages packages = Pp.enumerate packages ~f:pp_package
 
 let pp_packages_by_target packages =
-  let module Duniverse = Dune_pkg.Duniverse in
-  let duniverse_pkgs, opam_pkgs =
+  let module Vendor = Dune_pkg.Vendor in
+  let dune_pkgs, opam_pkgs =
     List.partition packages ~f:(fun pkg ->
-      match Duniverse.classify pkg with
-      | Duniverse.Duniverse -> true
-      | Duniverse.Opam_sandbox -> false)
+      match Vendor.classify_build_method pkg with
+      | Vendor.Dune_native -> true
+      | Vendor.Opam_sandboxed -> false)
   in
   let sections =
-    [ "dune", duniverse_pkgs; "opam", opam_pkgs ]
+    [ "dune", dune_pkgs; "opam", opam_pkgs ]
     |> List.filter ~f:(fun (_, pkgs) -> not (List.is_empty pkgs))
   in
   match sections with

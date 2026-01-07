@@ -1,4 +1,4 @@
-module Duniverse = Duniverse
+module Vendor = Vendor
 module Fetch = Fetch
 module Pkg_cache = Pkg_cache
 module Checksum = Checksum

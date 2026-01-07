@@ -2,7 +2,8 @@ open Import
 module Lock_dir = Dune_pkg.Lock
 module Lock_pkg = Dune_pkg.Lock_pkg
 module Source = Dune_pkg.Source
-module Duniverse = Dune_pkg.Duniverse
+module Vendor = Dune_pkg.Vendor
+module Vendor_rules = Dune_rules.Vendor_rules
 module Rev_store = Dune_pkg.Rev_store
 module OpamUrl = Dune_pkg.OpamUrl
 module Pkg_cache = Dune_pkg.Pkg_cache
@@ -212,10 +213,10 @@ let start_fetch ~name ~version =
    Uses the project name from dune-project if available, otherwise falls back
    to the primary package name. Returns (dirname, version). *)
 let determine_dirname group fetched_dir =
-  let { Duniverse.primary_name; primary_version; _ } = group in
+  let { Vendor.primary_name; primary_version; _ } = group in
   (* Check if fetched source has a dune-project with a name *)
   let fetched_source_dir = Path.Source.of_string (Path.to_string fetched_dir) in
-  match Duniverse.read_project_name fetched_source_dir with
+  match Vendor_rules.read_project_name fetched_source_dir with
   | Some project_name -> project_name, primary_version
   | None -> Package_name.to_string primary_name, primary_version
 ;;
@@ -225,8 +226,8 @@ let determine_dirname group fetched_dir =
    project name from dune-project if available. *)
 let fetch_source_group ~rev_store ~platform ~patches_dir ~pkgs_by_name group =
   let open Fiber.O in
-  let { Duniverse.packages; source; primary_name; primary_version } = group in
-  let initial_target = Duniverse.source_group_dir group |> Path.source in
+  let { Vendor.packages; source; primary_name; primary_version } = group in
+  let initial_target = Vendor.source_group_dir group |> Path.source in
   let initial_target_path = Path.to_string initial_target in
   (* Check for existing directory by looking up in duniverse/dune cache *)
   let find_existing_dir () =
@@ -237,10 +238,10 @@ let fetch_source_group ~rev_store ~platform ~patches_dir ~pkgs_by_name group =
       (* Look up in duniverse/dune's library->directory mapping.
          Use the primary package name as the expected library name. *)
       let pkg_name = Package_name.to_string primary_name in
-      match Duniverse.find_dir_for_library pkg_name with
+      match Vendor_rules.find_dir_for_library pkg_name with
       | Some dirname ->
         let dir_path =
-          Path.source (Path.Source.relative Duniverse.duniverse_dir dirname)
+          Path.source (Path.Source.relative Vendor.default_dir dirname)
         in
         if Path.exists dir_path then Some dir_path else None
       | None -> None)
@@ -262,7 +263,7 @@ let fetch_source_group ~rev_store ~platform ~patches_dir ~pkgs_by_name group =
       sprintf "%s.%s" final_name (Package_version.to_string final_version)
     in
     let final_target =
-      Path.source (Path.Source.relative Duniverse.duniverse_dir final_dirname)
+      Path.source (Path.Source.relative Vendor.default_dir final_dirname)
     in
     (* Rename if the project name differs from the initial target *)
     let target =
@@ -314,7 +315,7 @@ let fetch_source_group ~rev_store ~platform ~patches_dir ~pkgs_by_name group =
         match Package_name.Map.find pkgs_by_name name with
         | None -> Fiber.return ()
         | Some pkg ->
-          let patches = Duniverse.get_patches pkg ~platform in
+          let patches = Vendor.get_patches pkg ~platform in
           let* () =
             Fiber.sequential_iter patches ~f:(fun patch_sw ->
               match Dune_lang.String_with_vars.text_only patch_sw with
@@ -352,18 +353,18 @@ let fetch_duniverse ~lock_dir_path ~solver_env () =
            no_source_count);
     Fiber.return ())
   else (
-    let duniverse_path = Path.source Duniverse.duniverse_dir in
+    let duniverse_path = Path.source Vendor.default_dir in
     if not (Path.exists duniverse_path) then Path.mkdir_p duniverse_path;
     let marker_path =
-      Path.source (Path.Source.relative Duniverse.duniverse_dir Duniverse.marker_filename)
+      Path.source (Path.Source.relative Vendor.default_dir Vendor.marker_filename)
     in
     (* Group packages by source to avoid duplicate fetches *)
-    let source_groups = Duniverse.group_by_source fetchable_pkgs in
+    let source_groups = Vendor.group_by_source fetchable_pkgs in
     (* Build map for classifying packages *)
     let pkg_classifications =
       List.fold_left fetchable_pkgs ~init:Package_name.Map.empty ~f:(fun acc pkg ->
         let name = pkg.Lock_dir.Pkg.info.name in
-        Package_name.Map.set acc name (Duniverse.classify pkg))
+        Package_name.Map.set acc name (Vendor.classify_build_method pkg))
     in
     (* Build map for looking up packages by name *)
     let pkgs_by_name =
@@ -389,13 +390,13 @@ let fetch_duniverse ~lock_dir_path ~solver_env () =
     let dune_content =
       let vendor_stanzas =
         List.filter_map group_dirnames ~f:(fun (group, dirname) ->
-          let { Duniverse.packages; _ } = group in
-          let pkg_dir = Path.Source.relative Duniverse.duniverse_dir dirname in
+          let { Vendor.packages; _ } = group in
+          let pkg_dir = Path.Source.relative Vendor.default_dir dirname in
           (* Check if this is an opam package (needs sandbox) *)
           let is_opam =
             List.for_all packages ~f:(fun (name, _) ->
               match Package_name.Map.find pkg_classifications name with
-              | Some Duniverse.Opam_sandbox -> true
+              | Some Vendor.Opam_sandboxed -> true
               | _ -> false)
           in
           (* Scan for libraries using cascading strategy:
@@ -405,7 +406,7 @@ let fetch_duniverse ~lock_dir_path ~solver_env () =
             | (name, _) :: _ -> Package_name.to_string name
             | [] -> dirname
           in
-          let libs = Duniverse.scan_libraries pkg_dir ~pkg_name in
+          let libs = Vendor_rules.scan_libraries pkg_dir ~pkg_name in
           if is_opam
           then
             (* Opam package - needs sandbox, include libraries if found *)
@@ -430,7 +431,7 @@ let fetch_duniverse ~lock_dir_path ~solver_env () =
     then Io.write_file marker_path dune_content;
     (* Generate .gitignore to exclude fetched sources by default *)
     let gitignore_path =
-      Path.source (Path.Source.relative Duniverse.duniverse_dir ".gitignore")
+      Path.source (Path.Source.relative Vendor.default_dir ".gitignore")
     in
     let gitignore_content =
       {|# Auto-generated by dune pkg fetch
@@ -457,28 +458,28 @@ let auto_fetch_missing ~lock_dir_path ~solver_env () =
     List.filter all_pkgs ~f:(fun (pkg : Lock_dir.Pkg.t) -> Option.is_some pkg.info.source)
   in
   (* Group by source and filter to groups whose directory is missing *)
-  let source_groups = Duniverse.group_by_source fetchable_pkgs in
+  let source_groups = Vendor.group_by_source fetchable_pkgs in
   let missing_groups =
     List.filter source_groups ~f:(fun group ->
-      let target = Duniverse.source_group_dir group in
+      let target = Vendor.source_group_dir group in
       not (Path.exists (Path.source target)))
   in
   if List.is_empty missing_groups
   then Fiber.return ()
   else (
-    let duniverse_path = Path.source Duniverse.duniverse_dir in
+    let duniverse_path = Path.source Vendor.default_dir in
     if not (Path.exists duniverse_path) then Path.mkdir_p duniverse_path;
     let marker_path =
-      Path.source (Path.Source.relative Duniverse.duniverse_dir Duniverse.marker_filename)
+      Path.source (Path.Source.relative Vendor.default_dir Vendor.marker_filename)
     in
     (* Build map for classifying packages *)
     let pkg_classifications =
       List.fold_left fetchable_pkgs ~init:Package_name.Map.empty ~f:(fun acc pkg ->
         let name = pkg.Lock_dir.Pkg.info.name in
-        Package_name.Map.set acc name (Duniverse.classify pkg))
+        Package_name.Map.set acc name (Vendor.classify_build_method pkg))
     in
     (* Group all fetchable packages by source for vendor stanza generation *)
-    let all_source_groups = Duniverse.group_by_source fetchable_pkgs in
+    let all_source_groups = Vendor.group_by_source fetchable_pkgs in
     (* Build map for looking up packages by name *)
     let pkgs_by_name =
       List.fold_left fetchable_pkgs ~init:Package_name.Map.empty ~f:(fun acc pkg ->
@@ -500,14 +501,14 @@ let auto_fetch_missing ~lock_dir_path ~solver_env () =
         fetch_results
         ~init:[]
         ~f:(fun acc group (_was_fetched, dirname) ->
-          (group.Duniverse.primary_name, dirname) :: acc)
+          (group.Vendor.primary_name, dirname) :: acc)
     in
     (* Generate duniverse/dune with vendored_dirs and vendor stanzas *)
     (* Scan all existing directories for libraries *)
     let dune_content =
       let vendor_stanzas =
         List.filter_map all_source_groups ~f:(fun group ->
-          let { Duniverse.packages; primary_name; primary_version; _ } = group in
+          let { Vendor.packages; primary_name; primary_version; _ } = group in
           (* Use the fetched dirname if available, otherwise compute from project name *)
           let dirname =
             match List.assoc fetched_dirnames primary_name with
@@ -521,22 +522,22 @@ let auto_fetch_missing ~lock_dir_path ~solver_env () =
                   (Package_version.to_string primary_version)
               in
               let initial_dir =
-                Path.Source.relative Duniverse.duniverse_dir initial_dirname
+                Path.Source.relative Vendor.default_dir initial_dirname
               in
               if Path.exists (Path.source initial_dir)
               then (
-                match Duniverse.read_project_name initial_dir with
+                match Vendor_rules.read_project_name initial_dir with
                 | Some proj_name ->
                   sprintf "%s.%s" proj_name (Package_version.to_string primary_version)
                 | None -> initial_dirname)
               else initial_dirname
           in
-          let pkg_dir = Path.Source.relative Duniverse.duniverse_dir dirname in
+          let pkg_dir = Path.Source.relative Vendor.default_dir dirname in
           (* Check if this is an opam package (needs sandbox) *)
           let is_opam =
             List.for_all packages ~f:(fun (name, _) ->
               match Package_name.Map.find pkg_classifications name with
-              | Some Duniverse.Opam_sandbox -> true
+              | Some Vendor.Opam_sandboxed -> true
               | _ -> false)
           in
           (* Scan for libraries using cascading strategy:
@@ -546,7 +547,7 @@ let auto_fetch_missing ~lock_dir_path ~solver_env () =
             | (name, _) :: _ -> Package_name.to_string name
             | [] -> dirname
           in
-          let libs = Duniverse.scan_libraries pkg_dir ~pkg_name in
+          let libs = Vendor_rules.scan_libraries pkg_dir ~pkg_name in
           if is_opam
           then
             (* Opam package - needs sandbox, include libraries if found *)

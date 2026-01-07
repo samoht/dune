@@ -7,7 +7,7 @@ open Import
     Syntax:
     {[
       (vendor fmt.0.9.0 (libraries fmt fmt.tty))
-      (vendor make-pkg.1.0.0 (sandbox opam))
+      (vendor make-pkg.1.0.0 (build opam))  ; Build using opam sandbox
       (vendor yojson.1.7.0 (libraries (yojson :as yojson_v1)))
     ]}
 
@@ -17,10 +17,16 @@ open Import
     [vendor] stanzas can restrict which libraries are exposed from specific
     subdirectories. *)
 
-module Sandbox_mode : sig
+module Build_method : sig
+  (** How a vendored package should be built.
+
+      - [Dune_native]: Built as vendored code in the main dune context.
+        Libraries are directly available to the build system.
+      - [Opam_sandboxed]: Built in an isolated opam-style sandbox using
+        the package's opam build commands. *)
   type t =
-    | None
-    | Opam
+    | Dune_native
+    | Opam_sandboxed
 
   val decode : t Decoder.t
   val to_dyn : t -> Dyn.t
@@ -46,7 +52,9 @@ type t =
   ; directory : Filename.t
   ; libraries : Library_entry.t list option
   ; packages : Package_name.t list option
-  ; sandbox : Sandbox_mode.t option
+  ; build_method : Build_method.t option
+    (** How to build this vendored package. None means use default
+        (Dune_native for dune packages, Opam_sandboxed for non-dune). *)
   }
 
 val decode : t Decoder.t

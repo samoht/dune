@@ -1,6 +1,6 @@
 open Import
 module Lock_dir = Dune_pkg.Lock
-module Duniverse = Dune_pkg.Duniverse
+module Vendor = Dune_pkg.Vendor
 module Package_version = Dune_pkg.Package_version
 
 (* Default patches directory *)
@@ -122,7 +122,7 @@ end
 (* ---- Diff subcommand (show what would be in a patch) ---- *)
 
 let show_diff ~patches_dir name version =
-  let duniverse_pkg_dir = Duniverse.package_dir name version in
+  let duniverse_pkg_dir = Vendor.package_dir name version in
   let pkg_path = Path.source duniverse_pkg_dir in
   if not (Path.exists pkg_path)
   then
@@ -214,7 +214,7 @@ end
 (* ---- Commit subcommand ---- *)
 
 let commit_patch ~patches_dir name version =
-  let duniverse_pkg_dir = Duniverse.package_dir name version in
+  let duniverse_pkg_dir = Vendor.package_dir name version in
   let pkg_path = Path.source duniverse_pkg_dir in
   if not (Path.exists pkg_path)
   then

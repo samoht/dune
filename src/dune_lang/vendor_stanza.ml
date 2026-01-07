@@ -7,31 +7,38 @@ open Import
     Syntax:
     {[
       (vendor fmt.0.9.0 (libraries fmt fmt.tty))
-      (vendor make-pkg.1.0.0 (sandbox opam))
+      (vendor make-pkg.1.0.0 (build opam))  ; Build using opam sandbox
       (vendor yojson.1.7.0 (libraries (yojson :as yojson_v1)))
     ]}
 
     The directory is relative to the location of the dune file containing
     the stanza. *)
 
-module Sandbox_mode = struct
+module Build_method = struct
+  (** How a vendored package should be built.
+
+      - [Dune_native]: Built as vendored code in the main dune context.
+        Libraries are directly available to the build system.
+      - [Opam_sandboxed]: Built in an isolated opam-style sandbox using
+        the package's opam build commands. *)
   type t =
-    | None
-    | Opam
+    | Dune_native
+    | Opam_sandboxed
 
   let decode =
     let open Decoder in
-    enum [ "none", None; "opam", Opam ]
+    (* Keep "opam" for backward compatibility *)
+    enum [ "dune", Dune_native; "opam", Opam_sandboxed ]
   ;;
 
   let to_dyn = function
-    | None -> Dyn.variant "None" []
-    | Opam -> Dyn.variant "Opam" []
+    | Dune_native -> Dyn.variant "Dune_native" []
+    | Opam_sandboxed -> Dyn.variant "Opam_sandboxed" []
   ;;
 
   let to_string = function
-    | None -> "none"
-    | Opam -> "opam"
+    | Dune_native -> "dune"
+    | Opam_sandboxed -> "opam"
   ;;
 end
 
@@ -79,8 +86,8 @@ type t =
     (* None = all libraries, Some [] = none, Some libs = only these *)
   ; packages : Package_name.t list option
     (* None = all packages, Some [] = none, Some pkgs = only these *)
-  ; sandbox : Sandbox_mode.t option
-    (* None = default (no sandbox), Some Opam = build in opam sandbox *)
+  ; build_method : Build_method.t option
+    (* None = default (Dune_native for dune packages, auto-detect otherwise) *)
   }
 
 let decode =
@@ -91,16 +98,16 @@ let decode =
   @@
   let+ libraries = field_o "libraries" (repeat Library_entry.decode)
   and+ packages = field_o "packages" (repeat Package_name.decode)
-  and+ sandbox = field_o "sandbox" Sandbox_mode.decode in
-  { loc; directory; libraries; packages; sandbox }
+  and+ build_method = field_o "build" Build_method.decode in
+  { loc; directory; libraries; packages; build_method }
 ;;
 
-let to_dyn { loc = _; directory; libraries; packages; sandbox } =
+let to_dyn { loc = _; directory; libraries; packages; build_method } =
   Dyn.record
     [ "directory", Dyn.string directory
     ; "libraries", Dyn.option (Dyn.list Library_entry.to_dyn) libraries
     ; "packages", Dyn.option (Dyn.list Package_name.to_dyn) packages
-    ; "sandbox", Dyn.option Sandbox_mode.to_dyn sandbox
+    ; "build_method", Dyn.option Build_method.to_dyn build_method
     ]
 ;;
 

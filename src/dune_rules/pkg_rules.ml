@@ -13,7 +13,7 @@ include struct
   module Depexts = Lock_dir.Depexts
   module Digest_feed = Dune_digest.Feed
   module Dune_dep = Dune_dep
-  module Duniverse = Duniverse
+  module Vendor = Vendor
 end
 
 module Vendor_stanza = Dune_lang.Vendor_stanza
@@ -274,8 +274,26 @@ module Paths = struct
   ;;
 
   let install_paths t = Lazy.force t.install_paths
-  let install_roots t = Lazy.force t.install_roots
   let target_dir t = t.target_dir
+end
+
+module Shared_install = struct
+  let dir ~context = Install.Context.dir ~context
+
+  let roots_build ~context =
+    Install.Roots.opam_from_prefix ~relative:Path.Build.relative (dir ~context)
+  ;;
+
+  let roots ~context = roots_build ~context |> Install.Roots.map ~f:Path.build
+
+  (* Compiler packages store their libraries in a subdirectory named "ocaml" *)
+  let roots_for_package ~pkg_name ~context =
+    let base_roots = roots ~context in
+    match Pkg_toolchain.is_compiler_and_toolchains_enabled pkg_name with
+    | false -> base_roots
+    | true ->
+      { base_roots with lib_root = Path.relative base_roots.lib_root "ocaml" }
+  ;;
 end
 
 module Install_cookie = struct
@@ -443,6 +461,8 @@ module Pkg = struct
     ; build_command : Build_command.t option
     ; install_command : Dune_lang.Action.t option
     ; depends : t list
+    ; vendored_depends : (Package.Name.t * Path.Source.t) list
+      (* Dependencies on vendored dune packages - name and source path *)
     ; depends_on_dune : bool
       (* whether the package declares a dependency on Dune, even if Dune is stripped from [depends] *)
     ; depexts : Depexts.t list
@@ -454,6 +474,11 @@ module Pkg = struct
     ; mutable exported_env : string Env_update.t list
     ; all_package_versions : Package_version.t Package.Name.Map.t
       (* All packages in the lock, for looking up versions of non-dependencies *)
+    ; is_cached_toolchain : bool
+      (* Whether this toolchain is being populated from the global cache *)
+    ; toolchain_cache_dir : Path.t option
+      (* Path to the global toolchain cache directory if this is a cached toolchain *)
+    ; context : Context_name.t
     }
 
   module Top_closure = Top_closure.Make (Id.Set) (Monad.Id)
@@ -521,22 +546,34 @@ module Pkg = struct
     | Some root -> loop root Path.Local.Set.empty Path.Local.root
   ;;
 
-  let dep t = Dep.file t.paths.target_dir
+  let dep t = Dep.file (Paths.install_cookie t.paths)
 
   let package_deps t =
     deps_closure t
     |> List.fold_left ~init:Dep.Set.empty ~f:(fun acc t -> dep t |> Dep.Set.add acc)
   ;;
 
+  (* Dependencies on vendored dune packages - depend on their @install alias
+     so they get installed to the shared install directory where opam packages
+     can find them via OCAMLFIND_DESTDIR *)
+  let vendored_deps t =
+    let context = t.context in
+    List.map t.vendored_depends ~f:(fun (_pkg_name, vendored_path) ->
+      (* Depend on @install to install the package to shared install dir *)
+      let alias_name = Alias0.install in
+      (* Vendored package directory, converted to build path *)
+      let dir =
+        Path.Build.append_source (Context_name.build_dir context) vendored_path
+      in
+      let alias = Alias.make alias_name ~dir in
+      Dep.alias alias)
+    |> Dep.Set.of_list
+  ;;
+
+  (* All packages install files to the shared _build/install/<ctx>/ directory.
+     The per-package target_dir/cookie is used only for dependency tracking. *)
   let install_roots t =
-    let default_install_roots = Paths.install_roots t.paths in
-    match Pkg_toolchain.is_compiler_and_toolchains_enabled t.info.name with
-    | false -> default_install_roots
-    | true ->
-      (* Compiler packages store their libraries in a subdirectory named "ocaml". *)
-      { default_install_roots with
-        lib_root = Path.relative default_install_roots.lib_root "ocaml"
-      }
+    Shared_install.roots_for_package ~pkg_name:t.info.name ~context:t.context
   ;;
 
   (* Given a list of packages, construct an env containing variables
@@ -728,19 +765,6 @@ module Action_expander = struct
       x
     ;;
 
-    let dune_section_of_pform : Pform.Var.Pkg.Section.t -> Section.t = function
-      | Lib -> Lib
-      | Libexec -> Libexec
-      | Bin -> Bin
-      | Sbin -> Sbin
-      | Toplevel -> Toplevel
-      | Share -> Share
-      | Etc -> Etc
-      | Doc -> Doc
-      | Stublibs -> Stublibs
-      | Man -> Man
-    ;;
-
     let section_dir_of_root
           (roots : _ Install.Roots.t)
           (section : Pform.Var.Pkg.Section.t)
@@ -770,7 +794,7 @@ module Action_expander = struct
         [ Value.String "" ]
     ;;
 
-    let expand_pkg (paths : Path.t Paths.t) (pform : Pform.Var.Pkg.t) =
+    let expand_pkg ~context (paths : Path.t Paths.t) (pform : Pform.Var.Pkg.t) =
       match pform with
       | Switch -> Memo.return [ Value.String "dune" ]
       | Os Os -> sys_poll_var (fun { os; _ } -> os)
@@ -780,7 +804,10 @@ module Action_expander = struct
       | Sys_ocaml_version ->
         sys_poll_var (fun { sys_ocaml_version; _ } -> sys_ocaml_version)
       | Build -> Memo.return [ Value.Dir paths.source_dir ]
-      | Prefix -> Memo.return [ Value.Dir paths.prefix ]
+      | Prefix ->
+        (* All packages install to the shared _build/install/<ctx>/ directory.
+           The per-package target_dir/cookie is used only for dependency tracking. *)
+        Memo.return [ Value.Dir (Shared_install.dir ~context |> Path.build) ]
       | User -> Memo.return [ Value.String (Unix.getlogin ()) ]
       | Jobs -> Memo.return [ Value.String (Int.to_string !Clflags.concurrency) ]
       | Arch -> sys_poll_var (fun { arch; _ } -> arch)
@@ -788,12 +815,78 @@ module Action_expander = struct
         let group = Unix.getgid () |> Unix.getgrgid in
         Memo.return [ Value.String group.gr_name ]
       | Section_dir section ->
-        let roots = Paths.install_roots paths in
-        let dir = section_dir_of_root roots section in
+        let dir = section_dir_of_root (Shared_install.roots ~context) section in
         Memo.return [ Value.Dir dir ]
     ;;
 
+    (* Resolve builtin package variables that don't come from the package itself *)
+    let resolve_builtin_var
+          ~context
+          ~package_name
+          ~all_versions
+          ~present
+          ~scope
+          ~self_source_dir
+          ~dep_source_dir
+          variable_name
+      =
+      match Package_variable_name.to_string variable_name with
+      | "pinned" -> Some (Memo.return @@ Ok [ Value.false_ ])
+      | "preinstalled" -> Some (Memo.return @@ Ok [ Value.false_ ])
+      | "native" -> Some (Memo.return @@ Ok [ Value.true_ ])
+      | "enable" ->
+        Some (Memo.return @@ Ok [ Value.String (if present then "enable" else "disable") ])
+      | "installed" ->
+        let in_lock = Package.Name.Map.mem all_versions package_name in
+        Some (Memo.return @@ Ok [ Value.String (Bool.to_string in_lock) ])
+      | "version" ->
+        (match Package.Name.Map.find all_versions package_name with
+         | Some version ->
+           Some (Memo.return @@ Ok [ Value.String (Package_version.to_string version) ])
+         | None -> Some (Memo.return @@ Ok [ Value.String "" ]))
+      | "build-id" ->
+        let source_dir =
+          match scope with
+          | Package_variable.Scope.Self -> Some self_source_dir
+          | Package_variable.Scope.Package _ -> dep_source_dir
+        in
+        let build_id =
+          match source_dir with
+          | Some dir -> Path.to_string dir |> Dune_digest.string |> Dune_digest.to_string
+          | None -> ""
+        in
+        Some (Memo.return @@ Ok [ Value.String build_id ])
+      | _ ->
+        (* Try section directory *)
+        (match dep_source_dir with
+         | None -> None
+         | Some _ ->
+           (match
+              Pform.Var.Pkg.Section.of_string (Package_variable_name.to_string variable_name)
+            with
+            | None -> None
+            | Some section ->
+              let roots = Shared_install.roots_for_package ~pkg_name:package_name ~context in
+              Some (Memo.return @@ Ok [ Value.Dir (section_dir_of_root roots section) ])))
+    ;;
+
+    (* Apply opam's var?default semantics: if var is truthy, return default, else "" *)
+    let apply_default_if_true default_if_true result =
+      match default_if_true with
+      | None -> result
+      | Some default ->
+        Result.map result ~f:(fun values ->
+          let is_truthy =
+            match values with
+            | [ Value.String "true" ] -> true
+            | [ Value.String "false" ] | [ Value.String "" ] | [] -> false
+            | _ -> true
+          in
+          if is_truthy then [ Value.String default ] else [ Value.String "" ])
+    ;;
+
     let expand_pkg_macro
+          ~context
           ~loc
           ~all_package_versions
           (self_paths : _ Paths.t)
@@ -811,23 +904,6 @@ module Action_expander = struct
              encoding"
             []
       in
-      (* Apply opam's var?default semantics: if var is truthy, return default, else "" *)
-      let apply_default_if_true result =
-        match default_if_true with
-        | None -> result
-        | Some default ->
-          Result.map result ~f:(fun values ->
-            let is_truthy =
-              match values with
-              | [ Value.String "true" ] -> true
-              | [ Value.String "false" ] -> false
-              | [ Value.String "" ] -> false
-              | [ Value.String _ ] -> true
-              | _ :: _ -> true
-              | [] -> false
-            in
-            if is_truthy then [ Value.String default ] else [ Value.String "" ])
-      in
       let package_name =
         match scope with
         | Self -> self_paths.name
@@ -843,64 +919,22 @@ module Action_expander = struct
         | Some v -> Memo.return @@ Ok (Variable.dune_value v)
         | None ->
           let present = Option.is_some dep_paths in
-          (match Package_variable_name.to_string variable_name with
-           | "pinned" -> Memo.return @@ Ok [ Value.false_ ]
-           | "preinstalled" ->
-             (* Packages managed by dune pkg are never preinstalled *)
-             Memo.return @@ Ok [ Value.false_ ]
-           | "native" ->
-             (* Native code compilation is available (ocamlopt exists) *)
-             Memo.return @@ Ok [ Value.true_ ]
-           | "enable" ->
-             Memo.return @@ Ok [ Value.String (if present then "enable" else "disable") ]
-           | "installed" ->
-             (* Check if package exists in lock file *)
-             let in_lock = Package.Name.Map.mem all_versions package_name in
-             Memo.return @@ Ok [ Value.String (Bool.to_string in_lock) ]
-           | "version" ->
-             (* Look up version from all packages in lock, not just dependencies *)
-             (match Package.Name.Map.find all_versions package_name with
-              | Some version ->
-                Memo.return @@ Ok [ Value.String (Package_version.to_string version) ]
-              | None ->
-                (* Package not in lock file - return empty string *)
-                Memo.return @@ Ok [ Value.String "" ])
-           | "build-id" ->
-             (* Compute a build-id from the package source directory path.
-                For self-scope, use the current package's paths directly.
-                For other packages, use their paths if available in deps.
-                This is a simplified version of opam's build-id which also includes
-                dependency hashes. *)
-             let pkg_paths =
-               match scope with
-               | Self -> Some self_paths
-               | Package _ -> dep_paths
-             in
-             let build_id =
-               match pkg_paths with
-               | Some paths ->
-                 Path.to_string paths.source_dir
-                 |> Dune_digest.string
-                 |> Dune_digest.to_string
-               | None -> ""
-             in
-             Memo.return @@ Ok [ Value.String build_id ]
-           | _ ->
-             (match dep_paths with
-              | None -> Memo.return (Error (`Undefined_pkg_var variable_name))
-              | Some paths ->
-                (match
-                   Pform.Var.Pkg.Section.of_string
-                     (Package_variable_name.to_string variable_name)
-                 with
-                 | None -> Memo.return (Error (`Undefined_pkg_var variable_name))
-                 | Some section ->
-                   let section = dune_section_of_pform section in
-                   let install_paths = Paths.install_paths paths in
-                   Memo.return
-                   @@ Ok [ Value.Dir (Install.Paths.get install_paths section) ])))
+          let dep_source_dir = Option.map dep_paths ~f:(fun p -> p.Paths.source_dir) in
+          (match
+             resolve_builtin_var
+               ~context
+               ~package_name
+               ~all_versions
+               ~present
+               ~scope
+               ~self_source_dir:self_paths.Paths.source_dir
+               ~dep_source_dir
+               variable_name
+           with
+           | Some result -> result
+           | None -> Memo.return (Error (`Undefined_pkg_var variable_name)))
       in
-      apply_default_if_true result
+      apply_default_if_true default_if_true result
     ;;
 
     let expand_pform
@@ -920,7 +954,7 @@ module Action_expander = struct
       =
       let loc = Dune_sexp.Template.Pform.loc source in
       match pform with
-      | Var (Pkg var) -> expand_pkg paths var >>| Result.ok
+      | Var (Pkg var) -> expand_pkg ~context paths var >>| Result.ok
       | Var Context_name ->
         Memo.return (Ok [ Value.String (Context_name.to_string context) ])
       | Var Make ->
@@ -930,7 +964,7 @@ module Action_expander = struct
         in
         Ok [ Value.Path make ]
       | Macro ({ macro = Pkg | Pkg_self; _ } as macro_invocation) ->
-        expand_pkg_macro ~loc ~all_package_versions paths depends macro_invocation
+        expand_pkg_macro ~context ~loc ~all_package_versions paths depends macro_invocation
       | _ -> Expander0.isn't_allowed_in_this_position ~source
     ;;
 
@@ -1004,8 +1038,18 @@ module Action_expander = struct
                 (match Filename.Map.find artifacts program with
                  | Some s -> Memo.return @@ Ok s
                  | None ->
-                   (let path = Global.env () |> Env_path.path in
-                    Which.which ~path program)
+                   (* Use the package's build environment PATH (which includes
+                      _build/install/<ctx>/bin/), then fall back to system PATH *)
+                   let pkg_path =
+                     Value_list_env.get_path t.env
+                     |> Option.value ~default:[]
+                     |> List.filter_map ~f:(function
+                       | Value.Path p | Value.Dir p -> Some p
+                       | Value.String s -> Some (Path.of_string s))
+                   in
+                   let system_path = Global.env () |> Env_path.path in
+                   let path = pkg_path @ system_path in
+                   Which.which ~path program
                    >>= (function
                     | Some p -> Memo.return (Ok p)
                     | None ->
@@ -1065,12 +1109,17 @@ module Action_expander = struct
                | String s -> Run_with_path.Spec.String s
                | Path p | Dir p -> Path p))
          in
-         let ocamlfind_destdir = (Lazy.force expander.paths.install_roots).lib_root in
+         (* Use shared install directory for PREFIX and OCAMLFIND_DESTDIR so packages
+            can find files installed by dependencies *)
+         let shared_roots = Shared_install.roots_build ~context:expander.context in
+         let prefix = Shared_install.dir ~context:expander.context |> Path.build in
+         let ocamlfind_destdir = Path.build shared_roots.lib_root in
          Run_with_path.action
            ~depexts
            ~pkg:(expander.name, prog_loc)
            exe
            args
+           ~prefix
            ~ocamlfind_destdir)
     | Progn t ->
       let+ args = Memo.parallel_map t ~f:(expand ~expander) in
@@ -1222,16 +1271,27 @@ module Action_expander = struct
     }
   ;;
 
-  let sandbox = Sandbox_mode.Set.singleton Sandbox_mode.copy
+  (* Pkg rules use no sandbox so packages can access the shared install directory.
+     This differs from dune's normal sandbox which remaps paths - pkg rules need
+     cross-package access via PREFIX which doesn't work with path remapping. *)
+  let default_sandbox = Sandbox_mode.Set.singleton Sandbox_mode.none
 
-  let expand context (pkg : Pkg.t) action =
+  let expand
+        ?(can_go_in_shared_cache = true)
+        ?(sandbox = default_sandbox)
+        ?(chdir = true)
+        context
+        (pkg : Pkg.t)
+        action
+    =
     let+ action =
       let expander = expander context pkg in
-      expand action ~expander >>| Action.chdir pkg.paths.source_dir
+      let+ action = expand action ~expander in
+      if chdir then Action.chdir pkg.paths.source_dir action else action
     in
     (* TODO copying is needed for build systems that aren't dune and those
        with an explicit install step *)
-    Action.Full.make ~sandbox action
+    Action.Full.make ~sandbox ~can_go_in_shared_cache action
     |> Action_builder.return
     |> Action_builder.with_no_targets
   ;;
@@ -1244,8 +1304,10 @@ module Action_expander = struct
   ;;
 
   let build_command context (pkg : Pkg.t) =
+    (* Build commands run sandboxed for isolation, like opam does.
+       Packages can still access PREFIX via absolute path. *)
     Option.map pkg.build_command ~f:(function
-      | Action action -> expand context pkg action
+      | Action action -> expand ~sandbox:default_sandbox context pkg action
       | Dune ->
         (* CR-someday rgrinberg: respect [dune subst] settings. *)
         Command.run_dyn_prog
@@ -1256,7 +1318,10 @@ module Action_expander = struct
   ;;
 
   let install_command context (pkg : Pkg.t) =
-    Option.map pkg.install_command ~f:(fun action -> expand context pkg action)
+    (* Install commands also run sandboxed like build commands.
+       Packages access PREFIX via absolute path which works from within sandbox. *)
+    Option.map pkg.install_command ~f:(fun action ->
+      expand ~sandbox:default_sandbox context pkg action)
   ;;
 
   let exported_env (expander : Expander.t) (env : _ Env_update.t) =
@@ -1270,6 +1335,9 @@ end
 
 module DB = struct
   let default_system_provided = Package.Name.Set.singleton Dune_pkg.Dune_dep.name
+
+  (* Helper to get platform from system vars *)
+  let platform () = Lock_dir.Sys_vars.solver_env
 
   module Pkg_table = struct
     module Pkg = Lock_dir.Pkg
@@ -1419,14 +1487,12 @@ module DB = struct
   type t =
     { id : Id.t
     ; pkg_digest_table : Pkg_table.t
-    ; system_provided : Package.Name.Set.t
     ; all_package_versions : Package_version.t Package.Name.Map.t
     }
 
   let equal x y = Id.equal x.id y.id
 
-  let create ~pkg_digest_table ~system_provided =
-    (* Extract all package versions from the digest table for variable expansion *)
+  let create ~pkg_digest_table =
     let all_package_versions =
       Pkg_digest.Map.fold
         pkg_digest_table
@@ -1436,15 +1502,24 @@ module DB = struct
           let version = entry.pkg.info.version in
           Package.Name.Map.set acc name version)
     in
-    { id = Id.gen (); pkg_digest_table; system_provided; all_package_versions }
+    { id = Id.gen (); pkg_digest_table; all_package_versions }
   ;;
 
-  let pkg_digest_of_name lock_dir platform pkg_name ~system_provided =
+  let pkg_digest_of_name lock_dir ~platform pkg_name =
     let entries_by_name =
-      Pkg_table.entries_by_name_of_lock_dir lock_dir ~platform ~system_provided
+      Pkg_table.entries_by_name_of_lock_dir
+        lock_dir
+        ~platform
+        ~system_provided:default_system_provided
     in
     let entry = Package.Name.Map.find_exn entries_by_name pkg_name in
     entry.pkg_digest
+  ;;
+
+  (* Helper to compute pkg_digest with platform lookup *)
+  let pkg_digest_of_lock_dir lock_dir pkg_name =
+    let+ platform = platform () in
+    pkg_digest_of_name lock_dir ~platform pkg_name
   ;;
 
   let of_ctx =
@@ -1469,50 +1544,41 @@ module DB = struct
                 dependencies to be shared with the project's if it too is being
                 built in the default context. *)
              let allow_sharing = allow_sharing && Context_name.is_default ctx in
-             (* Is this value anything other than [default_system_provided]? *)
-             let system_provided = default_system_provided in
              let+ pkg_digest_table =
                let* lock_dir = Lock_dir.get_exn ctx
-               and* platform = Lock_dir.Sys_vars.solver_env in
+               and* platform = platform () in
                (if allow_sharing
                 then Memo.Lazy.force Pkg_table.all_existing_dev_tools
                 else Memo.return Pkg_table.empty)
                >>| Pkg_table.union
-                     (Pkg_table.of_lock_dir lock_dir ~platform ~system_provided)
+                     (Pkg_table.of_lock_dir
+                        lock_dir
+                        ~platform
+                        ~system_provided:default_system_provided)
              in
-             create ~pkg_digest_table ~system_provided)
+             create ~pkg_digest_table)
     in
     fun ctx ~allow_sharing -> Memo.exec of_ctx_memo (ctx, allow_sharing)
   ;;
 
-  (* Returns the db for the given context and the digest of the given package
-     within that context. *)
   let of_project_pkg ctx pkg_name =
-    let* lock_dir = Lock_dir.get_exn ctx
-    and* platform = Lock_dir.Sys_vars.solver_env in
-    let+ t = of_ctx ctx ~allow_sharing:true in
-    t, pkg_digest_of_name lock_dir platform pkg_name ~system_provided:t.system_provided
+    let* lock_dir = Lock_dir.get_exn ctx in
+    let* t = of_ctx ctx ~allow_sharing:true
+    and* pkg_digest = pkg_digest_of_lock_dir lock_dir pkg_name in
+    Memo.return (t, pkg_digest)
   ;;
 
-  (* Returns the db for all dev tools combined with the default context, and
-     the digest for the dev tool's package. *)
   let of_dev_tool =
-    let system_provided = default_system_provided in
     let inactive_lockdir =
       Memo.lazy_ (fun () ->
         let+ pkg_digest_table = Memo.Lazy.force Pkg_table.all_existing_dev_tools in
-        create ~pkg_digest_table ~system_provided)
+        create ~pkg_digest_table)
     in
     let of_dev_tool_memo =
       Memo.create "pkg-db-dev-tool" ~input:(module Dune_pkg.Dev_tool)
       @@ fun dev_tool ->
-      let+ lock_dir = Lock_dir.of_dev_tool dev_tool
-      and+ platform = Lock_dir.Sys_vars.solver_env in
-      pkg_digest_of_name
-        lock_dir
-        platform
-        (Pkg_dev_tool.package_name dev_tool)
-        ~system_provided
+      let* lock_dir = Lock_dir.of_dev_tool dev_tool in
+      pkg_digest_of_lock_dir lock_dir (Pkg_dev_tool.package_name dev_tool)
     in
     fun dev_tool ->
       let+ db =
@@ -1525,8 +1591,17 @@ module DB = struct
   ;;
 end
 
+(** Status of a package with respect to vendoring. *)
+module Vendor_status = struct
+  type t =
+    | Not_vendored
+    | Dune_native (* Built as vendored code in main dune context *)
+    | Opam_sandboxed (* Built in opam sandbox with local source *)
+end
+
 module rec Resolve : sig
   val resolve : DB.t -> Loc.t -> Pkg_digest.t -> Package_universe.t -> Pkg.t Memo.t
+  val resolve_opt : DB.t -> Pkg_digest.t -> Package_universe.t -> Pkg.t option Memo.t
 end = struct
   open Resolve
 
@@ -1563,6 +1638,146 @@ end = struct
     | Action a -> Build_command.Action (relocate a)
   ;;
 
+  (* Check if package is vendored and determine build method.
+     Returns the vendor status and potentially modified info. *)
+  let check_vendor_status pkg info =
+    let vendor_path = Vendor.package_dir info.Pkg_info.name info.version in
+    let+ is_vendored =
+      Fs_memo.dir_exists (Path.Outside_build_dir.In_source_dir vendor_path)
+    in
+    match is_vendored, Vendor.classify_build_method pkg with
+    | true, Vendor.Dune_native -> Vendor_status.Dune_native, info
+    | true, Vendor.Opam_sandboxed ->
+      (* Override source to use local path *)
+      let abs_path =
+        Path.source vendor_path |> Path.to_absolute_filename |> Path.External.of_string
+      in
+      let vendor_source = Source.external_copy (Loc.none, abs_path) in
+      Vendor_status.Opam_sandboxed, { info with Pkg_info.source = Some vendor_source }
+    | false, _ -> Vendor_status.Not_vendored, info
+  ;;
+
+  (* Resolve a single dependency, handling vendored packages.
+     Returns Either.Left for vendored dune deps, Either.Right for normal deps. *)
+  let resolve_dep db package_universe dep =
+    let { DB.Pkg_table.dep_pkg; dep_loc = _; dep_pkg_digest } = dep in
+    let vendor_path = Vendor.package_dir dep_pkg_digest.name dep_pkg.info.version in
+    let* is_vendored =
+      Fs_memo.dir_exists (Path.Outside_build_dir.In_source_dir vendor_path)
+    in
+    match is_vendored, Vendor.classify_build_method dep_pkg with
+    | true, Vendor.Dune_native ->
+      (* Vendored dune package - track as vendored dependency with path *)
+      Memo.return (Either.Left (dep_pkg_digest.name, vendor_path))
+    | _ ->
+      let package_universe =
+        match package_universe with
+        | Package_universe.Dev_tool _ ->
+          (* Dependencies of dev tools are installed into the default context
+             so they may be shared with the project's dependencies. *)
+          Package_universe.Dependencies Context_name.default
+        | _ -> package_universe
+      in
+      (* Use resolve_opt to gracefully handle vendored packages *)
+      let+ pkg_opt = resolve_opt db dep_pkg_digest package_universe in
+      (match pkg_opt with
+       | None ->
+         (* Package resolved to None - track as vendored dep *)
+         Either.Left (dep_pkg_digest.name, vendor_path)
+       | Some pkg -> Either.Right pkg)
+  ;;
+
+  (* Resolve files_dir, handling both versioned and unversioned paths.
+     Handles the case where lockdirs may or may not be portable. *)
+  let resolve_files_dir package_universe info =
+    let* lock_dir =
+      Package_universe.lock_dir_path package_universe >>| Option.value_exn
+    in
+    let+ files_dir =
+      let module Pkg = Dune_pkg.Lock.Pkg in
+      (* TODO(steve): simplify this once portable lockdirs become the default.
+         This logic currently handles both portable lockdirs (version number
+         in files dir name) and non-portable lockdirs (no version number). *)
+      let path_with_version =
+        Pkg.source_files_dir info.Pkg_info.name (Some info.version) ~lock_dir
+      in
+      let* path_with_version_exists =
+        Fs_memo.dir_exists (Path.Outside_build_dir.In_source_dir path_with_version)
+      in
+      match path_with_version_exists with
+      | true -> Memo.return @@ Some (Pkg.files_dir info.name (Some info.version) ~lock_dir)
+      | false ->
+        let path_without_version = Pkg.source_files_dir info.name None ~lock_dir in
+        let+ path_without_version_exists =
+          Fs_memo.dir_exists (Path.Outside_build_dir.In_source_dir path_without_version)
+        in
+        (match path_without_version_exists with
+         | true -> Some (Pkg.files_dir info.name None ~lock_dir)
+         | false -> None)
+    in
+    files_dir
+    |> Option.map ~f:(fun (p : Path.t) ->
+      match p with
+      | External e ->
+        let source_path = Dune_pkg.Pkg_workspace.dev_tool_path_to_source_dir e in
+        (match Path.Source.explode source_path with
+         | [ "_build"; ".dev-tools.locks"; dev_tool; files_dir ] ->
+           Path.Build.L.relative
+             Private_context.t.build_dir
+             [ "default"; ".dev-tool-locks"; dev_tool; files_dir ]
+         | components ->
+           Code_error.raise
+             "Package files directory is external source directory, this is unsupported"
+             [ "external", Path.External.to_dyn e
+             ; "source", Path.Source.to_dyn source_path
+             ; "components", Dyn.(list string) components
+             ])
+      | In_source_tree s ->
+        Code_error.raise "Unexpected files_dir path" [ "dir", Path.Source.to_dyn s ]
+      | In_build_dir b -> b)
+  ;;
+
+  (* Apply toolchain caching: for cached toolchains, replace build/install
+     commands with populate-from-cache action. *)
+  let apply_toolchain_caching ~info ~pkg ~build_command ~install_command ~write_paths
+        ~package_universe
+    =
+    let is_toolchain = Pkg_toolchain.is_compiler_and_toolchains_enabled info.Pkg_info.name in
+    let is_cached = is_toolchain && Pkg_toolchain.is_installed pkg in
+    let toolchain_cache_dir =
+      if is_cached then Some (Pkg_toolchain.cache_dir pkg) else None
+    in
+    let build_command, install_command =
+      if is_cached
+      then (
+        let cache_dir = Option.value_exn toolchain_cache_dir in
+        let context = Package_universe.context_name package_universe in
+        let install_dir = Install.Context.dir ~context in
+        Log.info
+          "Toolchain cache hit"
+          [ "name", Dyn.string (Package.Name.to_string info.name)
+          ; "version", Dyn.string (Package_version.to_string info.version)
+          ; "cache_dir", Dyn.string (Path.to_string cache_dir)
+          ; "local_target", Dyn.string (Path.Build.to_string write_paths.Paths.target_dir)
+          ; "install_dir", Dyn.string (Path.Build.to_string install_dir)
+          ];
+        let populate_action =
+          Pkg_toolchain.populate_from_cache_action pkg ~install_dir ~target_dir:write_paths.target_dir
+        in
+        Some (Build_command.Action populate_action), None)
+      else if is_toolchain
+      then (
+        Log.info
+          "Toolchain cache miss"
+          [ "name", Dyn.string (Package.Name.to_string info.name)
+          ; "version", Dyn.string (Package_version.to_string info.version)
+          ];
+        build_command, install_command)
+      else build_command, install_command
+    in
+    build_command, install_command, is_cached, toolchain_cache_dir
+  ;;
+
   let resolve_impl { Input.db; pkg_digest; universe = package_universe } =
     match Pkg_digest.Map.find db.pkg_digest_table pkg_digest with
     | None -> Memo.return None
@@ -1582,195 +1797,91 @@ end = struct
         ; pkg_digest = _
         } ->
       assert (Package.Name.equal pkg_digest.name info.name);
-      (* For non-dune packages in duniverse, use duniverse sources instead of fetching *)
-      let* info =
-        let duniverse_path = Duniverse.package_dir info.name info.version in
-        let* in_duniverse =
-          Fs_memo.dir_exists (Path.Outside_build_dir.In_source_dir duniverse_path)
-        in
-        match in_duniverse, Duniverse.classify pkg with
-        | true, Duniverse.Opam_sandbox ->
-          (* Non-dune package in duniverse: override source to use local path *)
-          let abs_path =
-            Path.source duniverse_path
-            |> Path.to_absolute_filename
-            |> Path.External.of_string
-          in
-          let duniverse_source = Source.external_copy (Loc.none, abs_path) in
-          Memo.return { info with Pkg_info.source = Some duniverse_source }
-        | _ ->
-          (* Either not in duniverse, or a dune package (handled elsewhere) *)
-          Memo.return info
-      in
-      let* platform = Lock_dir.Sys_vars.solver_env in
-      let choose_for_current_platform field =
-        Dune_pkg.Lock.Conditional_choice.choose_for_platform field ~platform
-      in
-      let* depends =
-        Memo.parallel_map
-          deps
-          ~f:(fun { DB.Pkg_table.dep_pkg; dep_loc; dep_pkg_digest } ->
-            (* Check if this dependency is a duniverse dune package - if so, skip it
-               since it will be built as vendored code, not via .pkg/ rules *)
-            let duniverse_path =
-              Duniverse.package_dir dep_pkg_digest.name dep_pkg.info.version
-            in
-            let* in_duniverse =
-              Fs_memo.dir_exists (Path.Outside_build_dir.In_source_dir duniverse_path)
-            in
-            match in_duniverse, Duniverse.classify dep_pkg with
-            | true, Duniverse.Duniverse ->
-              (* Duniverse dune package - don't include in .pkg/ dependency chain *)
-              Memo.return None
-            | _ ->
-              let package_universe =
-                match package_universe with
-                | Dev_tool _ ->
-                  (* The dependencies of dev tools are installed into the default
-                   context so they may be shared with the project's
-                   dependencies. *)
-                  Package_universe.Dependencies Context_name.default
-                | _ -> package_universe
-              in
-              let+ pkg = resolve db dep_loc dep_pkg_digest package_universe in
-              Some pkg)
-        >>| List.filter_opt
-      and+ files_dir =
-        let* lock_dir =
-          Package_universe.lock_dir_path package_universe >>| Option.value_exn
-        in
-        let+ files_dir =
-          let module Pkg = Dune_pkg.Lock.Pkg in
-          (* TODO(steve): simplify this once portable lockdirs become the
-             default. This logic currently handles both the cases where
-             lockdirs are non-portable (the files dir won't have a version
-             number in its name) and the case where lockdirs are portable (the
-             solution may have multiple versions of the same package
-             necessitating version numbers in files dirs to prevent
-             collisions). *)
-          let path_with_version =
-            Pkg.source_files_dir info.name (Some info.version) ~lock_dir
-          in
-          let* path_with_version_exists =
-            Fs_memo.dir_exists (Path.Outside_build_dir.In_source_dir path_with_version)
-          in
-          match path_with_version_exists with
-          | true ->
-            Memo.return @@ Some (Pkg.files_dir info.name (Some info.version) ~lock_dir)
-          | false ->
-            let path_without_version = Pkg.source_files_dir info.name None ~lock_dir in
-            let+ path_without_version_exists =
-              Fs_memo.dir_exists
-                (Path.Outside_build_dir.In_source_dir path_without_version)
-            in
-            (match path_without_version_exists with
-             | true -> Some (Pkg.files_dir info.name None ~lock_dir)
-             | false -> None)
-        in
-        files_dir
-        |> Option.map ~f:(fun (p : Path.t) ->
-          match p with
-          | External e ->
-            let source_path = Dune_pkg.Pkg_workspace.dev_tool_path_to_source_dir e in
-            (match Path.Source.explode source_path with
-             | [ "_build"; ".dev-tools.locks"; dev_tool; files_dir ] ->
-               Path.Build.L.relative
-                 Private_context.t.build_dir
-                 [ "default"; ".dev-tool-locks"; dev_tool; files_dir ]
-             | components ->
-               Code_error.raise
-                 "Package files directory is external source directory, this is \
-                  unsupported"
-                 [ "external", Path.External.to_dyn e
-                 ; "source", Path.Source.to_dyn source_path
-                 ; "components", Dyn.(list string) components
-                 ])
-          | In_source_tree s ->
-            Code_error.raise "Unexpected files_dir path" [ "dir", Path.Source.to_dyn s ]
-          | In_build_dir b -> b)
-      in
-      let id = Pkg.Id.gen () in
-      let write_paths =
-        Paths.make pkg_digest package_universe ~relative:Path.Build.relative
-      in
-      let install_command = choose_for_current_platform install_command in
-      let install_command = Option.map install_command ~f:relocate in
-      let build_command = choose_for_current_platform build_command in
-      let build_command = Option.map build_command ~f:relocate_build in
-      let is_toolchain = Pkg_toolchain.is_compiler_and_toolchains_enabled info.name in
-      let is_cached = is_toolchain && Pkg_toolchain.is_installed pkg in
-      (* If toolchain is already cached, skip build and install commands *)
-      let build_command = if is_cached then None else build_command in
-      let install_command = if is_cached then None else install_command in
-      let paths =
-        let paths = Paths.map_path write_paths ~f:Path.build in
-        match is_toolchain with
-        | false -> paths
-        | true ->
-          (* Modify the environment as well as build and install commands for
-             the compiler package. The specific changes are:
-             - setting the prefix in the build environment to inside the user's
-               toolchain directory
-             - changing the install command so that the
-               package is installed with the DESTDIR variable set to a
-               temporary directory, and the result is then moved to the user's
-               toolchain directory
-             - if a matching version of the compiler is
-               already installed in the user's toolchain directory then the
-               build and install commands are replaced with no-ops *)
-          let prefix = Pkg_toolchain.installation_prefix pkg in
-          let install_roots =
-            Pkg_toolchain.install_roots ~prefix
-            |> Install.Roots.map ~f:Path.outside_build_dir
-          in
-          { paths with
-            prefix = Path.outside_build_dir prefix
-          ; install_roots = Lazy.from_val install_roots
-          }
-      in
-      let t =
-        { Pkg.id
-        ; build_command
-        ; install_command
-        ; depends
-        ; depends_on_dune = has_dune_dep
-        ; depexts
-        ; paths
-        ; write_paths
-        ; info
-        ; files_dir
-        ; pkg_digest
-        ; exported_env = []
-        ; all_package_versions = db.all_package_versions
-        }
-      in
-      let+ exported_env =
-        let expander =
-          Action_expander.expander (Package_universe.context_name package_universe) t
-        in
-        Memo.parallel_map exported_env ~f:(Action_expander.exported_env expander)
-      in
-      t.exported_env <- exported_env;
-      Some t
+      let* vendor_status, info = check_vendor_status pkg info in
+      (match vendor_status with
+       | Vendor_status.Dune_native -> Memo.return None
+       | Vendor_status.Not_vendored | Vendor_status.Opam_sandboxed ->
+         (* Resolve dependencies and files directory in parallel *)
+         let* platform = Lock_dir.Sys_vars.solver_env in
+         let choose_for_current_platform field =
+           Dune_pkg.Lock.Conditional_choice.choose_for_platform field ~platform
+         in
+         let* all_depends = Memo.parallel_map deps ~f:(resolve_dep db package_universe)
+         and+ files_dir = resolve_files_dir package_universe info in
+         let vendored_depends, depends = List.partition_map all_depends ~f:Fun.id in
+         (* Prepare paths and commands *)
+         let id = Pkg.Id.gen () in
+         let write_paths =
+           Paths.make pkg_digest package_universe ~relative:Path.Build.relative
+         in
+         let install_command = choose_for_current_platform install_command in
+         let install_command = Option.map install_command ~f:relocate in
+         let build_command = choose_for_current_platform build_command in
+         let build_command = Option.map build_command ~f:relocate_build in
+         (* Apply toolchain caching if applicable *)
+         let build_command, install_command, is_cached, toolchain_cache_dir =
+           apply_toolchain_caching
+             ~info
+             ~pkg
+             ~build_command
+             ~install_command
+             ~write_paths
+             ~package_universe
+         in
+         (* Build the package record *)
+         let paths = Paths.map_path write_paths ~f:Path.build in
+         let context = Package_universe.context_name package_universe in
+         let t =
+           { Pkg.id
+           ; build_command
+           ; install_command
+           ; depends
+           ; vendored_depends
+           ; depends_on_dune = has_dune_dep
+           ; depexts
+           ; paths
+           ; write_paths
+           ; info
+           ; files_dir
+           ; pkg_digest
+           ; exported_env = []
+           ; all_package_versions = db.all_package_versions
+           ; is_cached_toolchain = is_cached
+           ; toolchain_cache_dir
+           ; context
+           }
+         in
+         let+ exported_env =
+           let expander =
+             Action_expander.expander (Package_universe.context_name package_universe) t
+           in
+           Memo.parallel_map exported_env ~f:(Action_expander.exported_env expander)
+         in
+         t.exported_env <- exported_env;
+         Some t)
   ;;
 
-  let resolve =
-    let memo =
-      Memo.create
-        "pkg-resolve"
-        ~input:(module Input)
-        ~human_readable_description:(fun t ->
-          Pp.textf "- package %s" (Package.Name.to_string t.pkg_digest.name))
-        resolve_impl
-    in
-    fun (db : DB.t) loc pkg_digest package_universe ->
-      Memo.exec memo { db; pkg_digest; universe = package_universe }
-      >>| function
-      | Some s -> s
-      | None ->
-        User_error.raise
-          ~loc
-          [ Pp.textf "Unknown package %S" (Package.Name.to_string pkg_digest.name) ]
+  let resolve_memo =
+    Memo.create
+      "pkg-resolve"
+      ~input:(module Input)
+      ~human_readable_description:(fun t ->
+        Pp.textf "- package %s" (Package.Name.to_string t.pkg_digest.name))
+      resolve_impl
+  ;;
+
+  let resolve_opt (db : DB.t) pkg_digest package_universe =
+    Memo.exec resolve_memo { db; pkg_digest; universe = package_universe }
+  ;;
+
+  let resolve (db : DB.t) loc pkg_digest package_universe =
+    resolve_opt db pkg_digest package_universe
+    >>| function
+    | Some s -> s
+    | None ->
+      User_error.raise
+        ~loc
+        [ Pp.textf "Unknown package %S" (Package.Name.to_string pkg_digest.name) ]
   ;;
 end
 
@@ -2292,6 +2403,11 @@ let files path =
   Dep.Set.of_source_files ~files ~empty_directories, files
 ;;
 
+(* Sandbox mode for pkg rules - use no sandbox so packages can access
+   the shared install directory via PREFIX. Dune's copy sandbox remaps paths
+   which breaks cross-package access. *)
+let pkg_sandbox = Sandbox_mode.Set.singleton Sandbox_mode.none
+
 let dune_dep =
   lazy (Sys.executable_name |> Path.External.of_string |> Path.external_ |> Dep.file)
 ;;
@@ -2325,7 +2441,7 @@ let build_rule context_name ~source_deps (pkg : Pkg.t) =
                   Action.progn
                     [ Action.mkdir (Path.Build.parent_exn dst); Action.copy src dst ])
                 |> Action.concurrent
-                |> Action.Full.make
+                |> Action.Full.make ~sandbox:pkg_sandbox
                 |> Action_builder.return)
           ]
         in
@@ -2350,7 +2466,7 @@ let build_rule context_name ~source_deps (pkg : Pkg.t) =
               Action.remove_tree dst
             ; Action.copy src dst
             ]
-          |> Action.Full.make
+          |> Action.Full.make ~sandbox:pkg_sandbox
           |> Action_builder.With_targets.return)
       and+ build_action =
         match Action_expander.build_command context_name pkg with
@@ -2367,7 +2483,7 @@ let build_rule context_name ~source_deps (pkg : Pkg.t) =
             |> List.rev_map ~f:(fun section ->
               Install.Paths.get install_paths section |> Action.mkdir)
             |> Action.progn
-            |> Action.Full.make
+            |> Action.Full.make ~sandbox:pkg_sandbox
             |> Action_builder.With_targets.return
           in
           [ mkdir_install_dirs; install_action ]
@@ -2382,15 +2498,16 @@ let build_rule context_name ~source_deps (pkg : Pkg.t) =
          | None -> `No_install_action
          | Some _ -> `Has_install_action)
         ~prefix_outside_build_dir
-      |> Action.Full.make
+      |> Action.Full.make ~sandbox:pkg_sandbox
       |> Action_builder.return
       |> Action_builder.with_no_targets
     in
-    (* Action to print a "Building" message for the package if its
-       target directory is not yet created. *)
+    (* Action to print a progress message for the package.
+       Uses "Cached" for toolchains restored from cache, "Building" otherwise. *)
     let progress_building =
-      Pkg_build_progress.progress_action pkg.info.name pkg.info.version `Building
-      |> Action.Full.make
+      let status = if pkg.is_cached_toolchain then `Cached else `Building in
+      Pkg_build_progress.progress_action pkg.info.name pkg.info.version status
+      |> Action.Full.make ~sandbox:pkg_sandbox
       |> Action_builder.return
       |> Action_builder.with_no_targets
     in
@@ -2406,9 +2523,23 @@ let build_rule context_name ~source_deps (pkg : Pkg.t) =
   let open Action_builder.With_targets.O in
   (let deps =
      let deps = Dep.Set.union source_deps (Pkg.package_deps pkg) in
-     match pkg.depends_on_dune with
-     | false -> deps
-     | true -> Dep.Set.add deps (Lazy.force dune_dep)
+     (* Add dependencies on vendored dune packages (their install aliases) *)
+     let deps = Dep.Set.union deps (Pkg.vendored_deps pkg) in
+     let deps =
+       match pkg.depends_on_dune with
+       | false -> deps
+       | true -> Dep.Set.add deps (Lazy.force dune_dep)
+     in
+     (* For cached toolchains, add a dependency on the global cache's ocaml binary.
+        This invalidates the shared cache when the global cache changes.
+        We use the ocaml binary as it exists in valid installs but not in stale ones. *)
+     match pkg.toolchain_cache_dir with
+     | None -> deps
+     | Some cache_dir ->
+       let ocaml_binary = Path.relative cache_dir "target/bin/ocaml" in
+       if Path.Untracked.exists ocaml_binary
+       then Dep.Set.add deps (Dep.file ocaml_binary)
+       else deps
    in
    Action_builder.deps deps |> Action_builder.with_no_targets)
   (* TODO should we add env deps on these? *)
@@ -2445,156 +2576,249 @@ let pkg_alias_disabled =
     }
 ;;
 
-let setup_pkg_install_alias =
+(* Vendor build helpers - extracted from setup_pkg_install_alias for clarity *)
+module Vendor_build = struct
+  (* Classify a package's vendor status by checking the vendor directory
+     and determining the appropriate build method. *)
+  let classify (lock_pkg : Lock_dir.Pkg.t) =
+    let vendor_path = Vendor.package_dir lock_pkg.info.name lock_pkg.info.version in
+    let* is_vendored =
+      Fs_memo.dir_exists (Path.Outside_build_dir.In_source_dir vendor_path)
+    in
+    let vendor_marker =
+      Path.Source.relative Vendor.default_dir Vendor.marker_filename
+    in
+    let* marker_exists =
+      Fs_memo.file_exists (Path.Outside_build_dir.In_source_dir vendor_marker)
+    in
+    (* Only consider it vendored if both the marker file exists AND the package dir exists *)
+    let is_vendored = is_vendored && marker_exists in
+    if not is_vendored
+    then Memo.return Vendor_status.Not_vendored
+    else
+      (* Check if vendor stanza has (build opam) *)
+      let+ vendor_stanza = Source_tree.vendor_stanza vendor_path in
+      let stanza_forces_opam =
+        match vendor_stanza with
+        | Some { Vendor_stanza.build_method = Some Vendor_stanza.Build_method.Opam_sandboxed; _ } -> true
+        | _ -> false
+      in
+      let inferred_method = Vendor.classify_build_method lock_pkg in
+      (* Use opam sandbox if inferred method says so OR if vendor stanza forces it *)
+      match inferred_method, stanza_forces_opam with
+      | Vendor.Dune_native, false -> Vendor_status.Dune_native
+      | _ -> Vendor_status.Opam_sandboxed
+  ;;
+
   let build_packages_of_context ctx_name =
-    (* Fetching the package target implies that we will also fetch the extra
-       sources. *)
     let open Action_builder.O in
     let* pkg_digests =
       Action_builder.of_memo
         (let open Memo.O in
-         let+ db = DB.of_ctx ctx_name ~allow_sharing:true in
+         let* db = DB.of_ctx ctx_name ~allow_sharing:true in
          let digests = Pkg_digest.Map.values db.pkg_digest_table in
-         let num_pkgs = List.length digests in
+         let+ filtered =
+           Memo.parallel_map digests ~f:(fun { DB.Pkg_table.pkg; pkg_digest; _ } ->
+             let+ status = classify pkg in
+             match status with
+             | Vendor_status.Dune_native -> None
+             | Vendor_status.Not_vendored | Vendor_status.Opam_sandboxed ->
+               Some pkg_digest)
+         in
+         let pkg_digests = List.filter_map filtered ~f:Fun.id in
+         let num_pkgs = List.length pkg_digests in
          Pkg_build_progress.Progress.set_total num_pkgs;
          Dune_engine.Progress.set_total num_pkgs;
-         List.map digests ~f:(fun { DB.Pkg_table.pkg_digest; _ } -> pkg_digest))
+         pkg_digests)
     in
     List.map pkg_digests ~f:(fun pkg_digest ->
       Paths.make ~relative:Path.Build.relative pkg_digest (Dependencies ctx_name)
       |> Paths.target_dir
       |> Path.build)
     |> Action_builder.paths
-  in
-  let build_vendor_libraries ctx_name =
-    (* Build libraries from vendor stanzas in duniverse.
-       We add a dependency on the build directory to ensure vendor libraries
-       are built. The actual building happens through dune's normal rule
-       generation for vendored directories. *)
-    let open Action_builder.O in
-    let* vendor_dirs =
-      Action_builder.of_memo
-        (let open Memo.O in
-         let duniverse_dir = Duniverse.duniverse_dir in
-         Source_tree.vendor_stanzas duniverse_dir
-         >>| List.map ~f:(fun (subdir, _stanza) ->
-           let vendor_dir = Path.Source.relative duniverse_dir subdir in
-           Path.Build.append_source (Context_name.build_dir ctx_name) vendor_dir))
-    in
-    (* Depend on the directories existing - this triggers dune's normal build *)
-    Action_builder.paths_existing (List.map vendor_dirs ~f:Path.build)
-  in
-  fun ~dir ctx_name ->
-    let rule =
-      (* We only need to build when the build_dir is the root of the context *)
-      match
-        let build_dir = Context_name.build_dir ctx_name in
-        Path.Build.equal dir build_dir
-      with
-      | false -> Memo.return Rules.empty
-      | true ->
-        let* active = Lock_dir.lock_dir_active ctx_name in
-        let alias = Alias.make ~dir Alias0.pkg_install in
-        Rules.collect_unit (fun () ->
-          let deps =
-            match active with
-            | true ->
-              (* Build both .pkg packages and vendor stanza libraries *)
-              let open Action_builder.O in
-              let* () = build_packages_of_context ctx_name in
-              build_vendor_libraries ctx_name
-            | false -> pkg_alias_disabled
-          in
-          Rules.Produce.Alias.add_deps alias deps)
-    in
-    Gen_rules.rules_for ~dir ~allowed_subdirs:Filename.Set.empty rule
-    |> Gen_rules.rules_here
-;;
+  ;;
 
-(* Check if a package has sources in the duniverse directory.
-   Returns (in_duniverse, should_use_opam_sandbox) where:
-   - in_duniverse: true if sources exist in duniverse/
-   - should_use_opam_sandbox: true if package should be built in opam sandbox
-     (either because it's not a dune package, or has (sandbox opam) in vendor stanza) *)
-let duniverse_status (lock_pkg : Lock_dir.Pkg.t) =
-  let duniverse_path = Duniverse.package_dir lock_pkg.info.name lock_pkg.info.version in
-  let* in_duniverse =
-    Fs_memo.dir_exists (Path.Outside_build_dir.In_source_dir duniverse_path)
-  in
-  let duniverse_marker =
-    Path.Source.relative Duniverse.duniverse_dir Duniverse.marker_filename
-  in
-  let* marker_exists =
-    Fs_memo.file_exists (Path.Outside_build_dir.In_source_dir duniverse_marker)
-  in
-  (* Only consider it duniverse if both the marker file exists AND the package dir exists *)
-  let in_duniverse = in_duniverse && marker_exists in
-  if not in_duniverse
-  then Memo.return (false, false)
-  else
-    (* Check if vendor stanza has (sandbox opam) *)
-    let+ vendor_stanza = Source_tree.vendor_stanza duniverse_path in
-    let sandbox_opam =
-      match vendor_stanza with
-      | Some { Vendor_stanza.sandbox = Some Vendor_stanza.Sandbox_mode.Opam; _ } -> true
-      | _ -> false
+  let build_opam_sandbox_rule ctx_name ~subdir ~vendor_dir ~opam_path =
+    let pkg_name = Package.Name.of_string subdir in
+    let opam_contents = Io.read_file ~binary:true (Path.source opam_path) in
+    let opam_file =
+      Dune_pkg.Opam_file.read_from_string_exn ~contents:opam_contents (Path.source opam_path)
     in
-    let is_dune_pkg =
-      match Duniverse.classify lock_pkg with
-      | Duniverse.Duniverse -> true
-      | Duniverse.Opam_sandbox -> false
+    let pkg_version =
+      match OpamFile.OPAM.version_opt opam_file with
+      | Some v -> Package_version.of_string (OpamPackage.Version.to_string v)
+      | None -> Package_version.of_string "dev"
     in
-    (* Use opam sandbox if not a dune package OR if vendor stanza says sandbox opam *)
-    in_duniverse, (not is_dune_pkg) || sandbox_opam
+    let build_cmds = OpamFile.OPAM.build opam_file in
+    let install_cmds = OpamFile.OPAM.install opam_file in
+    let install_dir = Install.Context.dir ~context:ctx_name in
+    let prefix = Path.build install_dir |> Path.to_string in
+    let cmd_to_args cmd =
+      List.filter_map cmd ~f:(fun (arg, _filter) ->
+        match (arg : OpamTypes.simple_arg) with
+        | CString s -> Some s
+        | CIdent _ -> None)
+    in
+    let run_cmds cmds =
+      List.filter_map cmds ~f:(fun (args, _filter) ->
+        match cmd_to_args args with
+        | [] -> None
+        | cmd :: args -> Some (Action.run (Ok (Path.of_string cmd)) args))
+    in
+    let source_dir = Path.source vendor_dir in
+    let progress_building =
+      Pkg_build_progress.progress_action pkg_name pkg_version `Building
+    in
+    let progress_installing =
+      Pkg_build_progress.progress_action pkg_name pkg_version `Installing
+    in
+    let build_actions = run_cmds build_cmds in
+    let install_actions = run_cmds install_cmds in
+    let all_actions =
+      [ progress_building ] @ build_actions @ [ progress_installing ] @ install_actions
+    in
+    let marker_file =
+      Path.Build.relative
+        (Context_name.build_dir ctx_name)
+        (sprintf ".pkg/vendor-%s.marker" subdir)
+    in
+    let env = Env.add Env.empty ~var:"PREFIX" ~value:prefix in
+    let action =
+      Action.chdir source_dir (Action.progn all_actions)
+      |> Action.Full.make
+      |> Action.Full.add_env env
+    in
+    let with_targets =
+      Action_builder.return action
+      |> Action_builder.with_no_targets
+      |> Action_builder.With_targets.add ~file_targets:[ marker_file ]
+    in
+    marker_file, with_targets
+  ;;
+
+  let classify_vendor_stanzas ctx_name =
+    let open Memo.O in
+    let vendor_dir = Vendor.default_dir in
+    Source_tree.vendor_stanzas vendor_dir
+    >>= Memo.parallel_map ~f:(fun (subdir, stanza) ->
+      let subdir_path = Path.Source.relative vendor_dir subdir in
+      let build_dir =
+        Path.Build.append_source (Context_name.build_dir ctx_name) subdir_path
+      in
+      match stanza.Vendor_stanza.build_method with
+      | Some Vendor_stanza.Build_method.Opam_sandboxed ->
+        let dune_project_path = Path.Source.relative subdir_path "dune-project" in
+        let* has_dune_project =
+          Fs_memo.file_exists (Path.Outside_build_dir.In_source_dir dune_project_path)
+        in
+        if has_dune_project
+        then Memo.return (`Dune_package build_dir)
+        else
+          let dir_name = Path.Source.basename subdir_path in
+          let candidates =
+            [ Path.Source.relative subdir_path (dir_name ^ ".opam")
+            ; Path.Source.relative subdir_path "opam"
+            ]
+          in
+          let* opam_file_opt =
+            Memo.List.find_map candidates ~f:(fun opam_path ->
+              Fs_memo.file_exists (Path.Outside_build_dir.In_source_dir opam_path)
+              >>| function
+              | true -> Some opam_path
+              | false -> None)
+          in
+          (match opam_file_opt with
+           | None ->
+             User_error.raise
+               [ Pp.textf
+                   "Vendor directory %s has (sandbox opam) but no opam file found"
+                   (Path.Source.to_string subdir_path)
+               ]
+           | Some opam_path ->
+             Memo.return (`Opam_sandbox (subdir, subdir_path, opam_path)))
+      | _ -> Memo.return (`Dune_package build_dir))
+  ;;
+
+  let register_opam_sandbox_rules ctx_name opam_sandbox_pkgs =
+    List.map opam_sandbox_pkgs ~f:(fun (subdir, vendor_dir, opam_path) ->
+      let marker_file, with_targets =
+        build_opam_sandbox_rule ctx_name ~subdir ~vendor_dir ~opam_path
+      in
+      let (_ : unit Memo.t) = rule ~loc:Loc.none with_targets in
+      marker_file)
+  ;;
+
+  let build_vendor_deps dune_dirs opam_markers =
+    let open Action_builder.O in
+    let* () = Action_builder.paths_existing (List.map dune_dirs ~f:Path.build) in
+    Action_builder.paths_existing (List.map opam_markers ~f:Path.build)
+  ;;
+
+  let has_vendor_sandbox_packages () =
+    let open Memo.O in
+    let vendor_dir = Vendor.default_dir in
+    Source_tree.vendor_stanzas vendor_dir
+    >>| List.exists ~f:(fun (_subdir, stanza) ->
+      match stanza.Vendor_stanza.build_method with
+      | Some Vendor_stanza.Build_method.Opam_sandboxed -> true
+      | _ -> false)
+  ;;
+end
+
+let setup_pkg_install_alias ~dir ctx_name =
+  let rule =
+    match
+      let build_dir = Context_name.build_dir ctx_name in
+      Path.Build.equal dir build_dir
+    with
+    | false -> Memo.return Rules.empty
+    | true ->
+      let* active = Lock_dir.lock_dir_active ctx_name in
+      let alias = Alias.make ~dir Alias0.pkg_install in
+      Rules.collect_unit (fun () ->
+        let* vendor_info = Vendor_build.classify_vendor_stanzas ctx_name in
+        let dune_dirs, opam_sandbox_pkgs =
+          List.partition_map vendor_info ~f:(function
+            | `Dune_package dir -> Left dir
+            | `Opam_sandbox info -> Right info)
+        in
+        let opam_markers =
+          Vendor_build.register_opam_sandbox_rules ctx_name opam_sandbox_pkgs
+        in
+        let* deps =
+          match active with
+          | true ->
+            Memo.return
+              (let open Action_builder.O in
+               let* () = Vendor_build.build_packages_of_context ctx_name in
+               Vendor_build.build_vendor_deps dune_dirs opam_markers)
+          | false ->
+            let+ has_vendor = Vendor_build.has_vendor_sandbox_packages () in
+            if has_vendor
+            then Vendor_build.build_vendor_deps dune_dirs opam_markers
+            else pkg_alias_disabled
+        in
+        Rules.Produce.Alias.add_deps alias deps)
+  in
+  Gen_rules.rules_for ~dir ~allowed_subdirs:Filename.Set.empty rule
+  |> Gen_rules.rules_here
 ;;
 
 let setup_package_rules (db : DB.t) ~package_universe ~dir ~pkg_digest
   : Gen_rules.result Memo.t
   =
-  (* First check if this package is in duniverse *)
-  let* in_duniverse, should_use_opam_sandbox =
+  (* First check if this package is vendored *)
+  let* vendor_status =
     match Pkg_digest.Map.find db.pkg_digest_table pkg_digest with
-    | None -> Memo.return (false, false)
-    | Some { DB.Pkg_table.pkg; _ } -> duniverse_status pkg
+    | None -> Memo.return Vendor_status.Not_vendored
+    | Some { DB.Pkg_table.pkg; _ } -> Vendor_build.classify pkg
   in
-  if in_duniverse && not should_use_opam_sandbox
-  then (
-    (* Duniverse dune packages are built as vendored code in the main context.
-       We create an empty cookie so dependency resolution succeeds.
-       The actual libraries/binaries are found via normal dune install paths. *)
-    let paths = Paths.make pkg_digest package_universe ~relative:Path.Build.relative in
-    let target_dir = paths.target_dir in
-    let cookie_file = Paths.install_cookie' target_dir in
-    let empty_cookie : Install_cookie.t =
-      { Install_cookie.Gen.files = Section.Map.empty; variables = [] }
-    in
-    let cookie_content =
-      Install_cookie.Persistent.to_string
-        { empty_cookie with files = Section.Map.to_list empty_cookie.files }
-    in
-    let rules =
-      Rules.collect_unit (fun () ->
-        (* Create action that makes target directory and writes cookie *)
-        let action =
-          Action.progn
-            [ Action.mkdir target_dir; Action.write_file cookie_file cookie_content ]
-          |> Action.Full.make
-          |> Action_builder.return
-          |> Action_builder.with_targets
-               ~targets:
-                 (Targets.create
-                    ~files:Path.Build.Set.empty
-                    ~dirs:(Path.Build.Set.singleton target_dir))
-        in
-        rule action)
-    in
-    let directory_targets = Path.Build.Map.singleton target_dir Loc.none in
-    let build_dir_only_sub_dirs =
-      Gen_rules.Build_only_sub_dirs.singleton ~dir Subdir_set.empty
-    in
-    Memo.return @@ Gen_rules.make ~directory_targets ~build_dir_only_sub_dirs rules)
-  else
-    (* Use opam sandbox: either not in duniverse, or has (sandbox opam) vendor stanza *)
+  match vendor_status with
+  | Vendor_status.Dune_native ->
+    (* Vendored dune packages are built as vendored code in the main context.
+       They have NO pkg rules - the libraries/binaries come from normal dune build. *)
+    Memo.return @@ Gen_rules.rules_here Gen_rules.Rules.empty
+  | Vendor_status.Not_vendored | Vendor_status.Opam_sandboxed ->
     let* pkg = Resolve.resolve db Loc.none pkg_digest package_universe in
     let paths =
       Paths.make pkg.pkg_digest package_universe ~relative:Path.Build.relative
@@ -2718,7 +2942,10 @@ let all_deps universe =
   in
   Pkg_digest.Map.values db.pkg_digest_table
   |> Memo.parallel_map ~f:(fun { DB.Pkg_table.pkg_digest; _ } ->
-    Resolve.resolve db Loc.none pkg_digest universe)
+    (* Use resolve_opt to filter out vendored dune packages - they return None
+       because they're built as vendored code, not via pkg rules *)
+    Resolve.resolve_opt db pkg_digest universe)
+  >>| List.filter_map ~f:Fun.id
   >>| Pkg.top_closure
 ;;
 
