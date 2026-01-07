@@ -776,25 +776,39 @@ DEEP NESTING IN VENDORED PACKAGE
 SANDBOX MODE - opam sandbox for non-dune packages
 ===========================================
 
-TODO: Sandbox mode for non-dune packages is not yet implemented.
-The (sandbox opam) field is parsed but has no effect currently.
+Non-dune packages (those without a dune-project file) can be built using
+opam's sandbox mechanism when (build opam) is specified. The build and
+install commands are read from the package's opam file.
 
   $ rm -rf duniverse _build
   $ mkdir -p duniverse/make-pkg.1.0.0
+  $ cat >duniverse/make-pkg.1.0.0/make-pkg.opam <<'EOF'
+  > opam-version: "2.0"
+  > name: "make-pkg"
+  > version: "1.0.0"
+  > build: [
+  >   ["make" "all"]
+  > ]
+  > install: [
+  >   ["make" "install"]
+  > ]
+  > EOF
+
   $ cat >duniverse/make-pkg.1.0.0/Makefile <<'EOF'
   > all:
   > 	@echo "Building make-pkg"
   > install:
   > 	@echo "Installing make-pkg"
-  > 	mkdir -p $(PREFIX)/lib/make-pkg
-  > 	echo "data" > $(PREFIX)/lib/make-pkg/data.txt
+  > 	mkdir -p $(OPAM_SWITCH_PREFIX)/lib/make-pkg
+  > 	echo "data" > $(OPAM_SWITCH_PREFIX)/lib/make-pkg/data.txt
   > EOF
 
   $ cat >duniverse/dune <<EOF
   > (vendored_dirs *)
-  > (vendor make-pkg.1.0.0 (sandbox opam))
+  > (vendor make-pkg.1.0.0 (build opam))
   > EOF
 
-Non-dune packages with (sandbox opam) should be built in opam sandbox:
+Non-dune packages with (build opam) should be built in opam sandbox:
 
-  $ dune build @pkg-install 2>&1 | grep -E "^(Building|Installing)" | head -5
+  $ dune build @pkg-install 2>&1
+  $ cat _build/default/.pkg/vendor-make-pkg.1.0.0.marker 2>&1 || echo "no marker file"

@@ -83,10 +83,7 @@ let solve ~dev_tool ~local_packages =
       Workspace.add_repo workspace Dune_pkg.Pkg_workspace.Repository.binary_packages
     | `Disabled -> workspace
   and* compiler_pins = compiler_pins in
-  (* as we want to write to the source, we're using the source lock dir here *)
-  let lock_dir =
-    Dune_rules.Lock_dir.dev_tool_external_lock_dir dev_tool |> Path.external_
-  in
+  let lock_dir = Dune_rules.Pkg_dev_tool.lock_dir dev_tool |> Path.build in
   Memo.of_reproducible_fiber
   @@ Pkg.Lock.solve
        workspace
@@ -164,14 +161,12 @@ let extra_dependencies dev_tool =
 
 let lockdir_status dev_tool =
   let open Memo.O in
-  let dev_tool_lock_dir = Dune_rules.Lock_dir.dev_tool_external_lock_dir dev_tool in
-  let* lock_dir_exists =
-    Dune_engine.Fs_memo.dir_exists (Path.Outside_build_dir.External dev_tool_lock_dir)
-  in
+  let dev_tool_lock_dir = Dune_rules.Pkg_dev_tool.lock_dir dev_tool in
+  let lock_dir_exists = dev_tool_lock_dir |> Path.build |> Path.exists in
   match lock_dir_exists with
   | false -> Memo.return `No_lockdir
   | true ->
-    let dev_tool_lock_dir = Path.external_ dev_tool_lock_dir in
+    let dev_tool_lock_dir = Path.build dev_tool_lock_dir in
     (match Lock_dir.read_disk dev_tool_lock_dir with
      | Error _ -> Memo.return `No_lockdir
      | Ok { packages; _ } ->
@@ -304,7 +299,7 @@ let lock_dev_tool_with_version dev_tool version =
    Returns None if the lock file doesn't exist or doesn't contain the tool. *)
 let dev_tool_version dev_tool =
   let open Memo.O in
-  let* lock_dir_opt = Dune_rules.Lock_dir.of_dev_tool_if_lock_dir_exists dev_tool in
+  let* lock_dir_opt = Dune_rules.Pkg_dev_tool.load_lock_dir_if_exists dev_tool in
   match lock_dir_opt with
   | None -> Memo.return None
   | Some lock_dir ->
@@ -312,7 +307,9 @@ let dev_tool_version dev_tool =
     let* platform =
       Pkg.Pkg_common.poll_solver_env_from_current_system () |> Memo.of_reproducible_fiber
     in
-    let packages = Lock_dir.Packages.pkgs_on_platform_by_name lock_dir.packages ~platform in
+    let packages =
+      Lock_dir.Packages.pkgs_on_platform_by_name lock_dir.packages ~platform
+    in
     (match Package_name.Map.find packages package_name with
      | None -> Memo.return None
      | Some pkg -> Memo.return (Some (Package_version.to_string pkg.info.version)))

@@ -124,13 +124,14 @@ module Spec = struct
   type ('path, 'target) t =
     { prog : ('path, Action.Prog.Not_found.t) result
     ; args : 'path arg Array.Immutable.t
+    ; prefix : 'path
     ; ocamlfind_destdir : 'path
     ; pkg : Dune_pkg.Package_name.t * Loc.t
     ; depexts : string list
     }
 
   let name = "run-with-path"
-  let version = 2
+  let version = 3
 
   let map_arg arg ~f =
     Array.Immutable.map arg ~f:(function
@@ -141,6 +142,7 @@ module Spec = struct
   let bimap t f _g =
     { t with
       args = Array.Immutable.map t.args ~f:(map_arg ~f)
+    ; prefix = f t.prefix
     ; ocamlfind_destdir = f t.ocamlfind_destdir
     ; prog = Result.map t.prog ~f
     }
@@ -148,7 +150,9 @@ module Spec = struct
 
   let is_useful_to ~memoize:_ = true
 
-  let encode { prog; args; ocamlfind_destdir; pkg = _; depexts = _ } path _ : Sexp.t =
+  let encode { prog; args; prefix; ocamlfind_destdir; pkg = _; depexts = _ } path _
+    : Sexp.t
+    =
     let prog : Sexp.t =
       match prog with
       | Ok p -> path p
@@ -161,11 +165,11 @@ module Spec = struct
              | String s -> Sexp.Atom s
              | Path p -> path p)))
     in
-    List [ List ([ prog ] @ args); path ocamlfind_destdir ]
+    List [ List ([ prog ] @ args); path prefix; path ocamlfind_destdir ]
   ;;
 
   let action
-        { prog; args; ocamlfind_destdir; pkg; depexts }
+        { prog; args; prefix; ocamlfind_destdir; pkg; depexts }
         ~(ectx : Action.context)
         ~(eenv : Action.env)
     =
@@ -190,7 +194,12 @@ module Spec = struct
         Path.to_string bin_folder
       in
       let env =
+        let prefix_value = Path.to_absolute_filename prefix in
         eenv.env
+        (* OPAM_SWITCH_PREFIX is the standard opam env var for the switch prefix *)
+        |> Env.add ~var:"OPAM_SWITCH_PREFIX" ~value:prefix_value
+        (* PREFIX is also set for compatibility with traditional Makefiles *)
+        |> Env.add ~var:"PREFIX" ~value:prefix_value
         |> Env.add
              ~var:"OCAMLFIND_DESTDIR"
              ~value:(Path.to_absolute_filename ocamlfind_destdir)
@@ -229,6 +238,6 @@ end
 
 module A = Action_ext.Make (Spec)
 
-let action ~pkg ~depexts prog args ~ocamlfind_destdir =
-  A.action { Spec.prog; args; ocamlfind_destdir; pkg; depexts }
+let action ~pkg ~depexts prog args ~prefix ~ocamlfind_destdir =
+  A.action { Spec.prog; args; prefix; ocamlfind_destdir; pkg; depexts }
 ;;

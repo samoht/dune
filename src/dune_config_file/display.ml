@@ -43,6 +43,10 @@ let to_dyn : t -> Dyn.t = function
 
 let console_backend = function
   | Tui -> Dune_tui.backend ()
+  | Simple { verbosity = Verbose; _ } ->
+    (* Verbose mode uses dumb backend for line-by-line output *)
+    Terminal_signals.unblock ();
+    Dune_console.Backend.dumb
   | Simple { status_line; _ } ->
     (match status_line with
      | false ->

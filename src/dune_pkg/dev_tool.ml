@@ -79,19 +79,27 @@ let package_name = function
   | Merlin -> Package_name.of_string "merlin"
 ;;
 
-let of_package_name package_name =
+let of_package_name_opt package_name =
   match Package_name.to_string package_name with
-  | "ocamlformat" -> Ocamlformat
-  | "odoc" -> Odoc
-  | "ocaml-lsp-server" -> Ocamllsp
-  | "utop" -> Utop
-  | "earlybird" -> Ocamlearlybird
-  | "odig" -> Odig
-  | "opam-publish" -> Opam_publish
-  | "dune-release" -> Dune_release
-  | "ocaml-index" -> Ocaml_index
-  | "merlin" -> Merlin
-  | other -> User_error.raise [ Pp.textf "No such dev tool: %s" other ]
+  | "ocamlformat" -> Some Ocamlformat
+  | "odoc" -> Some Odoc
+  | "ocaml-lsp-server" -> Some Ocamllsp
+  | "utop" -> Some Utop
+  | "earlybird" -> Some Ocamlearlybird
+  | "odig" -> Some Odig
+  | "opam-publish" -> Some Opam_publish
+  | "dune-release" -> Some Dune_release
+  | "ocaml-index" -> Some Ocaml_index
+  | "merlin" -> Some Merlin
+  | _ -> None
+;;
+
+let of_package_name package_name =
+  match of_package_name_opt package_name with
+  | Some t -> t
+  | None ->
+    User_error.raise
+      [ Pp.textf "No such dev tool: %s" (Package_name.to_string package_name) ]
 ;;
 
 let exe_name = function

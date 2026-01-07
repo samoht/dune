@@ -3,6 +3,13 @@ open Memo.O
 open Dune_pkg
 include Dune_pkg.Lock
 
+let context =
+  let name = Context_name.of_string "lock" in
+  Build_context.create ~name
+;;
+
+let build_dir ctx = Path.Build.relative context.build_dir (Context_name.to_string ctx)
+
 module Sys_vars = struct
   type t =
     { os : string option Memo.Lazy.t
@@ -130,44 +137,9 @@ let select_lock_dir lock_dir_selection =
 ;;
 
 let default_dir = "dune.lock"
-
-(* location where project lock dirs are stored *)
-let path_prefix =
-  (* the lock dir is always stored in the default context *)
-  let ctx_name = Context_name.default |> Context_name.to_string in
-  Path.Build.L.relative Private_context.t.build_dir [ ctx_name; ".lock" ]
-;;
-
+let path_prefix = build_dir Context_name.default
 let default_path = Path.Build.relative path_prefix default_dir |> Path.build
 let default_source_path = Path.Source.(relative root default_dir)
-
-let dev_tool_to_path_segment dev_tool =
-  dev_tool |> Dev_tool.package_name |> Package_name.to_string |> Path.Local.of_string
-;;
-
-(* This function returns the lock dir that is created outside the build system. *)
-let dev_tool_external_lock_dir dev_tool =
-  let external_root =
-    Path.Build.root |> Path.build |> Path.to_absolute_filename |> Path.External.of_string
-  in
-  let dev_tools_path = Path.External.relative external_root ".dev-tools.locks" in
-  let dev_tool_segment = dev_tool_to_path_segment dev_tool in
-  Path.External.append_local dev_tools_path dev_tool_segment
-;;
-
-(* This function returns the lock dir location where the build system can create
-   the lock directory. This is where lock files should be loaded from and it
-   is populated either by copy rules or the solver running. *)
-let dev_tool_lock_dir dev_tool =
-  (* dev tools always live in default *)
-  let ctx_name = Context_name.default |> Context_name.to_string in
-  let dev_tool_segment = dev_tool_to_path_segment dev_tool in
-  let lock_dir =
-    Path.Build.L.relative Private_context.t.build_dir [ ctx_name; ".dev-tool-locks" ]
-  in
-  let lock_dir = Path.Build.append_local lock_dir dev_tool_segment in
-  Path.build lock_dir
-;;
 
 let lock_dir_of_source p =
   let local = Path.Source.to_local p in
@@ -242,19 +214,10 @@ let get_with_path =
 
 let get ctx = get_with_path ctx >>| Result.map ~f:snd
 let get_exn ctx = get ctx >>| User_error.ok_exn
+let load_exn path = Load.load_exn path
 
-let of_dev_tool dev_tool =
-  let path = dev_tool |> dev_tool_external_lock_dir |> Path.external_ in
-  Load.load_exn path
-;;
-
-let of_dev_tool_if_lock_dir_exists dev_tool =
-  let path = dev_tool |> dev_tool_external_lock_dir |> Path.external_ in
-  let exists =
-    (* Note we use [Path.Untracked] here rather than [Fs_memo] because a tool's
-       lockdir may be generated part way through a build. *)
-    Path.Untracked.exists path
-  in
+let load_if_exists path =
+  let exists = Path.Untracked.exists path in
   if exists
   then
     let+ t = Load.load_exn path in

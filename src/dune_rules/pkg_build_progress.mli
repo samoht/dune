@@ -33,5 +33,5 @@ val format_user_message
 val progress_action
   :  Package.Name.t
   -> Package_version.t
-  -> [ `Downloading | `Building ]
+  -> [ `Downloading | `Building | `Installing | `Cached ]
   -> Action.t

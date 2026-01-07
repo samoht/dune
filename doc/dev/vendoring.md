@@ -48,8 +48,58 @@ The `vendor` stanza declares a vendored dependency directory:
 (vendor <directory>           ; required: path to vendored source (relative to dune file)
  (libraries <lib-name> ...)   ; optional: libraries to expose (all if omitted)
  (packages <pkg-name> ...)    ; optional: packages to expose (all if omitted)
- (sandbox <mode>))            ; optional: sandbox mode (default: none)
+ (build <method>)             ; optional: build method (dune or opam, default: dune)
+ (compiler <name>)            ; optional: marks this as providing a compiler
+ (toolchain <name>))          ; optional: marks this as providing a findlib toolchain
 ```
+
+### Compiler and Toolchain Declaration
+
+The `(compiler ...)` and `(toolchain ...)` fields mark vendored packages as providing
+compilers or cross-compilation toolchains:
+
+```lisp
+; Native compilers - used by (context (workspace (compiler ...)))
+(vendor ocaml.5.2.0
+ (compiler ocaml.5.2.0))
+
+(vendor ocaml.4.14.2
+ (compiler ocaml.4.14.2))
+
+; Cross-compilation toolchain - registers a findlib toolchain
+(vendor ocaml-windows.5.2.0
+ (toolchain windows))
+```
+
+These can then be referenced in dune-workspace:
+
+```dune
+; Define toolchain (references vendored ocaml-windows package)
+(toolchain windows
+  (package ocaml-windows))
+
+; Uses ocaml.5.4 as the native compiler
+(context (workspace (compiler ocaml.5.4)))
+
+; Uses ocaml.4.14 as the native compiler, named ocaml414
+(context (workspace (compiler ocaml.4.14) (name ocaml414)))
+
+; Uses ocaml.5.4 for native, creates default.windows using toolchain "windows"
+(context (workspace
+  (compiler ocaml.5.4)
+  (targets native windows)))
+```
+
+**`(compiler ...)`**:
+- Declares the package as an OCaml compiler provider
+- Makes the compiler name available for workspace context `(compiler ...)` field
+- Dune builds this package first to get `ocamlc`, `ocamlopt`, etc.
+
+**`(toolchain ...)`**:
+- Declares the package as providing a findlib toolchain for cross-compilation
+- The toolchain name matches what `(targets ...)` references (e.g., `windows`)
+- Dune uses this to know which packages to build when preparing cross-compilation contexts
+- Sets `OCAMLFIND_TOOLCHAIN=<name>` for the target context
 
 ## Selective Library Exposure
 
@@ -90,6 +140,32 @@ The `libraries` field lists the libraries to expose:
 
 If omitted, all libraries in the vendored directory are exposed.
 
+### Library Aliasing
+
+Libraries can be renamed to avoid conflicts when vendoring multiple versions:
+
+```lisp
+(vendor duniverse/yojson.1.7.0
+ (libraries (yojson :as yojson_v1)))
+
+(vendor duniverse/yojson.2.0.0
+ (libraries yojson))
+```
+
+The alias creates a new public name for the library while keeping the original
+module structure. In the example above, code can use both versions:
+
+```ocaml
+(* Uses yojson 1.7.0 *)
+let old_result = Yojson_v1.Basic.from_string json
+
+(* Uses yojson 2.0.0 *)
+let new_result = Yojson.Basic.from_string json
+```
+
+Aliasing only affects the public library name used in `(libraries ...)` stanzas.
+The OCaml module names inside the library remain unchanged.
+
 ### Use Cases
 
 #### Multi-Version Migration
@@ -97,14 +173,17 @@ If omitted, all libraries in the vendored directory are exposed.
 Gradual migration from one version of a library to another:
 
 ```lisp
-; Old version for legacy code
+; Old version for legacy code - alias to avoid conflict
 (vendor duniverse/yojson.1.7.0
- (libraries yojson_1_7))  ; renamed to avoid conflict
+ (libraries (yojson :as yojson_v1)))
 
 ; New version for new code
 (vendor duniverse/yojson.2.0.0
  (libraries yojson))
 ```
+
+This allows gradual migration where legacy code uses `yojson_v1` and new code
+uses `yojson`, both coexisting in the same project.
 
 #### Cherry-Picking from Large Projects
 
@@ -152,25 +231,26 @@ Excluded libraries:
 - Their `dune` files are not parsed
 - Their source files are ignored
 
-## Sandbox Modes
+## Build Methods
 
-The `sandbox` field controls how vendored code is built:
+The `build` field controls how vendored code is built:
 
-| Mode | Description |
-|------|-------------|
-| `none` | No sandboxing (default). Vendored code builds like regular project code. |
-| `opam` | Opam-style sandbox. Simulates opam's build environment for packages that expect it. |
+| Method | Description |
+|--------|-------------|
+| `dune` | Native dune build (default). Vendored code builds like regular project code. |
+| `opam` | Opam-style build. Uses opam build/install commands from lock file or opam file. |
 
-The `opam` sandbox mode is useful for packages that:
+The `opam` build method is useful for packages that:
 - Use opam-specific variables (e.g., `%{lib}%`, `%{prefix}%`)
 - Have install steps that expect opam directory layout
 - Include opam build scripts or substitutions
+- Don't use dune as their build system
 
 Example:
 
 ```lisp
 (vendor dune-release.2.0.0
- (sandbox opam))  ; needs opam environment simulation
+ (build opam))  ; needs opam environment simulation
 ```
 
 ## Generated Vendor File
@@ -189,7 +269,7 @@ for each fetched package:
  (libraries cmdliner))
 
 (vendor opam-state.2.2.0
- (sandbox opam))
+ (build opam))
 ```
 
 ### Generation Logic
@@ -222,17 +302,27 @@ Example lock entry triggering opam sandbox:
 
 ### Regeneration and Overrides
 
-The `duniverse/dune` file is regenerated on each `dune pkg fetch`. User customizations
-(e.g., library filtering) should be done in the project's `dune-project` or a separate
-`dune` file, not in the generated file.
+The `duniverse/dune` file is **fully regenerated** on each `dune pkg fetch`.
 
-To override generated settings, add vendor stanzas in `dune-project`:
+For customizations, create your own vendor directory:
 
 ```lisp
-; dune-project - overrides take precedence
-(vendor duniverse/fmt.0.9.0
+; vendor/dune (user-maintained)
+(vendored_dirs *)
+
+; Custom vendored package with specific library selection
+(vendor my-fork.1.0.0
+ (libraries my-fork.core))
+
+; Override a duniverse package by copying it here
+(vendor fmt.0.9.0
  (libraries fmt))  ; expose only fmt, not fmt.tty or fmt.cli
 ```
+
+This approach:
+- Keeps `duniverse/` fully managed by dune (can be gitignored)
+- User customizations live in `vendor/` (committed to git)
+- No conflict between generated and user-maintained configuration
 
 ## The @pkg-install Alias
 
@@ -298,16 +388,6 @@ top-level `.gitignore` exclusions.
 
 ## Future Extensions
 
-### Aliasing Libraries
-
-Allow renaming libraries for conflict resolution:
-
-```lisp
-(vendor duniverse/yojson.1.7.0
- (libraries
-  (yojson :as yojson_old)))
-```
-
 ### Virtual Library Providers
 
 Specify which implementation a vendor provides for virtual libraries:
@@ -343,3 +423,59 @@ to read the opam file, then record the detected mode in `duniverse/dune`.
 
 For overrides, explicit `(sandbox ...)` in `dune-project` takes precedence over
 the generated `duniverse/dune`.
+
+## Opam File Generation
+
+**Status**: Implemented
+
+When `dune pkg fetch` fetches packages to duniverse, it also writes opam files
+for each package. This enables `(build opam)` packages to be built standalone
+without needing the lock directory.
+
+### Implementation
+
+For single-file lock format (`dune.lock` file):
+1. `dune pkg fetch` derives package metadata from the opam repository
+2. The opam file content is extracted from the resolved package
+3. An `opam` file is written to each package's duniverse directory
+
+```
+duniverse/
+  zarith.1.14/
+    opam               # Auto-generated from opam-repository
+    src/               # Source code
+    configure          # Build scripts
+```
+
+For directory lock format (`dune.lock/` directory):
+- Opam files are not generated (metadata is already in .pkg files)
+- The directory lock format is being deprecated in favor of single-file
+
+### Build Behavior
+
+When building `(build opam)` packages, dune reads build/install commands
+directly from the local opam file in duniverse. This means:
+
+- **No lock directory needed at build time** - all information is in duniverse
+- **Editable build commands** - users can modify the local opam file
+- **Standalone builds** - the duniverse directory is self-contained
+
+### Opam File Handling
+
+- Many packages use a single `opam` file (not `<name>.opam`); dune writes to `opam`
+- On re-fetch, the opam file is overwritten (user modifications are lost)
+- Users who want custom build commands can commit their modified opam file
+
+### Future: Build Command Overrides
+
+A future enhancement may allow specifying build commands directly in the vendor
+stanza:
+
+```lisp
+(vendor zarith.1.14
+ (build opam)
+ (build_command (run ./configure) (run make))
+ (install_command (run make install PREFIX=%{prefix}%)))
+```
+
+This would allow customization without modifying the vendored source.

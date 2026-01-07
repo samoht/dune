@@ -16,6 +16,7 @@ val equal : t -> t -> bool
 val hash : t -> int
 val package_name : t -> Package_name.t
 val of_package_name : Package_name.t -> t
+val of_package_name_opt : Package_name.t -> t option
 val exe_name : t -> string
 
 (** Returns the path to this tool's executable relative to the root of

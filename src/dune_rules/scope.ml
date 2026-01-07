@@ -1,6 +1,5 @@
 open Import
 open Memo.O
-
 module Vendor_stanza = Dune_lang.Vendor_stanza
 
 type t =
@@ -132,7 +131,8 @@ module DB = struct
                 let info =
                   let expander = Expander0.get ~dir in
                   let info =
-                    Library.to_lib_info conf ~expander ~dir ~lib_config |> Lib_info.of_local
+                    Library.to_lib_info conf ~expander ~dir ~lib_config
+                    |> Lib_info.of_local
                   in
                   (* Rename the library and wrapper module if an alias is provided *)
                   match alias with
@@ -430,7 +430,8 @@ module DB = struct
                 in
                 if not pkg_visible
                 then (
-                  Log.info "vendor stanza: excluding library (package not visible)"
+                  Log.info
+                    "vendor stanza: excluding library (package not visible)"
                     [ "lib", Lib_name.to_dyn lib_name
                     ; "src_dir", Path.Source.to_dyn src_dir
                     ];
@@ -439,7 +440,8 @@ module DB = struct
                   (* Check for alias - library_exposed_name returns the alias if set *)
                   match Vendor_stanza.library_exposed_name vendor ~lib_name with
                   | None ->
-                    Log.info "vendor stanza: excluding library (not in libraries list)"
+                    Log.info
+                      "vendor stanza: excluding library (not in libraries list)"
                       [ "lib", Lib_name.to_dyn lib_name
                       ; "src_dir", Path.Source.to_dyn src_dir
                       ];
@@ -448,7 +450,8 @@ module DB = struct
                     if Lib_name.equal exposed_name lib_name
                     then `Include None (* No alias, use original name *)
                     else (
-                      Log.info "vendor stanza: aliasing library"
+                      Log.info
+                        "vendor stanza: aliasing library"
                         [ "lib", Lib_name.to_dyn lib_name
                         ; "alias", Lib_name.to_dyn exposed_name
                         ; "src_dir", Path.Source.to_dyn src_dir
@@ -459,13 +462,19 @@ module DB = struct
               (match result with
                | `Exclude -> acc, coq_acc, rocq_acc
                | `Include alias ->
-                 (ctx_dir, Library_related_stanza.Library (lib, alias)) :: acc, coq_acc, rocq_acc)
+                 ( (ctx_dir, Library_related_stanza.Library (lib, alias)) :: acc
+                 , coq_acc
+                 , rocq_acc ))
           | Deprecated_library_name.T d ->
             Memo.return
-              ((ctx_dir, Library_related_stanza.Deprecated_library_name d) :: acc, coq_acc, rocq_acc)
+              ( (ctx_dir, Library_related_stanza.Deprecated_library_name d) :: acc
+              , coq_acc
+              , rocq_acc )
           | Library_redirect.Local.T d ->
             Memo.return
-              ((ctx_dir, Library_related_stanza.Library_redirect d) :: acc, coq_acc, rocq_acc)
+              ( (ctx_dir, Library_related_stanza.Library_redirect d) :: acc
+              , coq_acc
+              , rocq_acc )
           | Coq_stanza.Theory.T coq_lib ->
             Memo.return (acc, (ctx_dir, coq_lib) :: coq_acc, rocq_acc)
           | Rocq_stanza.Theory.T rocq_lib ->

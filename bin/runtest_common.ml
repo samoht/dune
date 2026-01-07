@@ -185,7 +185,7 @@ let make_request ~scontexts ~to_cwd ~test_paths =
           Path.Source.L.relative Path.Source.root (to_cwd @ Path.Source.explode dir)
         in
         Context_name.Map.find_exn scontexts Context_name.default, contexts, dir
-      | In_private_context _ | In_install_dir _ ->
+      | In_pkg_dir _ | In_install_dir _ ->
         User_error.raise
           [ Pp.textf "This path is internal to dune: %s" (Path.to_string_maybe_quoted dir)
           ]

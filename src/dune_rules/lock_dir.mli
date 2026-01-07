@@ -1,37 +1,24 @@
 open Import
-module Pkg = Dune_pkg.Lock.Pkg
-module Pkg_info = Dune_pkg.Lock.Pkg_info
-module Build_command = Dune_pkg.Lock.Build_command
-module Depexts = Dune_pkg.Lock.Depexts
-module Conditional_choice = Dune_pkg.Lock.Conditional_choice
-module Dependency = Dune_pkg.Lock.Dependency
+module Pkg = Dune_pkg.Pkg
+module Pkg_info = Dune_pkg.Pkg.Info
+module Build_command = Dune_pkg.Pkg.Build_command
+module Depexts = Dune_pkg.Pkg.Depexts
+module Conditional_choice = Dune_pkg.Pkg.Conditional_choice
+module Dependency = Dune_pkg.Pkg.Dependency
 
 type t := Dune_pkg.Lock.t
 
+val context : Build_context.t
+val build_dir : Context_name.t -> Path.Build.t
 val get_with_path : Context_name.t -> (Path.t * t, User_message.t) result Memo.t
 val get : Context_name.t -> (t, User_message.t) result Memo.t
 val get_exn : Context_name.t -> t Memo.t
-val of_dev_tool : Dune_pkg.Dev_tool.t -> t Memo.t
-
-(** Returns [None] if the lock_dir for the specified dev tool does not exist. *)
-val of_dev_tool_if_lock_dir_exists : Dune_pkg.Dev_tool.t -> t option Memo.t
-
+val load_exn : Path.t -> t Memo.t
+val load_if_exists : Path.t -> t option Memo.t
 val lock_dir_active : Context_name.t -> bool Memo.t
 val get_path : Context_name.t -> Path.t option Memo.t
-
-(** The default filesystem location where the lock dir is going to get created *)
 val default_path : Path.t
-
-(** The default path where the lock dir will be written to manually *)
 val default_source_path : Path.Source.t
-
-(** The location in the source tree where a dev tool lock dir is expected *)
-val dev_tool_external_lock_dir : Dune_pkg.Dev_tool.t -> Path.External.t
-
-(** Returns the path to the lock_dir that will be used to lock the
-    given dev tool *)
-val dev_tool_lock_dir : Dune_pkg.Dev_tool.t -> Path.t
-
 val select_lock_dir : Workspace.Lock_dir_selection.t -> Path.Source.t Memo.t
 
 (** Returns the lock directories present in the given workspace. *)

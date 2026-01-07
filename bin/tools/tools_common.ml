@@ -40,11 +40,9 @@ let find_pkg_in_packages packages pkg_name =
 (* Read version from a dev tool's lock file synchronously.
    Returns None if the lock file doesn't exist. *)
 let read_dev_tool_version_sync ~workspace_root dev_tool =
-  let tool_name = Dune_pkg.Dev_tool.package_name dev_tool |> Package_name.to_string in
+  let lock_dir = Pkg_dev_tool.lock_dir dev_tool in
   let lock_dir_str =
-    Filename.concat
-      (Path.to_string workspace_root)
-      (Filename.concat "_build/.dev-tools.locks" tool_name)
+    Filename.concat (Path.to_string workspace_root) (Path.Build.to_string lock_dir)
   in
   let lock_dir_path = Path.of_string lock_dir_str in
   if not (Path.exists lock_dir_path)
@@ -98,18 +96,14 @@ let create_install_symlink ~workspace_root dev_tool ~cached_exe_path =
 
 (* Populate the global cache after a successful dev tool build. *)
 let populate_cache_sync ~workspace_root dev_tool =
-  (* Get the source directory where the tool was built.
-     Path: workspace_root/_build/_private/default/.dev-tool/{name}/target *)
-  let dev_tool_name =
-    Dune_pkg.Dev_tool.package_name dev_tool |> Package_name.to_string
-  in
-  (* Build path as a string then convert - ensures correct absolute path handling *)
+  (* The install directory for the dev tool context contains the built tool.
+     Path: workspace_root/_build/install/dev-tools-{name}/ *)
+  let ctx = Pkg_dev_tool.context_name dev_tool in
+  let source_dir_build = Install.Context.dir ~context:ctx in
   let source_dir_str =
     Filename.concat
       (Path.to_string workspace_root)
-      (String.concat
-         ~sep:Filename.dir_sep
-         [ "_build"; "_private"; "default"; ".dev-tool"; dev_tool_name; "target" ])
+      (Path.Build.to_string source_dir_build)
   in
   let source_dir = Path.of_string source_dir_str in
   (* Only proceed if the source directory exists *)
@@ -301,7 +295,8 @@ let build_dev_tool_with_version_directly common dev_tool version =
     Build.run_build_system ~common ~auto_fetch:true ~request:(fun _build_system ->
       let open Action_builder.O in
       let* () =
-        Lock_dev_tool.lock_dev_tool_with_version dev_tool version |> Action_builder.of_memo
+        Lock_dev_tool.lock_dev_tool_with_version dev_tool version
+        |> Action_builder.of_memo
       in
       Action_builder.path (dev_tool_exe_path dev_tool))
   in
@@ -385,7 +380,10 @@ let install_unified_command =
       Arg.(
         required
         & pos 0 (some string) None
-        & info [] ~docv:"TOOL[.VERSION]" ~doc:(Some "Tool name, optionally with version (e.g., ocamlformat.0.27.0)"))
+        & info
+            []
+            ~docv:"TOOL[.VERSION]"
+            ~doc:(Some "Tool name, optionally with version (e.g., ocamlformat.0.27.0)"))
     in
     let common, config = Common.init builder in
     match parse_tool_spec tool_spec with
@@ -400,7 +398,9 @@ let install_unified_command =
       lock_and_build_dev_tool_with_version ~common ~config builder dev_tool version
   in
   let info =
-    let doc = "Install a dev tool. Use TOOL.VERSION syntax to install a specific version." in
+    let doc =
+      "Install a dev tool. Use TOOL.VERSION syntax to install a specific version."
+    in
     Cmd.info "install" ~doc
   in
   Cmd.v info term

@@ -502,7 +502,15 @@ end = struct
     List.rev_concat [ files; files_from_dirs; source_trees ]
   ;;
 
-  let stanza_to_entries ~package_db ~sctx ~dir ~scope ~expander stanza =
+  let stanza_to_entries
+        ~vendored_packages:_
+        ~package_db
+        ~sctx
+        ~dir
+        ~scope
+        ~expander
+        stanza
+    =
     (let+ stanza = keep_if expander stanza ~scope in
      let open Option.O in
      let* stanza = stanza in
@@ -511,6 +519,7 @@ end = struct
     >>= function
     | None -> Memo.return None
     | Some (stanza, package) ->
+      let name = Package.Id.name package in
       let+ entries =
         match Stanza.repr stanza with
         | Install_conf.T i | Executables.T { install_conf = Some i; _ } ->
@@ -528,7 +537,6 @@ end = struct
         | Plugin.T t -> Plugin_rules.install_rules ~sctx ~package_db ~dir t
         | _ -> Memo.return []
       in
-      let name = Package.Id.name package in
       Some (name, entries)
   ;;
 
@@ -536,7 +544,8 @@ end = struct
 
   let stanzas_to_entries sctx =
     let ctx = Context.build_context (Super_context.context sctx) in
-    let* stanzas = Dune_load.dune_files ctx.name in
+    let* stanzas = Dune_load.dune_files ctx.name
+    and* vendored_packages = Dune_load.vendored_packages () in
     let* packages = Dune_load.packages () in
     let+ init =
       Package_map_traversals.parallel_map packages ~f:(fun _name (pkg : Package.t) ->
@@ -596,11 +605,19 @@ end = struct
     and+ entries =
       let* package_db = Package_db.create ctx.name in
       Dune_file.fold_static_stanzas stanzas ~init:[] ~f:(fun dune_file stanza acc ->
-        let dir = Path.Build.append_source ctx.build_dir (Dune_file.dir dune_file) in
+        let source_dir = Dune_file.dir dune_file in
+        let dir = Path.Build.append_source ctx.build_dir source_dir in
         let named_entries =
           let* expander = Super_context.expander sctx ~dir
           and* scope = Scope.DB.find_by_dir dir in
-          stanza_to_entries ~package_db ~sctx ~dir ~scope ~expander stanza
+          stanza_to_entries
+            ~vendored_packages
+            ~package_db
+            ~sctx
+            ~dir
+            ~scope
+            ~expander
+            stanza
         in
         named_entries :: acc)
       |> Memo.all_concurrently
@@ -1401,9 +1418,12 @@ let scheme_per_ctx_memo =
     ~input:(module Super_context.As_memo_key)
     "install-rule-scheme"
     (fun sctx ->
-       Dune_load.packages ()
-       >>| Package.Name.Map.values
-       >>= Memo.parallel_map ~f:(fun pkg -> scheme sctx (Package.name pkg))
+       let* packages = Dune_load.packages () in
+       (* All packages generate install artifacts, including vendored ones.
+          This is needed so opam-sandboxed packages can find vendored/duniverse
+          libraries via findlib. *)
+       Package.Name.Map.values packages
+       |> Memo.parallel_map ~f:(fun pkg -> scheme sctx (Package.name pkg))
        >>| Scheme.all
        >>= Scheme.evaluate ~union:Rules.Dir_rules.union)
 ;;

@@ -497,7 +497,9 @@ let make_lib_modules
         (* If alias is provided, use it for the wrapper module name *)
         match alias with
         | Some alias_name ->
-          Some (Module_name.of_string (Lib_name.Local.to_string (Lib_name.to_local_exn alias_name)))
+          Some
+            (Module_name.of_string
+               (Lib_name.Local.to_string (Lib_name.to_local_exn alias_name)))
         | None ->
           (match Library.main_module_name lib with
            | This x -> x

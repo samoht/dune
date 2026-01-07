@@ -524,25 +524,16 @@ let in_source_tree path =
   match (path : Path.t) with
   | In_source_tree s -> s
   | In_build_dir b ->
-    let in_source = Path.drop_build_context_exn path in
-    (match Path.Source.explode in_source with
-     | "default" :: ".lock" :: components ->
-       Path.Source.L.relative Path.Source.root components
-     | source_components ->
-       (match Path.Build.explode b with
-        | (".dev-tools.locks" as prefix) :: dev_tool :: components ->
-          let build_as_source =
-            Path.build_dir |> Path.to_string |> Path.Source.of_string
-          in
-          Path.Source.L.relative build_as_source (prefix :: dev_tool :: components)
-        | build_components ->
-          Code_error.raise
-            "Unexpected location of lock directory in build directory"
-            [ "path", Path.Build.to_dyn b
-            ; "in_source", Path.Source.to_dyn in_source
-            ; "source_components", Dyn.(list string) source_components
-            ; "build_components", Dyn.(list string) build_components
-            ]))
+    (match Path.Build.explode b with
+     (* Lock dir: _build/lock/<ctx>/<lock-dir-name>/... *)
+     | "lock" :: _ctx :: lock_dir_components ->
+       Path.Source.L.relative Path.Source.root lock_dir_components
+     | build_components ->
+       Code_error.raise
+         "Unexpected location of lock directory in build directory"
+         [ "path", Path.Build.to_dyn b
+         ; "build_components", Dyn.(list string) build_components
+         ])
   | External e -> Workspace.dev_tool_path_to_source_dir e
 ;;
 

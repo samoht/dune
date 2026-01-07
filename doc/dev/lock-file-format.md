@@ -16,6 +16,66 @@ Package resolution is a deterministic process with three levels of reproducibili
 The current `dune.lock/` directory sits between 2 and 3 - it stores full package
 specs that duplicate info from the opam repo. We should move to pure approach 2.
 
+## Workflow
+
+**Simple case (most users):**
+1. User has dune-project with dependencies
+2. `dune pkg lock` → creates dune.lock for current platform/compiler
+3. `dune build` works
+4. No dune-workspace needed
+
+**Multiple compilers or platforms:**
+1. User specifies via CLI or dune-workspace
+2. `dune pkg lock` solves for all specified compilers/platforms
+3. dune.lock contains packages with filters
+4. `dune build` builds all contexts
+
+**CLI options** (for quick setup without workspace):
+```bash
+dune pkg lock                                    # current platform, default compiler
+dune pkg lock --compiler ocaml.4.14.2            # specific compiler
+dune pkg lock --compiler ocaml.5.2.0,ocaml.4.14.2   # multiple (comma-separated)
+dune pkg lock --platform linux-x86_64,macos-arm64   # multiple platforms
+dune pkg lock --repo opam,relocatable            # multiple repos (comma-separated)
+dune pkg lock --repo opam --repo relocatable     # multiple repos (repeated option)
+dune pkg lock --repo myrepo:https://github.com/user/repo.git  # custom repo
+```
+
+**Built-in repositories** (used by default, in priority order):
+1. `relocatable` → relocatable compiler overlay (first priority)
+2. `overlay` → dune-specific package patches
+3. `opam` → `https://github.com/ocaml/opam-repository.git`
+
+Most users need no configuration - defaults just work.
+
+**dune-workspace** (only if customizing repos):
+```dune
+; Add custom repo while keeping defaults
+(repositories :standard myrepo)
+
+; Remove a default repo
+(repositories (:standard \ relocatable))
+
+; Explicit list (no defaults)
+(repositories myrepo opam)
+```
+
+**dune-workspace** (for persistence):
+```dune
+(toolchain windows
+  (repository https://github.com/ocaml-cross/opam-cross-windows.git)
+  (package ocaml-windows))
+
+(context default)
+(context (workspace (compiler ocaml.4.14) (name ocaml414)))
+(context (workspace (compiler ocaml.5.4) (targets native windows)))
+```
+
+If dune-workspace exists, solver reads it. CLI options override/extend.
+
+The lock file records what was solved for - it's output, not input. The workspace
+(or CLI) is the source of truth for what compilers/platforms to solve for.
+
 ## Current Format (Directory)
 
 ```
@@ -85,7 +145,7 @@ Two modes:
 ### Default: Minimal Lock (Approach 2)
 - Lock file pins repo hash + versions
 - Opam-repo cached in `~/.cache/dune/` (works offline after first fetch)
-- Sources fetched on demand to `_build/.pkg/`
+- Sources fetched on demand to `_build/_private/<context>/.pkg/`
 
 ### Optional: Full Vendor (Approach 3)
 - Run `dune pkg fetch` to download sources to `duniverse/`
@@ -184,7 +244,7 @@ val load_package_at_hash
 ### Phase 2: Add Derivation from Repo
 - Modify `Opam_repo` to support lookup by hash
 - Add `derive_from_file` function
-- Cache derived Lock.t in `_build/.pkg/lock-cache/`
+- Cache derived Lock.t in `_build/_private/<context>/.lock-cache/`
 
 ### Phase 3: Integration
 - Modify `Write_disk.prepare` to use file format
@@ -364,19 +424,76 @@ B builds first (%{A:installed}% = false)
 A builds second (%{B:installed}% = true)
 ```
 
-## Platforms
+## Filters (Platform and OCaml Version)
 
-For portable lock dirs (multi-platform), the version list may differ per platform:
+Package entries can have filters for platform and/or OCaml version:
 
 ```lisp
 (packages
- ; Common to all platforms
+ ; Common to all platforms and OCaml versions
  fmt.0.9.0
  cmdliner.1.3.0
 
- ; Platform-specific
- (linux conf-libffi.2.0.0)
- (macos conf-libffi.2.1.0))
+ ; Platform-specific (system library detection)
+ (conf-libffi.2.0.0 (os linux))
+ (conf-libffi.2.1.0 (os macos))
+
+ ; OCaml version-specific (API compatibility)
+ (ppxlib.0.32.0 (ocaml < 5))
+ (ppxlib.0.33.0 (ocaml >= 5))
+
+ ; Compilers - no filters, selected by context's (compiler ...) field
+ ocaml.5.2.0
+ ocaml.4.14.2
+ ocaml-windows.5.2.0)  ; cross-compiler, runs on host
 ```
 
-Or simpler - just list all versions, let build pick what applies.
+### Filter Syntax
+
+```
+package-entry ::= name.version                              ; always included
+               |  (name.version filter+)                    ; conditional
+
+filter ::= (os <name>)                            ; linux, macos, windows
+        |  (arch <name>)                          ; x86_64, arm64
+        |  (ocaml <op> <version>)                 ; version constraint
+
+op ::= < | <= | = | >= | >
+```
+
+### Workspace to Lock Mapping
+
+The workspace specifies contexts with their compilers. The solver reads this
+and solves for all specified compilers/platforms:
+
+```dune
+; dune-workspace
+(toolchain windows
+  (repository https://github.com/ocaml-cross/opam-cross-windows.git)
+  (package ocaml-windows))
+
+(context default)  ; uses system compiler
+
+(context (workspace
+  (compiler ocaml.4.14)
+  (name ocaml414)))
+
+(context (workspace
+  (compiler ocaml.5.4)
+  (targets native windows)))
+```
+
+At solve time: `dune pkg lock` reads workspace, solves for each unique
+(platform, compiler) combination.
+
+At build time: dune evaluates package filters against each context's platform
+and compiler to determine which packages apply.
+
+### Solver Behavior
+
+When locking with multiple contexts configured:
+
+1. Solver runs once per unique (platform, ocaml-version) combination
+2. Results merged into single lock file with appropriate filters
+3. Common packages (same version across all) have no filter
+4. Differing packages get filters for when they apply

@@ -91,8 +91,7 @@ let load () =
           match status with
           | `Regular -> Memo.return false
           | `Vendored ->
-            Source_tree.vendor_stanza (Dune_project.root project)
-            >>| Option.is_some
+            Source_tree.vendor_stanza (Dune_project.root project) >>| Option.is_some
         in
         let acc_packages =
           if has_vendor_stanza

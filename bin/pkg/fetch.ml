@@ -240,9 +240,7 @@ let fetch_source_group ~rev_store ~platform ~patches_dir ~pkgs_by_name group =
       let pkg_name = Package_name.to_string primary_name in
       match Vendor_rules.find_dir_for_library pkg_name with
       | Some dirname ->
-        let dir_path =
-          Path.source (Path.Source.relative Vendor.default_dir dirname)
-        in
+        let dir_path = Path.source (Path.Source.relative Vendor.default_dir dirname) in
         if Path.exists dir_path then Some dir_path else None
       | None -> None)
   in
@@ -337,7 +335,9 @@ let fetch_source_group ~rev_store ~platform ~patches_dir ~pkgs_by_name group =
 let fetch_duniverse ~lock_dir_path ~solver_env () =
   let open Fiber.O in
   let lock_path = Path.source lock_dir_path in
-  let* lock_dir = Lock_pkg.read_disk_fiber ~solver_env lock_path in
+  let* lock_dir, opam_files =
+    Lock_pkg.read_disk_fiber_with_opam_files ~solver_env lock_path
+  in
   let all_pkgs = Lock_dir.Packages.to_pkg_list lock_dir.packages in
   let fetchable_pkgs =
     List.filter all_pkgs ~f:(fun (pkg : Lock_dir.Pkg.t) -> Option.is_some pkg.info.source)
@@ -385,6 +385,31 @@ let fetch_duniverse ~lock_dir_path ~solver_env () =
       List.map2 source_groups fetch_results ~f:(fun group (_was_fetched, dirname) ->
         group, dirname)
     in
+    (* Write opam files for each package in duniverse *)
+    let opam_files_by_name =
+      List.fold_left
+        opam_files
+        ~init:Package_name.Map.empty
+        ~f:(fun acc (name, content) -> Package_name.Map.set acc name content)
+    in
+    List.iter group_dirnames ~f:(fun (group, dirname) ->
+      let { Vendor.packages; _ } = group in
+      List.iter packages ~f:(fun (name, _version) ->
+        match Package_name.Map.find opam_files_by_name name with
+        | None -> ()
+        | Some opam_content ->
+          (* Write opam file to the package directory *)
+          let opam_path =
+            Path.source
+              (Path.Source.relative
+                 (Path.Source.relative Vendor.default_dir dirname)
+                 "opam")
+          in
+          (* Only write if content changed or file doesn't exist *)
+          if (not (Path.exists opam_path)) || Io.read_file opam_path <> opam_content
+          then (
+            verbose (sprintf "  writing %s" (Path.to_string opam_path));
+            Io.write_file opam_path opam_content)));
     (* After fetching, generate duniverse/dune with vendor stanzas *)
     (* We scan each fetched directory for libraries to include in vendor stanzas *)
     let dune_content =
@@ -411,10 +436,10 @@ let fetch_duniverse ~lock_dir_path ~solver_env () =
           then
             (* Opam package - needs sandbox, include libraries if found *)
             if List.is_empty libs
-            then Some (sprintf "(vendor %s (sandbox opam))" dirname)
+            then Some (sprintf "(vendor %s (build opam))" dirname)
             else (
               let libs_str = String.concat ~sep:" " libs in
-              Some (sprintf "(vendor %s (sandbox opam) (libraries %s))" dirname libs_str))
+              Some (sprintf "(vendor %s (build opam) (libraries %s))" dirname libs_str))
           else if List.is_empty libs
           then None
           else (
@@ -521,9 +546,7 @@ let auto_fetch_missing ~lock_dir_path ~solver_env () =
                   (Package_name.to_string primary_name)
                   (Package_version.to_string primary_version)
               in
-              let initial_dir =
-                Path.Source.relative Vendor.default_dir initial_dirname
-              in
+              let initial_dir = Path.Source.relative Vendor.default_dir initial_dirname in
               if Path.exists (Path.source initial_dir)
               then (
                 match Vendor_rules.read_project_name initial_dir with
@@ -552,10 +575,10 @@ let auto_fetch_missing ~lock_dir_path ~solver_env () =
           then
             (* Opam package - needs sandbox, include libraries if found *)
             if List.is_empty libs
-            then Some (sprintf "(vendor %s (sandbox opam))" dirname)
+            then Some (sprintf "(vendor %s (build opam))" dirname)
             else (
               let libs_str = String.concat ~sep:" " libs in
-              Some (sprintf "(vendor %s (sandbox opam) (libraries %s))" dirname libs_str))
+              Some (sprintf "(vendor %s (build opam) (libraries %s))" dirname libs_str))
           else if List.is_empty libs
           then None
           else (

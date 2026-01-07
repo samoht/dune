@@ -39,10 +39,8 @@ module Ocamlformat = struct
     match Config.get Compile_time.lock_dev_tools with
     | `Enabled -> Memo.return true
     | `Disabled ->
-      (* even if lock_dev_tools might be disabled, there might be a lock dir
-         created by `dune tools install` *)
-      let path = Lock_dir.dev_tool_external_lock_dir Ocamlformat in
-      Fs_memo.dir_exists (Path.Outside_build_dir.External path)
+      let path = Pkg_dev_tool.lock_dir Ocamlformat in
+      Memo.return (path |> Path.build |> Path.Untracked.exists)
   ;;
 
   (* Config files for ocamlformat. When these are changed, running

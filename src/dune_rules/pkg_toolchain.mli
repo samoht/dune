@@ -33,3 +33,15 @@ val install_roots
 (** Check if a toolchain is already installed in the cache. Returns true
     if the install cookie exists, indicating a successful prior installation. *)
 val is_installed : Lock_dir.Pkg.t -> bool
+
+(** Get the cache directory path for a toolchain package *)
+val cache_dir : Lock_dir.Pkg.t -> Path.t
+
+(** Create an action that populates the shared install directory from the global
+    cache. Copies cached contents to install_dir, and creates target_dir for
+    dependency tracking. *)
+val populate_from_cache_action
+  :  Lock_dir.Pkg.t
+  -> install_dir:Path.Build.t
+  -> target_dir:Path.Build.t
+  -> Dune_lang.Action.t

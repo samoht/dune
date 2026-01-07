@@ -2,6 +2,9 @@
 
 open Import
 
+val context : Build_context.t
+val build_dir : Context_name.t -> Path.Build.t
+
 (** The package management rules setup two rules for every package:
 
     - A rule for fetching the source to produce .pkg/$package/source
@@ -11,6 +14,12 @@ open Import
 
     It setups an alias rules to trigger the fetch and build of the
     package universe. *)
+
+val setup_pkg_context_rules
+  :  Context_name.t
+  -> dir:Path.Build.t
+  -> components:string list
+  -> Build_config.Gen_rules.t Memo.t
 
 val setup_rules
   :  components:string list

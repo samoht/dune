@@ -20,7 +20,11 @@ let best_in_dir ~dir program =
   candidates program
   |> Memo.List.find_map ~f:(fun fn ->
     let path = Path.relative dir fn in
-    Fs_memo.file_exists (Path.as_outside_build_dir_exn path)
+    (match Path.as_outside_build_dir path with
+     | Some p -> Fs_memo.file_exists p
+     | None ->
+       (* For build paths, check existence directly *)
+       Memo.return (Path.Untracked.exists path))
     >>| function
     | false -> None
     | true -> Some path)

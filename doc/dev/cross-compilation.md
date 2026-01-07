@@ -3,6 +3,77 @@
 This document describes how cross-compilation works with dune and dune pkg,
 identifies gaps, and proposes a design for locking cross-compilers.
 
+## Context Types
+
+Dune supports three context types, each representing a different OCaml source:
+
+```dune
+(context default)                                    ; system OCaml (findlib)
+(context (opam (switch foo)))                        ; opam switch
+(context (workspace (compiler ocaml.5.4)))           ; local workspace
+```
+
+| Context Type | OCaml Source |
+|--------------|--------------|
+| `default` | System findlib / environment |
+| `opam` | Opam switch |
+| `workspace` | Local workspace (dune.lock / duniverse / vendored) |
+
+All three context types support cross-compilation via `(targets ...)`.
+
+### Toolchain Stanza
+
+Cross-compilation toolchains are declared explicitly with `(toolchain ...)`:
+
+```dune
+; dune-workspace
+(lang dune 3.18)
+
+; Define toolchains
+(toolchain windows
+  (repository https://github.com/ocaml-cross/opam-cross-windows.git)
+  (package ocaml-windows))
+
+(toolchain android
+  (repository https://github.com/ocaml-cross/opam-cross-android.git)
+  (package ocaml-android))
+
+(toolchain solo5
+  (package ocaml-solo5))  ; no extra repo needed, in main opam
+
+; Use toolchains by name in targets
+(context (workspace
+  (compiler ocaml.5.4)
+  (targets native windows android solo5)))
+```
+
+This creates:
+- `default` → uses `ocaml.5.4` for host
+- `default.windows` → uses `ocaml-windows.5.4` (version from compiler)
+- `default.android` → uses `ocaml-android.5.4`
+- `default.solo5` → uses `ocaml-solo5.5.4`
+
+### Toolchain Stanza Syntax
+
+```dune
+(toolchain <name>
+  (repository <url>)    ; optional: repo containing the cross-compiler
+  (package <name>))     ; required: package name (version derived from compiler)
+```
+
+- `<name>`: Toolchain name, used in `(targets ...)` and as context suffix
+- `(repository ...)`: Git URL for the opam repository (optional if package is in main opam)
+- `(package ...)`: Cross-compiler package name, version is derived from `(compiler ...)` in context
+
+### How It Works
+
+1. `(toolchain windows (package ocaml-windows) ...)` declares a toolchain
+2. `(context (workspace (compiler ocaml.5.4) (targets native windows)))` uses it
+3. Dune automatically:
+   - Adds `ocaml-windows.5.4` to solver query (version from compiler)
+   - Adds the repository to solver if specified
+   - Sets `OCAMLFIND_TOOLCHAIN=windows` for `default.windows` context
+
 ## Current Architecture
 
 ### Build Contexts
@@ -10,8 +81,13 @@ identifies gaps, and proposes a design for locking cross-compilers.
 Dune uses **build contexts** to manage cross-compilation:
 
 ```dune
-; dune-workspace
+; dune-workspace - using system/opam toolchain (already installed)
 (context (default (targets native windows)))
+
+; dune-workspace - using workspace toolchain (requires toolchain stanza)
+(context (workspace
+  (compiler ocaml.5.4)
+  (targets native windows)))
 ```
 
 This creates:
@@ -49,6 +125,91 @@ they're built by dune's context-aware build system.
 
 For **non-dune packages**: The build command runs as-is, without
 cross-compilation environment variables.
+
+## Opam Sandbox Directory Structure
+
+Non-dune packages are built in `_build/_private/<context>/.pkg/` using context names:
+
+```
+_build/_private/
+  default/.pkg/
+    <pkg-name>.<version>-<hash>/
+      source/     # extracted source
+      target/     # install prefix
+  ocaml414/.pkg/
+    <pkg-name>.<version>-<hash>/
+      source/
+      target/
+  default.windows/.pkg/
+    <pkg-name>.<version>-<hash>/
+      source/
+      target/
+```
+
+Each context has its own copy of sources and build artifacts.
+
+### Per-Context Opam Sandbox Builds
+
+When building non-dune packages (opam sandbox), each context builds separately:
+
+1. **Per-context isolation**: Each context has its own `_build/_private/<context>/.pkg/` directory
+2. **Compiler injection**: Each context uses its `(compiler ...)` package
+3. **Environment**: `OCAMLFIND_TOOLCHAIN`, `CC`, etc. set per context
+
+```
+# Building zarith (non-dune) for multiple contexts:
+
+_build/_private/default/.pkg/zarith.1.14-<hash>/source/          # built with ocaml.5.2.0
+_build/_private/ocaml414/.pkg/zarith.1.14-<hash>/source/         # built with ocaml.4.14.2
+_build/_private/default.windows/.pkg/zarith.1.14-<hash>/source/  # built with ocaml-windows
+```
+
+### Implementation: pkg_rules.ml Changes
+
+Currently `pkg_rules.ml` builds packages to a single location. Changes needed:
+
+1. **Context-aware build paths**: Include context name in build directory
+2. **Compiler from context**: Use `workspace_context.compiler` not just lock default
+3. **Environment per context**: Set `OCAMLFIND_TOOLCHAIN` based on context targets
+
+Example workspace with multiple compilers and cross-compilation:
+
+```dune
+; dune-workspace
+(lang dune 3.18)
+
+; Multi-version testing with workspace contexts
+(context (workspace (compiler ocaml.5.4)))
+
+(context (workspace
+  (compiler ocaml.4.14)
+  (name ocaml414)))
+
+; Cross-compilation with workspace context (requires toolchain stanza above)
+(context (workspace
+  (compiler ocaml.5.4)
+  (targets native windows)))
+```
+
+Running `dune pkg lock` with this workspace solves for all specified compilers
+and platforms, creating a single dune.lock with appropriate package filters.
+
+This creates:
+- `_build/default/` and `_build/_private/default/.pkg/` (OCaml 5.4)
+- `_build/ocaml414/` and `_build/_private/ocaml414/.pkg/` (OCaml 4.14)
+- `_build/default.windows/` and `_build/_private/default.windows/.pkg/` (cross-compiled)
+
+Each context has its own copy of sources and build artifacts.
+
+### How Cross-Compilation Targets Work
+
+When `(targets native windows)` is specified (with a `(toolchain windows ...)` stanza):
+1. The `ocaml-windows.5.4` package is built from the local workspace (version from compiler)
+2. It registers a findlib toolchain named `windows`
+3. Dune sets `OCAMLFIND_TOOLCHAIN=windows` for the `default.windows` context
+4. Local ocamlfind (also from workspace) discovers the toolchain
+
+This uses the same mechanism as opam-cross, just with local packages.
 
 ## Gap: Non-Dune Package Cross-Compilation
 
@@ -110,24 +271,25 @@ dune.lock/
 
 ### Workspace Configuration
 
-The workspace specifies which package to use for each target:
+The workspace specifies which compiler package to use via `workspace` contexts:
 
 ```dune
 ; dune-workspace
 (lang dune 3.18)
 
-(context
- (default
-  (targets
-   (native)
-   (windows
-    (toolchain-package ocaml-windows)
-    (sysroot /usr/x86_64-w64-mingw32)))))
+; Simple case: single compiler from local workspace
+(context (workspace (compiler ocaml.5.4)))
+
+; Cross-compilation: targets reference toolchain stanzas
+(context (workspace
+  (compiler ocaml.5.4)
+  (targets native windows)))
 ```
 
-Configuration options per target:
-- `toolchain-package`: Which OCaml package from the lock to use
-- `sysroot`: Path to target system root (for C library discovery)
+Configuration options for `workspace` contexts:
+- `compiler`: Which OCaml package from the local workspace to use (required)
+- `name`: Context name (default: `default`)
+- `targets`: Cross-compilation targets (`native` or toolchain names from `(toolchain ...)` stanzas)
 
 ### Build-Time Behaviour
 
@@ -196,32 +358,34 @@ let build_env pkg ~context =
 
 ### Changes to Workspace
 
-Add `toolchain-package` and `sysroot` to target syntax:
+Add new `Workspace` context type alongside `Default` and `Opam`:
 
 ```ocaml
 (* workspace.ml *)
-type target =
-  { name : string
-  ; toolchain_package : Package_name.t option
-  ; sysroot : Path.External.t option
-  }
+module Workspace = struct
+  type t =
+    { base : Common.t
+    ; compiler : Package_name.t  (* required: OCaml package from local workspace *)
+    }
+end
+
+type t =
+  | Default of Default.t
+  | Opam of Opam.t
+  | Workspace of Workspace.t    (* NEW *)
 ```
 
 ### Changes to Context
 
-Use locked cross-compiler instead of findlib discovery:
+Handle `Workspace` context in context creation:
 
 ```ocaml
-(* context.ml - modify target context creation *)
-| Named findlib_toolchain ->
-  (* Check workspace for toolchain-package first *)
-  match Workspace.toolchain_package_for_target target_name with
-  | Some pkg_name ->
-    (* Use locked package *)
-    create_from_locked_package pkg_name
-  | None ->
-    (* Fall back to findlib discovery *)
-    Findlib_config.discover_from_env ~findlib_toolchain
+(* context.ml *)
+let create_for_workspace workspace_ctx =
+  (* Use pkg_rules.ocaml_toolchain with specified compiler package *)
+  let compiler_pkg = workspace_ctx.compiler in
+  let* toolchain = Pkg_rules.ocaml_toolchain ~compiler_override:(Some compiler_pkg) ctx in
+  ...
 ```
 
 ## Example: conf-gmp Cross-Compilation
@@ -301,13 +465,13 @@ myproject/
 ```dune
 (lang dune 3.18)
 
-(context
- (default
-  (targets
-   (native)
-   (windows
-    (toolchain-package ocaml-windows)
-    (sysroot /usr/x86_64-w64-mingw32)))))
+(toolchain windows
+  (repository https://github.com/ocaml-cross/opam-cross-windows.git)
+  (package ocaml-windows))
+
+(context (workspace
+  (compiler ocaml.5.4)
+  (targets native windows)))
 ```
 
 ### Build Flow
@@ -349,7 +513,7 @@ $ dune build -x windows
 | Nix | `nativeBuildInputs` | `buildInputs` | `pkgsCross` |
 | Cargo | `[build-dependencies]` | `[dependencies]` | `.cargo/config.toml` |
 | CMake | `FIND_MODE NEVER` | `FIND_MODE ONLY` | Toolchain files |
-| Dune (proposed) | via `for_host` | default | `toolchain-package` |
+| Dune (proposed) | via `for_host` | default | `(compiler ...)` |
 
 ## Summary
 
@@ -362,5 +526,5 @@ The gap is narrow:
 
 The proposed design:
 - Keeps solving simple (cross-compiler is just another package)
-- Adds `toolchain-package` and `sysroot` to workspace target config
+- Adds `compiler` and `sysroot` to workspace context config
 - Injects cross-compilation environment for non-dune package builds

@@ -67,9 +67,7 @@ module Library_entry = struct
 
   let to_dyn { lib_name; alias } =
     Dyn.record
-      [ "lib_name", Lib_name.to_dyn lib_name
-      ; "alias", Dyn.option Lib_name.to_dyn alias
-      ]
+      [ "lib_name", Lib_name.to_dyn lib_name; "alias", Dyn.option Lib_name.to_dyn alias ]
   ;;
 
   let exposed_name t =

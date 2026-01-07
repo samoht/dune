@@ -89,5 +89,6 @@ let populate_cache ~dev_tool ~version ~ocaml_version ~source_dir =
     let exe_name = Dune_pkg.Dev_tool.exe_name dev_tool in
     let source_exe = Path.relative source_bin exe_name in
     let target_exe = Path.relative target_bin exe_name in
-    if Path.Untracked.exists source_exe then Io.copy_file ~src:source_exe ~dst:target_exe ())
+    if Path.Untracked.exists source_exe
+    then Io.copy_file ~src:source_exe ~dst:target_exe ())
 ;;

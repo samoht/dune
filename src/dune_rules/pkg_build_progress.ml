@@ -4,11 +4,15 @@ module Status = struct
   type t =
     [ `Downloading
     | `Building
+    | `Installing
+    | `Cached
     ]
 
   let to_string = function
     | `Downloading -> "Downloading"
     | `Building -> "Building"
+    | `Installing -> "Installing"
+    | `Cached -> "Cached"
   ;;
 end
 
@@ -75,7 +79,13 @@ module Message = struct
        ignore (Progress.increment () : int);
        Dune_engine.Progress.start_target (Dune_engine.Progress.Target.package pkg_str)
      | `Downloading ->
-       Dune_engine.Progress.start_target (Dune_engine.Progress.Target.fetch pkg_str));
+       Dune_engine.Progress.start_target (Dune_engine.Progress.Target.fetch pkg_str)
+     | `Installing ->
+       (* Installing doesn't increment progress counter - it's part of the same package *)
+       ()
+     | `Cached ->
+       ignore (Progress.increment () : int);
+       Dune_engine.Progress.start_target (Dune_engine.Progress.Target.package pkg_str));
     match !Dune_engine.Clflags.display with
     | Quiet -> ()
     | Short | Verbose -> Console.print_user_message (user_message t)

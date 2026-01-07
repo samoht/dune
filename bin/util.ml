@@ -2,10 +2,17 @@ open Import
 
 type checked =
   | In_build_dir of (Context.t * Path.Source.t)
-  | In_private_context of Path.Build.t
+  | In_pkg_dir of (Context.t * Path.Source.t)
   | In_install_dir of (Context.t * Path.Source.t)
   | In_source_dir of Path.Source.t
   | External of Path.External.t
+
+let is_pkg_context ctx =
+  Context_name.equal ctx Dune_rules.Private_context.t.name
+  || Context_name.equal ctx Dune_rules.Pkg_rules.context.name
+  || Context_name.equal ctx Dune_rules.Lock_dir.context.name
+  || Context_name.equal ctx Dune_rules.Fetch_rules.context.name
+;;
 
 let check_path contexts =
   let contexts =
@@ -46,10 +53,15 @@ let check_path contexts =
          (match Install.Context.analyze_path name src with
           | Invalid -> internal_path ()
           | Install (ctx, path) -> In_install_dir (context_exn ctx, path)
-          | Normal (ctx, path) ->
-            if Context_name.equal ctx Dune_rules.Private_context.t.name
-            then
-              In_private_context
-                (Path.Build.append_source Dune_rules.Private_context.t.build_dir path)
-            else In_build_dir (context_exn ctx, path)))
+          | Normal (ctx, src_path) ->
+            if is_pkg_context ctx
+            then (
+              (* For pkg contexts like _build/pkg/<ctx>/..., extract the actual context
+                 from the first component of src_path *)
+              match Path.Source.split_first_component src_path with
+              | Some (ctx_name, rest) ->
+                let build_ctx = Context_name.of_string ctx_name in
+                In_pkg_dir (context_exn build_ctx, Path.Source.of_local rest)
+              | None -> internal_path ())
+            else In_build_dir (context_exn ctx, src_path)))
 ;;

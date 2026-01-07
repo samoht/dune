@@ -1,6 +1,13 @@
 open Import
 open Memo.O
 
+let context =
+  let name = Context_name.of_string "pkg" in
+  Build_context.create ~name
+;;
+
+let build_dir ctx = Path.Build.relative context.build_dir (Context_name.to_string ctx)
+
 include struct
   open Dune_pkg
   module Package_variable = Package_variable
@@ -80,21 +87,16 @@ module Package_universe = struct
 
   let context_name = function
     | Dependencies context_name -> context_name
-    | Dev_tool _ ->
-      (* Dev tools can only be built in the default context. *)
-      Context_name.default
+    | Dev_tool dev_tool ->
+      (* Each dev tool has its own isolated build context *)
+      Pkg_dev_tool.context_name dev_tool
   ;;
 
   let lock_dir_path t =
     match t with
     | Dependencies ctx -> Lock_dir.get_path ctx
     | Dev_tool dev_tool ->
-      (* CR-Leonidas-from-XIV: It probably isn't always [Some] *)
-      dev_tool
-      |> Lock_dir.dev_tool_external_lock_dir
-      |> Path.external_
-      |> Option.some
-      |> Memo.return
+      dev_tool |> Pkg_dev_tool.lock_dir |> Path.build |> Option.some |> Memo.return
   ;;
 end
 
@@ -183,7 +185,7 @@ module Pkg_digest = struct
     let lockfile_and_dependency_digest =
       Digest_feed.compute_digest
         (Digest_feed.tuple2 Lock_dir.Pkg.digest_feed (Digest_feed.list digest_feed))
-        (Dune_pkg.Lock.Pkg.remove_locs lockfile_pkg, depends_pkg_digests)
+        (Lock_dir.Pkg.remove_locs lockfile_pkg, depends_pkg_digests)
     in
     let name = lockfile_pkg.info.name in
     let version = lockfile_pkg.info.version in
@@ -245,12 +247,12 @@ module Paths = struct
 
   let make pkg_digest universe =
     let root =
-      match (universe : Package_universe.t) with
-      | Dependencies ctx ->
-        Path.Build.L.relative
-          Private_context.t.build_dir
-          [ Context_name.to_string ctx; ".pkg"; Pkg_digest.to_string pkg_digest ]
-      | Dev_tool dev_tool -> Pkg_dev_tool.universe_install_path dev_tool
+      let ctx =
+        match (universe : Package_universe.t) with
+        | Dependencies ctx -> ctx
+        | Dev_tool dev_tool -> Pkg_dev_tool.context_name dev_tool
+      in
+      Path.Build.relative (build_dir ctx) (Pkg_digest.to_string pkg_digest)
     in
     of_root pkg_digest.name ~root
   ;;
@@ -291,8 +293,7 @@ module Shared_install = struct
     let base_roots = roots ~context in
     match Pkg_toolchain.is_compiler_and_toolchains_enabled pkg_name with
     | false -> base_roots
-    | true ->
-      { base_roots with lib_root = Path.relative base_roots.lib_root "ocaml" }
+    | true -> { base_roots with lib_root = Path.relative base_roots.lib_root "ocaml" }
   ;;
 end
 
@@ -562,9 +563,7 @@ module Pkg = struct
       (* Depend on @install to install the package to shared install dir *)
       let alias_name = Alias0.install in
       (* Vendored package directory, converted to build path *)
-      let dir =
-        Path.Build.append_source (Context_name.build_dir context) vendored_path
-      in
+      let dir = Path.Build.append_source (Context_name.build_dir context) vendored_path in
       let alias = Alias.make alias_name ~dir in
       Dep.alias alias)
     |> Dep.Set.of_list
@@ -862,11 +861,14 @@ module Action_expander = struct
          | None -> None
          | Some _ ->
            (match
-              Pform.Var.Pkg.Section.of_string (Package_variable_name.to_string variable_name)
+              Pform.Var.Pkg.Section.of_string
+                (Package_variable_name.to_string variable_name)
             with
             | None -> None
             | Some section ->
-              let roots = Shared_install.roots_for_package ~pkg_name:package_name ~context in
+              let roots =
+                Shared_install.roots_for_package ~pkg_name:package_name ~context
+              in
               Some (Memo.return @@ Ok [ Value.Dir (section_dir_of_root roots section) ])))
     ;;
 
@@ -964,7 +966,13 @@ module Action_expander = struct
         in
         Ok [ Value.Path make ]
       | Macro ({ macro = Pkg | Pkg_self; _ } as macro_invocation) ->
-        expand_pkg_macro ~context ~loc ~all_package_versions paths depends macro_invocation
+        expand_pkg_macro
+          ~context
+          ~loc
+          ~all_package_versions
+          paths
+          depends
+          macro_invocation
       | _ -> Expander0.isn't_allowed_in_this_position ~source
     ;;
 
@@ -1458,12 +1466,10 @@ module DB = struct
       Some entry
     ;;
 
-    let empty = Pkg_digest.Map.empty
-    let union = Pkg_digest.Map.union ~f:union_check
     let union_all = Pkg_digest.Map.union_all ~f:union_check
 
     let of_dev_tool_deps_if_lock_dir_exists dev_tool ~platform ~system_provided =
-      let+ lock_dir_opt = Lock_dir.of_dev_tool_if_lock_dir_exists dev_tool in
+      let+ lock_dir_opt = Pkg_dev_tool.load_lock_dir_if_exists dev_tool in
       Option.map lock_dir_opt ~f:(of_lock_dir ~platform ~system_provided)
     ;;
 
@@ -1526,44 +1532,30 @@ module DB = struct
     let of_ctx_memo =
       Memo.create
         "pkg-db"
-        ~input:
-          (module struct
-            type t = Context_name.t * bool
-
-            let to_dyn = Tuple.T2.to_dyn Context_name.to_dyn Dyn.bool
-            let hash = Tuple.T2.hash Context_name.hash Bool.hash
-            let equal = Tuple.T2.equal Context_name.equal Bool.equal
-          end)
-        (fun (ctx, allow_sharing) ->
+        ~input:(module Context_name)
+        (fun ctx ->
            Per_context.valid ctx
            >>= function
            | false ->
              Code_error.raise "invalid context" [ "context", Context_name.to_dyn ctx ]
            | true ->
-             (* Dev tools are built in the default context, so allow their
-                dependencies to be shared with the project's if it too is being
-                built in the default context. *)
-             let allow_sharing = allow_sharing && Context_name.is_default ctx in
              let+ pkg_digest_table =
                let* lock_dir = Lock_dir.get_exn ctx
                and* platform = platform () in
-               (if allow_sharing
-                then Memo.Lazy.force Pkg_table.all_existing_dev_tools
-                else Memo.return Pkg_table.empty)
-               >>| Pkg_table.union
-                     (Pkg_table.of_lock_dir
-                        lock_dir
-                        ~platform
-                        ~system_provided:default_system_provided)
+               Pkg_table.of_lock_dir
+                 lock_dir
+                 ~platform
+                 ~system_provided:default_system_provided
+               |> Memo.return
              in
              create ~pkg_digest_table)
     in
-    fun ctx ~allow_sharing -> Memo.exec of_ctx_memo (ctx, allow_sharing)
+    Memo.exec of_ctx_memo
   ;;
 
   let of_project_pkg ctx pkg_name =
     let* lock_dir = Lock_dir.get_exn ctx in
-    let* t = of_ctx ctx ~allow_sharing:true
+    let* t = of_ctx ctx
     and* pkg_digest = pkg_digest_of_lock_dir lock_dir pkg_name in
     Memo.return (t, pkg_digest)
   ;;
@@ -1577,7 +1569,7 @@ module DB = struct
     let of_dev_tool_memo =
       Memo.create "pkg-db-dev-tool" ~input:(module Dune_pkg.Dev_tool)
       @@ fun dev_tool ->
-      let* lock_dir = Lock_dir.of_dev_tool dev_tool in
+      let* lock_dir = Pkg_dev_tool.load_lock_dir dev_tool in
       pkg_digest_of_lock_dir lock_dir (Pkg_dev_tool.package_name dev_tool)
     in
     fun dev_tool ->
@@ -1585,7 +1577,7 @@ module DB = struct
         Lock_dir.lock_dir_active Context_name.default
         >>= function
         | false -> Memo.Lazy.force inactive_lockdir
-        | true -> of_ctx Context_name.default ~allow_sharing:true
+        | true -> of_ctx Context_name.default
       and+ pkg_digest = Memo.exec of_dev_tool_memo dev_tool in
       db, pkg_digest
   ;;
@@ -1672,10 +1664,10 @@ end = struct
     | _ ->
       let package_universe =
         match package_universe with
-        | Package_universe.Dev_tool _ ->
-          (* Dependencies of dev tools are installed into the default context
-             so they may be shared with the project's dependencies. *)
-          Package_universe.Dependencies Context_name.default
+        | Package_universe.Dev_tool dev_tool ->
+          (* Each dev tool has its own isolated context. Dependencies are built
+             in that context, not shared with the project. *)
+          Package_universe.Dependencies (Pkg_dev_tool.context_name dev_tool)
         | _ -> package_universe
       in
       (* Use resolve_opt to gracefully handle vendored packages *)
@@ -1694,7 +1686,7 @@ end = struct
       Package_universe.lock_dir_path package_universe >>| Option.value_exn
     in
     let+ files_dir =
-      let module Pkg = Dune_pkg.Lock.Pkg in
+      let module Pkg = Lock_dir.Pkg in
       (* TODO(steve): simplify this once portable lockdirs become the default.
          This logic currently handles both portable lockdirs (version number
          in files dir name) and non-portable lockdirs (no version number). *)
@@ -1705,7 +1697,8 @@ end = struct
         Fs_memo.dir_exists (Path.Outside_build_dir.In_source_dir path_with_version)
       in
       match path_with_version_exists with
-      | true -> Memo.return @@ Some (Pkg.files_dir info.name (Some info.version) ~lock_dir)
+      | true ->
+        Memo.return @@ Some (Pkg.files_dir info.name (Some info.version) ~lock_dir)
       | false ->
         let path_without_version = Pkg.source_files_dir info.name None ~lock_dir in
         let+ path_without_version_exists =
@@ -1721,10 +1714,10 @@ end = struct
       | External e ->
         let source_path = Dune_pkg.Pkg_workspace.dev_tool_path_to_source_dir e in
         (match Path.Source.explode source_path with
-         | [ "_build"; ".dev-tools.locks"; dev_tool; files_dir ] ->
-           Path.Build.L.relative
-             Private_context.t.build_dir
-             [ "default"; ".dev-tool-locks"; dev_tool; files_dir ]
+         (* Dev tool lock files: _build/dev-tools-{name}/.lock/{files_dir} *)
+         | [ "_build"; ctx_name; ".lock"; files_dir ]
+           when String.is_prefix ctx_name ~prefix:Pkg_dev_tool.context_name_prefix ->
+           Path.Build.L.relative Path.Build.root [ ctx_name; ".lock"; files_dir ]
          | components ->
            Code_error.raise
              "Package files directory is external source directory, this is unsupported"
@@ -1739,10 +1732,17 @@ end = struct
 
   (* Apply toolchain caching: for cached toolchains, replace build/install
      commands with populate-from-cache action. *)
-  let apply_toolchain_caching ~info ~pkg ~build_command ~install_command ~write_paths
+  let apply_toolchain_caching
+        ~info
+        ~pkg
+        ~build_command
+        ~install_command
+        ~write_paths
         ~package_universe
     =
-    let is_toolchain = Pkg_toolchain.is_compiler_and_toolchains_enabled info.Pkg_info.name in
+    let is_toolchain =
+      Pkg_toolchain.is_compiler_and_toolchains_enabled info.Pkg_info.name
+    in
     let is_cached = is_toolchain && Pkg_toolchain.is_installed pkg in
     let toolchain_cache_dir =
       if is_cached then Some (Pkg_toolchain.cache_dir pkg) else None
@@ -1762,7 +1762,10 @@ end = struct
           ; "install_dir", Dyn.string (Path.Build.to_string install_dir)
           ];
         let populate_action =
-          Pkg_toolchain.populate_from_cache_action pkg ~install_dir ~target_dir:write_paths.target_dir
+          Pkg_toolchain.populate_from_cache_action
+            pkg
+            ~install_dir
+            ~target_dir:write_paths.target_dir
         in
         Some (Build_command.Action populate_action), None)
       else if is_toolchain
@@ -2585,9 +2588,7 @@ module Vendor_build = struct
     let* is_vendored =
       Fs_memo.dir_exists (Path.Outside_build_dir.In_source_dir vendor_path)
     in
-    let vendor_marker =
-      Path.Source.relative Vendor.default_dir Vendor.marker_filename
-    in
+    let vendor_marker = Path.Source.relative Vendor.default_dir Vendor.marker_filename in
     let* marker_exists =
       Fs_memo.file_exists (Path.Outside_build_dir.In_source_dir vendor_marker)
     in
@@ -2600,7 +2601,10 @@ module Vendor_build = struct
       let+ vendor_stanza = Source_tree.vendor_stanza vendor_path in
       let stanza_forces_opam =
         match vendor_stanza with
-        | Some { Vendor_stanza.build_method = Some Vendor_stanza.Build_method.Opam_sandboxed; _ } -> true
+        | Some
+            { Vendor_stanza.build_method = Some Vendor_stanza.Build_method.Opam_sandboxed
+            ; _
+            } -> true
         | _ -> false
       in
       let inferred_method = Vendor.classify_build_method lock_pkg in
@@ -2615,7 +2619,7 @@ module Vendor_build = struct
     let* pkg_digests =
       Action_builder.of_memo
         (let open Memo.O in
-         let* db = DB.of_ctx ctx_name ~allow_sharing:true in
+         let* db = DB.of_ctx ctx_name in
          let digests = Pkg_digest.Map.values db.pkg_digest_table in
          let+ filtered =
            Memo.parallel_map digests ~f:(fun { DB.Pkg_table.pkg; pkg_digest; _ } ->
@@ -2642,7 +2646,9 @@ module Vendor_build = struct
     let pkg_name = Package.Name.of_string subdir in
     let opam_contents = Io.read_file ~binary:true (Path.source opam_path) in
     let opam_file =
-      Dune_pkg.Opam_file.read_from_string_exn ~contents:opam_contents (Path.source opam_path)
+      Dune_pkg.Opam_file.read_from_string_exn
+        ~contents:opam_contents
+        (Path.source opam_path)
     in
     let pkg_version =
       match OpamFile.OPAM.version_opt opam_file with
@@ -2652,20 +2658,55 @@ module Vendor_build = struct
     let build_cmds = OpamFile.OPAM.build opam_file in
     let install_cmds = OpamFile.OPAM.install opam_file in
     let install_dir = Install.Context.dir ~context:ctx_name in
-    let prefix = Path.build install_dir |> Path.to_string in
+    let prefix = Path.build install_dir in
+    let ocamlfind_destdir =
+      Path.build (Shared_install.roots_build ~context:ctx_name).lib_root
+    in
     let cmd_to_args cmd =
       List.filter_map cmd ~f:(fun (arg, _filter) ->
         match (arg : OpamTypes.simple_arg) with
         | CString s -> Some s
         | CIdent _ -> None)
     in
+    (* Use the build directory path which mirrors source via vendored_dirs *)
+    let build_dir =
+      Path.Build.append_source (Context_name.build_dir ctx_name) vendor_dir
+    in
+    let system_path = Global.env () |> Env_path.path in
     let run_cmds cmds =
       List.filter_map cmds ~f:(fun (args, _filter) ->
         match cmd_to_args args with
         | [] -> None
-        | cmd :: args -> Some (Action.run (Ok (Path.of_string cmd)) args))
+        | cmd :: cmd_args ->
+          (* Look up command in PATH like we do for package builds *)
+          let prog =
+            match Filename.analyze_program_name cmd with
+            | Absolute -> Ok (Path.of_string cmd)
+            | Relative_to_current_dir -> Ok (Path.relative (Path.build build_dir) cmd)
+            | In_path ->
+              (match Bin.which ~path:system_path cmd with
+               | Some p -> Ok p
+               | None ->
+                 Error
+                   (Action.Prog.Not_found.create
+                      ~program:cmd
+                      ~context:ctx_name
+                      ~loc:None
+                      ()))
+          in
+          let args =
+            Array.Immutable.of_list_map cmd_args ~f:(fun arg ->
+              Array.Immutable.of_list [ Run_with_path.Spec.String arg ])
+          in
+          Some
+            (Run_with_path.action
+               ~pkg:(pkg_name, Loc.none)
+               ~depexts:[]
+               prog
+               args
+               ~prefix
+               ~ocamlfind_destdir))
     in
-    let source_dir = Path.source vendor_dir in
     let progress_building =
       Pkg_build_progress.progress_action pkg_name pkg_version `Building
     in
@@ -2682,11 +2723,8 @@ module Vendor_build = struct
         (Context_name.build_dir ctx_name)
         (sprintf ".pkg/vendor-%s.marker" subdir)
     in
-    let env = Env.add Env.empty ~var:"PREFIX" ~value:prefix in
     let action =
-      Action.chdir source_dir (Action.progn all_actions)
-      |> Action.Full.make
-      |> Action.Full.add_env env
+      Action.chdir (Path.build build_dir) (Action.progn all_actions) |> Action.Full.make
     in
     let with_targets =
       Action_builder.return action
@@ -2713,11 +2751,18 @@ module Vendor_build = struct
         in
         if has_dune_project
         then Memo.return (`Dune_package build_dir)
-        else
+        else (
+          (* Look for opam files. Priority: opam, then <name>.opam
+             where <name> is extracted from dir name (e.g. make-pkg.1.0.0 -> make-pkg) *)
           let dir_name = Path.Source.basename subdir_path in
+          let pkg_name =
+            match String.lsplit2 dir_name ~on:'.' with
+            | Some (name, _version) -> name
+            | None -> dir_name
+          in
           let candidates =
-            [ Path.Source.relative subdir_path (dir_name ^ ".opam")
-            ; Path.Source.relative subdir_path "opam"
+            [ Path.Source.relative subdir_path "opam"
+            ; Path.Source.relative subdir_path (pkg_name ^ ".opam")
             ]
           in
           let* opam_file_opt =
@@ -2727,24 +2772,25 @@ module Vendor_build = struct
               | true -> Some opam_path
               | false -> None)
           in
-          (match opam_file_opt with
-           | None ->
-             User_error.raise
-               [ Pp.textf
-                   "Vendor directory %s has (sandbox opam) but no opam file found"
-                   (Path.Source.to_string subdir_path)
-               ]
-           | Some opam_path ->
-             Memo.return (`Opam_sandbox (subdir, subdir_path, opam_path)))
+          match opam_file_opt with
+          | None ->
+            User_error.raise
+              [ Pp.textf
+                  "Vendor directory %s has (build opam) but no opam file found. Try \
+                   running 'dune pkg fetch' to generate opam files."
+                  (Path.Source.to_string subdir_path)
+              ]
+          | Some opam_path -> Memo.return (`Opam_sandbox (subdir, subdir_path, opam_path)))
       | _ -> Memo.return (`Dune_package build_dir))
   ;;
 
   let register_opam_sandbox_rules ctx_name opam_sandbox_pkgs =
-    List.map opam_sandbox_pkgs ~f:(fun (subdir, vendor_dir, opam_path) ->
+    let open Memo.O in
+    Memo.parallel_map opam_sandbox_pkgs ~f:(fun (subdir, vendor_dir, opam_path) ->
       let marker_file, with_targets =
         build_opam_sandbox_rule ctx_name ~subdir ~vendor_dir ~opam_path
       in
-      let (_ : unit Memo.t) = rule ~loc:Loc.none with_targets in
+      let+ () = rule ~loc:Loc.none with_targets in
       marker_file)
   ;;
 
@@ -2782,7 +2828,7 @@ let setup_pkg_install_alias ~dir ctx_name =
             | `Dune_package dir -> Left dir
             | `Opam_sandbox info -> Right info)
         in
-        let opam_markers =
+        let* opam_markers =
           Vendor_build.register_opam_sandbox_rules ctx_name opam_sandbox_pkgs
         in
         let* deps =
@@ -2845,45 +2891,60 @@ let setup_package_rules (db : DB.t) ~package_universe ~dir ~pkg_digest
     Gen_rules.make ~directory_targets ~build_dir_only_sub_dirs rules
 ;;
 
+let setup_pkg_context_rules ctx ~dir ~components =
+  match components with
+  | [] ->
+    (* _build/pkg/<ctx>/ - list all package digests *)
+    Gen_rules.make
+      ~build_dir_only_sub_dirs:
+        (Gen_rules.Build_only_sub_dirs.singleton ~dir Subdir_set.all)
+      (Memo.return Rules.empty)
+    |> Memo.return
+  | [ pkg_digest_string ] ->
+    (* _build/pkg/<ctx>/{digest}/ - set up package build rules *)
+    let pkg_digest = Pkg_digest.of_string pkg_digest_string in
+    (match Pkg_dev_tool.of_context_name ctx with
+     | Some dev_tool ->
+       (* Dev tool context - use the dev tool's lock dir *)
+       let* db, _ = DB.of_dev_tool dev_tool in
+       setup_package_rules db ~package_universe:(Dependencies ctx) ~dir ~pkg_digest
+     | None ->
+       (* Regular context - check for project lock dir *)
+       let* lock_dir_active = Lock_dir.lock_dir_active ctx in
+       (match lock_dir_active with
+        | false -> Memo.return @@ Gen_rules.make (Memo.return Rules.empty)
+        | true ->
+          let* db = DB.of_ctx ctx in
+          setup_package_rules db ~package_universe:(Dependencies ctx) ~dir ~pkg_digest))
+  | _ :: _ ->
+    (* Subdirectories within a package build - redirect to parent *)
+    Memo.return @@ Gen_rules.redirect_to_parent Gen_rules.Rules.empty
+;;
+
 let setup_rules ~components ~dir ctx =
-  (* Note that the path components in the following patterns must
-     correspond to the paths returned by [Paths.make]. The string
-     ".dev-tool" is hardcoded into several patterns, and must match
-     the value of [Pkg_dev_tool.install_path_base_dir_name]. *)
-  assert (String.equal Pkg_dev_tool.install_path_base_dir_name ".dev-tool");
-  match Context_name.is_default ctx, components with
-  | true, [ ".dev-tool"; dev_tool_package_name ] ->
-    let pkg_name = Package.Name.of_string dev_tool_package_name in
-    let dev_tool = Pkg_dev_tool.of_package_name pkg_name in
-    let* db, pkg_digest = DB.of_dev_tool (Dune_pkg.Dev_tool.of_package_name pkg_name) in
-    setup_package_rules db ~package_universe:(Dev_tool dev_tool) ~dir ~pkg_digest
-  | true, [ ".dev-tool" ] ->
+  match components with
+  | [ ".pkg" ] ->
     Gen_rules.make
       ~build_dir_only_sub_dirs:
         (Gen_rules.Build_only_sub_dirs.singleton ~dir Subdir_set.all)
       (Memo.return Rules.empty)
     |> Memo.return
-  | _, [ ".pkg" ] ->
-    Gen_rules.make
-      ~build_dir_only_sub_dirs:
-        (Gen_rules.Build_only_sub_dirs.singleton ~dir Subdir_set.all)
-      (Memo.return Rules.empty)
-    |> Memo.return
-  | _, [ ".pkg"; pkg_digest_string ] ->
-    (* Only generate pkg rules if there is a lock dir for that context *)
-    let* lock_dir_active = Lock_dir.lock_dir_active ctx in
-    (match lock_dir_active with
-     | false -> Memo.return @@ Gen_rules.make (Memo.return Rules.empty)
-     | true ->
-       let pkg_digest = Pkg_digest.of_string pkg_digest_string in
-       let* db = DB.of_ctx ctx ~allow_sharing:true in
-       setup_package_rules db ~package_universe:(Dependencies ctx) ~dir ~pkg_digest)
-  | _, ".pkg" :: _ :: _ ->
-    Memo.return @@ Gen_rules.redirect_to_parent Gen_rules.Rules.empty
-  | true, ".dev-tool" :: _ :: _ :: _ ->
-    Memo.return @@ Gen_rules.redirect_to_parent Gen_rules.Rules.empty
-  | is_default, [] ->
-    let sub_dirs = ".pkg" :: (if is_default then [ ".dev-tool" ] else []) in
+  | [ ".pkg"; pkg_digest_string ] ->
+    let pkg_digest = Pkg_digest.of_string pkg_digest_string in
+    (match Pkg_dev_tool.of_context_name ctx with
+     | Some dev_tool ->
+       let* db, _ = DB.of_dev_tool dev_tool in
+       setup_package_rules db ~package_universe:(Dependencies ctx) ~dir ~pkg_digest
+     | None ->
+       let* lock_dir_active = Lock_dir.lock_dir_active ctx in
+       (match lock_dir_active with
+        | false -> Memo.return @@ Gen_rules.make (Memo.return Rules.empty)
+        | true ->
+          let* db = DB.of_ctx ctx in
+          setup_package_rules db ~package_universe:(Dependencies ctx) ~dir ~pkg_digest))
+  | ".pkg" :: _ :: _ -> Memo.return @@ Gen_rules.redirect_to_parent Gen_rules.Rules.empty
+  | [] ->
+    let sub_dirs = [ ".pkg" ] in
     let build_dir_only_sub_dirs =
       Gen_rules.Build_only_sub_dirs.singleton ~dir @@ Subdir_set.of_list sub_dirs
     in
@@ -2934,10 +2995,7 @@ let ocaml_toolchain context =
 let all_deps universe =
   let* db =
     match (universe : Package_universe.t) with
-    | Dependencies ctx ->
-      (* Disallow sharing so that the only packages in the DB are the ones from
-         the universe's respective lock directory. *)
-      DB.of_ctx ctx ~allow_sharing:false
+    | Dependencies ctx -> DB.of_ctx ctx
     | Dev_tool tool -> DB.of_dev_tool tool >>| fst
   in
   Pkg_digest.Map.values db.pkg_digest_table
@@ -3041,7 +3099,7 @@ let all_filtered_depexts_with_origins context =
 ;;
 
 let pkg_digest_of_project_dependency ctx package_name =
-  let+ db = DB.of_ctx ctx ~allow_sharing:false in
+  let+ db = DB.of_ctx ctx in
   Pkg_digest.Map.keys db.pkg_digest_table
   |> List.find ~f:(fun (pkg_digest : Pkg_digest.t) ->
     Package.Name.equal pkg_digest.name package_name)

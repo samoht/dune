@@ -38,7 +38,7 @@ let relocatable_base_version version =
 (* Get a readable platform identifier from enabled_on_platforms.
    For cross-compilation, different platforms need different cache entries.
    Returns something like "-macos-arm64" or "-linux-x86_64". *)
-let platform_suffix (pkg : Dune_pkg.Lock.Pkg.t) =
+let platform_suffix (pkg : Lock_dir.Pkg.t) =
   match pkg.enabled_on_platforms with
   | [] -> ""
   | [ platform ] ->
@@ -63,7 +63,7 @@ let platform_suffix (pkg : Dune_pkg.Lock.Pkg.t) =
     "-" ^ String.sub hash ~pos:0 ~len:(min 8 (String.length hash))
 ;;
 
-let pkg_dir (pkg : Dune_pkg.Lock.Pkg.t) =
+let pkg_dir (pkg : Lock_dir.Pkg.t) =
   (* The name of this package's directory within the toolchains directory.
 
      For relocatable-compiler packages, we use the base OCaml version plus
@@ -125,4 +125,33 @@ let is_installed pkg =
     Path.outside_build_dir (Path.Outside_build_dir.relative prefix "cookie")
   in
   Path.Untracked.exists cookie_path
+;;
+
+(* Get the cache directory path for a toolchain package *)
+let cache_dir pkg = Path.outside_build_dir (pkg_dir pkg)
+
+(* Populate the shared install directory from global cache.
+   Copies the cached target/ contents to install_dir.
+   Also creates target_dir and copies the cookie there for dependency tracking. *)
+let populate_from_cache_action pkg ~install_dir ~target_dir =
+  let cache_target = Path.outside_build_dir (installation_prefix pkg) in
+  let cache_target_str = Path.to_string cache_target in
+  let workspace_root = Path.to_absolute_filename Path.root in
+  let install_dir_abs =
+    Filename.concat workspace_root (Path.Build.to_string install_dir)
+  in
+  let target_dir_abs = Filename.concat workspace_root (Path.Build.to_string target_dir) in
+  let cache_cookie = Filename.concat cache_target_str "cookie" in
+  let target_cookie = Filename.concat target_dir_abs "cookie" in
+  let cmd =
+    sprintf
+      "mkdir -p %s %s && cp -a %s/* %s/ && cp %s %s"
+      (Filename.quote target_dir_abs)
+      (Filename.quote install_dir_abs)
+      (Filename.quote cache_target_str)
+      (Filename.quote install_dir_abs)
+      (Filename.quote cache_cookie)
+      (Filename.quote target_cookie)
+  in
+  Dune_lang.Action.System (String_with_vars.make_text Loc.none cmd)
 ;;

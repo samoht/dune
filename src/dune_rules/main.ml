@@ -30,7 +30,9 @@ let execution_parameters =
     let path = Path.Build.drop_build_context_exn path in
     let open Memo.O in
     let* ep = Execution_parameters.default in
-    if Context_name.equal context Private_context.t.name
+    if
+      Context_name.equal context Pkg_rules.context.name
+      || Context_name.equal context Lock_dir.context.name
     then Memo.return ep
     else
       let+ dir = Source_tree.nearest_dir path in
@@ -93,7 +95,8 @@ let init
          let open Memo.O in
          let+ contexts = Workspace.workspace () >>| Workspace.build_contexts in
          let open Dune_engine.Build_config.Gen_rules.Context_type in
-         (Private_context.t, Empty)
+         (Pkg_rules.context, Empty)
+         :: (Lock_dir.context, Empty)
          :: (Install.Context.install_context, Empty)
          :: (Fetch_rules.context, Empty)
          :: List.map contexts ~f:(fun ctx -> ctx, With_sources)))

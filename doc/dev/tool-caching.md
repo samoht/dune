@@ -41,11 +41,23 @@ ocamlformat from scratch, even if an identical binary exists elsewhere.
 ├── odoc.2.4.0-5.2.0/bin/odoc                     # compiler-dependent
 └── ocamllsp.1.18.0-5.2.0/bin/ocamllsp
 
-project/_build/install/bin/                        # Project links
-├── ocamlformat -> ~/.cache/dune/tools/ocamlformat.0.26.2/bin/ocamlformat
-├── odoc -> ~/.cache/dune/tools/odoc.2.4.0-5.2.0/bin/odoc
-└── ocamllsp -> ~/.cache/dune/tools/ocamllsp.1.18.0-5.2.0/bin/ocamllsp
+project/_build/install/dev-tools-ocamlformat/bin/ # Project install dir
+└── ocamlformat -> ~/.cache/dune/tools/ocamlformat.0.26.2/bin/ocamlformat
 ```
+
+**Dev Tool Directory Structure:**
+```
+_build/
+├── dev-tools-ocamlformat/          # Build context for ocamlformat
+├── pkg/dev-tools-ocamlformat/      # Package build sandbox
+│   └── {digest}/                   # Per-package source/target
+├── lock/dev-tools-ocamlformat/     # Lock directory (auto-generated)
+└── install/dev-tools-ocamlformat/  # Installed binaries
+    └── bin/ocamlformat             # Symlink to global cache
+```
+
+Each dev tool gets its own context named `dev-tools-{name}`, following the same
+structure as regular package builds.
 
 **Benefits:**
 - No workspace pollution (everything in `_build/`)
@@ -86,17 +98,18 @@ If the opam package definition changes, the version should change. Trust semver.
 
 When user runs `dune fmt`:
 
-1. Check `_build/install/bin/ocamlformat` → use if exists
+1. Check `_build/install/dev-tools-ocamlformat/bin/ocamlformat` → use if exists
 2. Parse `.ocamlformat` for version (e.g., `version = 0.26.2`)
 3. Check global cache `~/.cache/dune/tools/ocamlformat.0.26.2/`
-4. **Cache hit**: Create symlink in `_build/install/bin/`, run
+4. **Cache hit**: Create symlink in `_build/install/dev-tools-ocamlformat/bin/`, run
 5. **Cache miss**:
-   - Check binary repository for pre-built binary
-   - Fall back to build from source to global cache
-   - Create symlink in `_build/install/bin/`
-6. Run tool from `_build/install/bin/`
+   - Generate lock dir at `_build/lock/dev-tools-ocamlformat/`
+   - Build from source to `_build/install/dev-tools-ocamlformat/`
+   - Copy binary to global cache
+   - Create symlink in install dir pointing to cache
+6. Run tool from `_build/install/dev-tools-ocamlformat/bin/`
 
-**No lock file written. No files outside `_build/` in user's repo.**
+**No files outside `_build/` in user's repo.**
 
 ### Relocatable Binaries
 

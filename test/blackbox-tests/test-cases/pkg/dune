@@ -28,7 +28,7 @@
 
 (cram
  (deps %{bin:make})
- (applies_to make))
+ (applies_to make rule-deps))
 
 (cram
  (deps %{bin:which})

@@ -574,7 +574,9 @@ let opam_package_to_lock_file_pkg
   }
 ;;
 
-let file_to_lock ~loc ~solver_env (file : Lock.File.t) =
+(* Internal implementation that optionally collects opam file contents.
+   When ~with_opam_files is true, returns opam file content for each package. *)
+let file_to_lock_impl ~loc ~solver_env ~with_opam_files (file : Lock.File.t) =
   let open Fiber.O in
   let portable_lock_dir = Lock.File.is_portable file in
   let* repos, resolved_packages = Lock.File.derive ~loc file in
@@ -589,10 +591,9 @@ let file_to_lock ~loc ~solver_env (file : Lock.File.t) =
       ~f:(fun acc { Lock.File.Package_entry.name; version; platforms = _ } ->
         Package_name.Map.set acc name version)
   in
-  (* Create stats updater for tracking expanded variables *)
   let stats_updater = Solver_stats.Updater.init () in
-  (* Convert each resolved package to Lock.Pkg.t *)
-  let+ pkgs =
+  (* Convert each resolved package to Lock.Pkg.t, optionally collecting opam files *)
+  let+ pkgs_with_opam =
     Fiber.parallel_map
       resolved_packages
       ~f:(fun (name, version, _platforms, resolved_package) ->
@@ -601,6 +602,15 @@ let file_to_lock ~loc ~solver_env (file : Lock.File.t) =
           OpamPackage.create
             (Package_name.to_opam_package_name name)
             (Package_version.to_opam_package_version version)
+        in
+        let opam_content =
+          if with_opam_files
+          then
+            Some
+              ( name
+              , Resolved_package.opam_file resolved_package
+                |> OpamFile.OPAM.write_to_string )
+          else None
         in
         match
           opam_package_to_lock_file_pkg
@@ -613,9 +623,11 @@ let file_to_lock ~loc ~solver_env (file : Lock.File.t) =
             ~portable_lock_dir
             ~allow_missing_deps:true
         with
-        | Ok pkg -> Fiber.return pkg
+        | Ok pkg -> Fiber.return (pkg, opam_content)
         | Error msg -> User_error.raise [ User_message.pp msg ])
   in
+  let pkgs, opam_files_opts = List.split pkgs_with_opam in
+  let opam_files = List.filter_map opam_files_opts ~f:Fun.id in
   let packages =
     List.fold_left pkgs ~init:Package_name.Map.empty ~f:(fun acc (pkg : Lock.Pkg.t) ->
       Package_name.Map.add_exn acc pkg.info.name pkg)
@@ -626,14 +638,27 @@ let file_to_lock ~loc ~solver_env (file : Lock.File.t) =
       stats.expanded_variables
       solver_env
   in
-  Lock.create_latest_version
-    packages
-    ~local_packages:[]
-    ~ocaml:None
-    ~repos:(Some repos)
-    ~expanded_solver_variable_bindings
-    ~solved_for_platform:(Some solver_env)
-    ~portable_lock_dir
+  let lock =
+    Lock.create_latest_version
+      packages
+      ~local_packages:[]
+      ~ocaml:None
+      ~repos:(Some repos)
+      ~expanded_solver_variable_bindings
+      ~solved_for_platform:(Some solver_env)
+      ~portable_lock_dir
+  in
+  lock, opam_files
+;;
+
+let file_to_lock ~loc ~solver_env file =
+  let open Fiber.O in
+  let+ lock, _ = file_to_lock_impl ~loc ~solver_env ~with_opam_files:false file in
+  lock
+;;
+
+let file_to_lock_with_opam_files ~loc ~solver_env file =
+  file_to_lock_impl ~loc ~solver_env ~with_opam_files:true file
 ;;
 
 (* Cache for derived single-file locks.
@@ -745,4 +770,91 @@ let read_disk_fiber ~solver_env path =
         derive_and_cache_lock ~solver_env path)
     else (* Cache miss - derive from opam repo and cache result *)
       derive_and_cache_lock ~solver_env path
+;;
+
+(* Like read_disk_fiber but also returns opam files for fetch.
+   Only returns opam files for single-file format (where we derive from repo). *)
+let read_disk_fiber_with_opam_files ~solver_env path =
+  match Lock.detect_format path with
+  | None ->
+    User_error.raise
+      [ Pp.textf
+          "%s is not a valid lock directory or lock file"
+          (Path.to_string_maybe_quoted path)
+      ]
+  | Some Lock.Directory ->
+    (* Directory format - no opam files available (already processed) *)
+    Fiber.return (Lock.read_disk_exn path, [])
+  | Some Lock.File ->
+    (* Single-file format - derive from repo and return opam files *)
+    let open Fiber.O in
+    let file =
+      Io.with_lexbuf_from_file path ~f:(fun lexbuf ->
+        Lock.Metadata.parse_contents lexbuf ~f:(fun _lang -> Lock.File.decode))
+    in
+    let portable_lock_dir = Lock.File.is_portable file in
+    let loc = Loc.in_file path in
+    let+ lock, opam_files = file_to_lock_with_opam_files ~loc ~solver_env file in
+    let cache_path = Single_file_cache.cache_path_for path in
+    (* Also cache the result for subsequent non-fetch reads *)
+    (match Single_file_cache.get_source_mtime path with
+     | Some mtime ->
+       Single_file_cache.write_cache ~portable_lock_dir cache_path lock mtime
+     | None -> ());
+    lock, opam_files
+;;
+
+let pkg_of_local_opam_file ~loc ~name ~version ~opam_file =
+  let open Result.O in
+  let opam_package =
+    OpamPackage.create
+      (Package_name.to_opam_package_name name)
+      (Package_version.to_opam_package_version version)
+  in
+  (* Use default solver env - we don't need platform-specific resolution for local packages *)
+  let solver_env = Solver_env.with_defaults in
+  let get_solver_var variable_name = Solver_env.get solver_env variable_name in
+  (* Convert build commands *)
+  let* build_command =
+    let+ build_actions =
+      opam_commands_to_actions
+        get_solver_var
+        loc
+        opam_package
+        (OpamFile.OPAM.build opam_file)
+    in
+    build_actions |> make_action |> Option.map ~f:(fun a -> Lock.Build_command.Action a)
+  in
+  (* Convert install commands *)
+  let+ install_action =
+    OpamFile.OPAM.install opam_file
+    |> opam_commands_to_actions get_solver_var loc opam_package
+    >>| make_action
+  in
+  let info =
+    { Lock.Pkg_info.name
+    ; version
+    ; dev = true (* Vendor packages are always dev *)
+    ; avoid = false
+    ; source = None (* Source is local, not fetched *)
+    ; extra_sources = []
+    }
+  in
+  let build_command =
+    Option.map build_command ~f:(Lock.Conditional_choice.singleton solver_env)
+    |> Option.value ~default:Lock.Conditional_choice.empty
+  in
+  let install_command =
+    Option.map install_action ~f:(Lock.Conditional_choice.singleton solver_env)
+    |> Option.value ~default:Lock.Conditional_choice.empty
+  in
+  { Lock.Pkg.build_command
+  ; install_command
+  ; depends = Lock.Conditional_choice.empty
+  ; post_depends = Lock.Conditional_choice.empty
+  ; depexts = []
+  ; info
+  ; exported_env = []
+  ; enabled_on_platforms = []
+  }
 ;;

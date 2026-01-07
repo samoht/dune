@@ -19,5 +19,6 @@ val action
   -> depexts:string list
   -> Action.Prog.t
   -> Path.t Spec.arg Array.Immutable.t
+  -> prefix:Path.t
   -> ocamlfind_destdir:Path.t
   -> Action.t

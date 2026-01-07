@@ -12,7 +12,7 @@ include struct
   module Ocamlformat = Ocamlformat
 end
 
-let context_name = Context_name.of_string "_fetch"
+let context_name = Context_name.of_string "fetch"
 let context = Build_context.create ~name:context_name
 let digest_of_url url = OpamUrl.to_string url |> Digest.string
 
@@ -189,15 +189,11 @@ let find_checksum, find_url =
           Dune_pkg.Dev_tool.all
           ~init:(Checksum.Map.empty, Digest.Map.empty)
           ~f:(fun acc dev_tool ->
-            let dir = Lock_dir.dev_tool_external_lock_dir dev_tool in
-            let exists =
-              (* Note we use [Path.Untracked] here rather than [Fs_memo] because a tool's
-                 lockdir may be generated part way through a build. *)
-              Path.Untracked.exists (Path.external_ dir)
-            in
+            let dir = Pkg_dev_tool.lock_dir dev_tool |> Path.build in
+            let exists = Path.Untracked.exists dir in
             match exists with
             | false -> Memo.return acc
-            | true -> Lock_dir.of_dev_tool dev_tool >>| add_checksums_and_urls acc)
+            | true -> Pkg_dev_tool.load_lock_dir dev_tool >>| add_checksums_and_urls acc)
       in
       Per_context.list ()
       >>= Memo.parallel_map ~f:(fun ctx_name ->

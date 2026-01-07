@@ -508,7 +508,10 @@ let is_local t =
     (match Path.Build.extract_build_context dir with
      | None -> true
      | Some (name, _) ->
-       not (Context_name.equal (Context_name.of_string name) Private_context.t.name))
+       let ctx_name = Context_name.of_string name in
+       not
+         (Context_name.equal ctx_name Pkg_rules.context.name
+          || Context_name.equal ctx_name Lock_dir.context.name))
 ;;
 
 let resolve_main_module_name t =

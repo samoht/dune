@@ -393,13 +393,17 @@ let rename_for_alias t ~alias =
     | This None -> Inherited.This None (* unwrapped stays unwrapped *)
     | This (Some _) ->
       (* Change wrapper module name to be based on alias *)
-      Inherited.This (Some (Module_name.of_string (Lib_name.Local.to_string (Lib_name.to_local_exn alias))))
+      Inherited.This
+        (Some
+           (Module_name.of_string
+              (Lib_name.Local.to_string (Lib_name.to_local_exn alias))))
     | From loc -> Inherited.From loc (* inherited stays inherited *)
   in
   let local_main_module_name =
     Some (Module_name.of_string (Lib_name.Local.to_string (Lib_name.to_local_exn alias)))
   in
   { t with name = alias; main_module_name; local_main_module_name }
+;;
 
 let entry_modules t = t.entry_modules
 let dynlink_supported t = Mode.Dict.get t.plugins Native <> []

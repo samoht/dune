@@ -76,12 +76,15 @@ module Install_rules = struct
 end
 
 module Pkg_rules = struct
+  let context = Pkg_rules.context
   let all_filtered_depexts = Pkg_rules.all_filtered_depexts
   let all_filtered_depexts_with_origins = Pkg_rules.all_filtered_depexts_with_origins
   let pkg_digest_of_project_dependency = Pkg_rules.pkg_digest_of_project_dependency
 
   module Pkg_digest = Pkg_rules.Pkg_digest
 end
+
+module Fetch_rules = Fetch_rules
 
 module For_tests = struct
   module Dynlink_supported = Dynlink_supported
