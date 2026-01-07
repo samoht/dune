@@ -26,40 +26,7 @@ include struct
 end
 
 module Vendor_stanza = Dune_lang.Vendor_stanza
-
-module Variable = struct
-  type value = OpamVariable.variable_contents =
-    | B of bool
-    | S of string
-    | L of string list
-
-  type t = Package_variable_name.t * value
-
-  let dyn_of_value : value -> Dyn.t =
-    let open Dyn in
-    function
-    | B b -> variant "Bool" [ bool b ]
-    | S s -> variant "String" [ string s ]
-    | L xs -> variant "Strings" [ list string xs ]
-  ;;
-
-  let dune_value : value -> Value.t list = function
-    | B b -> [ String (Bool.to_string b) ]
-    | S s -> [ String s ]
-    | L s -> List.map s ~f:(fun x -> Value.String x)
-  ;;
-
-  let of_values : dir:Path.t -> Value.t list -> value =
-    fun ~dir xs ->
-    match List.map xs ~f:(Value.to_string ~dir) with
-    | [ x ] -> S x
-    | xs -> L xs
-  ;;
-
-  let to_dyn (name, value) =
-    Dyn.(pair Package_variable_name.to_dyn dyn_of_value (name, value))
-  ;;
-end
+module Variable = Pkg_opam.Variable
 
 module Package_universe = struct
   (* A type of group of packages that are co-installed. Multiple different
@@ -196,50 +163,7 @@ module Pkg_digest = struct
 end
 
 module Paths = struct
-  (* The [paths] of a package are the information about the artifacts
-     that we know {e without} executing any commands. *)
-  type 'a t =
-    { source_dir : 'a
-    ; target_dir : 'a
-    ; extra_sources : 'a
-    ; name : Package.Name.t
-    ; install_roots : 'a Install.Roots.t Lazy.t
-    ; install_paths : 'a Install.Paths.t Lazy.t
-    ; prefix : 'a
-    }
-
-  let map_path t ~f =
-    { t with
-      source_dir = f t.source_dir
-    ; target_dir = f t.target_dir
-    ; extra_sources = f t.extra_sources
-    ; install_roots = Lazy.map ~f:(Install.Roots.map ~f) t.install_roots
-    ; install_paths = Lazy.map ~f:(Install.Paths.map ~f) t.install_paths
-    ; prefix = f t.prefix
-    }
-  ;;
-
-  let install_roots ~target_dir ~relative =
-    Install.Roots.opam_from_prefix ~relative target_dir
-  ;;
-
-  let install_paths roots package ~relative = Install.Paths.make ~relative ~package ~roots
-
-  let of_root name ~root ~relative =
-    let source_dir = relative root "source" in
-    let target_dir = relative root "target" in
-    let extra_sources = relative root "extra_source" in
-    let install_roots = lazy (install_roots ~target_dir ~relative) in
-    let install_paths = lazy (install_paths (Lazy.force install_roots) name ~relative) in
-    { source_dir
-    ; target_dir
-    ; extra_sources
-    ; name
-    ; install_paths
-    ; install_roots
-    ; prefix = target_dir
-    }
-  ;;
+  include Vendor_rules.Paths
 
   let extra_source t extra_source = Path.append_local t.extra_sources extra_source
 
@@ -259,14 +183,6 @@ module Paths = struct
     of_root pkg_digest.name ~root
   ;;
 
-  let make_install_cookie target_dir ~relative = relative target_dir "cookie"
-
-  let install_cookie' target_dir =
-    make_install_cookie target_dir ~relative:Path.Build.relative
-  ;;
-
-  let install_cookie t = make_install_cookie t.target_dir ~relative:Path.relative
-
   let install_file t =
     Path.Build.relative
       t.source_dir
@@ -275,27 +191,6 @@ module Paths = struct
 
   let config_file t =
     Path.Build.relative t.source_dir (sprintf "%s.config" (Package.Name.to_string t.name))
-  ;;
-
-  let install_paths t = Lazy.force t.install_paths
-  let target_dir t = t.target_dir
-end
-
-module Shared_install = struct
-  let dir ~context = Install.Context.dir ~context
-
-  let roots_build ~context =
-    Install.Roots.opam_from_prefix ~relative:Path.Build.relative (dir ~context)
-  ;;
-
-  let roots ~context = roots_build ~context |> Install.Roots.map ~f:Path.build
-
-  (* Compiler packages store their libraries in a subdirectory named "ocaml" *)
-  let roots_for_package ~pkg_name ~context =
-    let base_roots = roots ~context in
-    match Pkg_toolchain.is_compiler_and_toolchains_enabled pkg_name with
-    | false -> base_roots
-    | true -> { base_roots with lib_root = Path.relative base_roots.lib_root "ocaml" }
   ;;
 end
 
@@ -576,7 +471,7 @@ module Resolved_pkg = struct
   (* All packages install files to the shared _build/install/<ctx>/ directory.
      The per-package target_dir/cookie is used only for dependency tracking. *)
   let install_roots t =
-    Shared_install.roots_for_package ~pkg_name:t.info.name ~context:t.context
+    Pkg_opam.Pkg_install.roots_for_package ~pkg_name:t.info.name ~context:t.context
   ;;
 
   (* Given a list of packages, construct an env containing variables
@@ -810,7 +705,7 @@ module Action_expander = struct
       | Prefix ->
         (* All packages install to the shared _build/install/<ctx>/ directory.
            The per-package target_dir/cookie is used only for dependency tracking. *)
-        Memo.return [ Value.Dir (Shared_install.dir ~context |> Path.build) ]
+        Memo.return [ Value.Dir (Pkg_opam.Pkg_install.dir ~context |> Path.build) ]
       | User -> Memo.return [ Value.String (Unix.getlogin ()) ]
       | Jobs -> Memo.return [ Value.String (Int.to_string !Clflags.concurrency) ]
       | Arch -> sys_poll_var (fun { arch; _ } -> arch)
@@ -818,7 +713,7 @@ module Action_expander = struct
         let group = Unix.getgid () |> Unix.getgrgid in
         Memo.return [ Value.String group.gr_name ]
       | Section_dir section ->
-        let dir = section_dir_of_root (Shared_install.roots ~context) section in
+        let dir = section_dir_of_root (Pkg_opam.Pkg_install.roots ~context) section in
         Memo.return [ Value.Dir dir ]
     ;;
 
@@ -871,7 +766,7 @@ module Action_expander = struct
             | None -> None
             | Some section ->
               let roots =
-                Shared_install.roots_for_package ~pkg_name:package_name ~context
+                Pkg_opam.Pkg_install.roots_for_package ~pkg_name:package_name ~context
               in
               Some (Memo.return @@ Ok [ Value.Dir (section_dir_of_root roots section) ])))
     ;;
@@ -1123,8 +1018,8 @@ module Action_expander = struct
          in
          (* Use shared install directory for PREFIX and OCAMLFIND_DESTDIR so packages
             can find files installed by dependencies *)
-         let shared_roots = Shared_install.roots_build ~context:expander.context in
-         let prefix = Shared_install.dir ~context:expander.context |> Path.build in
+         let shared_roots = Pkg_opam.Pkg_install.roots_build ~context:expander.context in
+         let prefix = Pkg_opam.Pkg_install.dir ~context:expander.context |> Path.build in
          let ocamlfind_destdir = Path.build shared_roots.lib_root in
          Run_with_path.action
            ~depexts

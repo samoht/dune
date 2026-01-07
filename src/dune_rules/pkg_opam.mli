@@ -23,7 +23,7 @@ end
 
 (** {1 Shared Install Paths} *)
 
-module Shared_install : sig
+module Pkg_install : sig
   val dir : context:Context_name.t -> Path.Build.t
   val roots_build : context:Context_name.t -> Path.Build.t Install.Roots.t
   val roots : context:Context_name.t -> Path.t Install.Roots.t

@@ -409,13 +409,13 @@ let marker_for_library ~context lib_name =
   | Some pkg_name -> marker_for_package ~context pkg_name
 ;;
 
-(* Build an opam package using the shared Opam_var expansion logic *)
+(* Build an opam package using the shared Pkg_opam expansion logic *)
 let build_opam_package ~context ~pkg_name ~pkg_version ~source_dir ~opam_file =
   let open Memo.O in
   let* vendored_map = get_vendored_map () in
   let build_cmds = OpamFile.OPAM.build opam_file in
   let install_cmds = OpamFile.OPAM.install opam_file in
-  (* Convert vendored_map to all_packages for Opam_var *)
+  (* Convert vendored_map to all_packages for Pkg_opam *)
   let all_packages =
     List.fold_left
       (Vendored_map.all_packages vendored_map)
@@ -426,16 +426,16 @@ let build_opam_package ~context ~pkg_name ~pkg_version ~source_dir ~opam_file =
         | None -> acc)
   in
   (* Get install paths *)
-  let install_dir = Opam_var.Shared_install.dir ~context in
+  let install_dir = Pkg_opam.Pkg_install.dir ~context in
   let prefix = Path.build install_dir in
-  let roots = Opam_var.Shared_install.roots_build ~context in
+  let roots = Pkg_opam.Pkg_install.roots_build ~context in
   let ocamlfind_destdir = Path.build roots.lib_root in
   (* For vendor builds, use the build directory path *)
   let build_dir = Path.Build.append_source (Context_name.build_dir context) source_dir in
   let build_path = Path.build build_dir in
   let system_path = Global.env () |> Env_path.path in
   let expand_vars s =
-    Opam_var.expand_string
+    Pkg_opam.expand_string
       ~context
       ~pkg_name
       ~pkg_version
@@ -445,7 +445,7 @@ let build_opam_package ~context ~pkg_name ~pkg_version ~source_dir ~opam_file =
       s
   in
   let expand_ident var =
-    Opam_var.expand_ident ~context ~pkg_name ~pkg_version ~prefix ~ocamlfind_destdir var
+    Pkg_opam.expand_ident ~context ~pkg_name ~pkg_version ~prefix ~ocamlfind_destdir var
   in
   let cmd_to_action (args, _filter) =
     let* args =

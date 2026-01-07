@@ -41,7 +41,7 @@ module Variable = struct
 end
 
 (** Shared install directory helpers *)
-module Shared_install = struct
+module Pkg_install = struct
   let dir ~context = Install.Context.dir ~context
 
   let roots_build ~context =
@@ -99,7 +99,7 @@ let expand_pkg ~context ~source_dir (pform : Pform.Var.Pkg.t) =
   | Build -> Memo.return [ Value.Dir source_dir ]
   | Prefix ->
     (* All packages install to the shared _build/install/<ctx>/ directory *)
-    Memo.return [ Value.Dir (Shared_install.dir ~context |> Path.build) ]
+    Memo.return [ Value.Dir (Pkg_install.dir ~context |> Path.build) ]
   | User -> Memo.return [ Value.String (Unix.getlogin ()) ]
   | Jobs -> Memo.return [ Value.String (Int.to_string !Clflags.concurrency) ]
   | Arch -> sys_poll_var (fun { arch; _ } -> arch)
@@ -107,7 +107,7 @@ let expand_pkg ~context ~source_dir (pform : Pform.Var.Pkg.t) =
     let group = Unix.getgid () |> Unix.getgrgid in
     Memo.return [ Value.String group.gr_name ]
   | Section_dir section ->
-    let dir = section_dir_of_root (Shared_install.roots ~context) section in
+    let dir = section_dir_of_root (Pkg_install.roots ~context) section in
     Memo.return [ Value.Dir dir ]
 ;;
 
@@ -158,7 +158,7 @@ let resolve_builtin_var
         with
         | None -> None
         | Some section ->
-          let roots = Shared_install.roots_for_package ~pkg_name:package_name ~context in
+          let roots = Pkg_install.roots_for_package ~pkg_name:package_name ~context in
           Some (Memo.return @@ Ok [ Value.Dir (section_dir_of_root roots section) ])))
 ;;
 
@@ -180,7 +180,7 @@ let apply_default_if_true default_if_true result =
 (** Expand a bare identifier (CIdent in opam commands).
     Returns None if the variable is not recognized. *)
 let expand_ident ~context ~pkg_name ~pkg_version ~prefix ~ocamlfind_destdir var =
-  let roots = Shared_install.roots ~context in
+  let roots = Pkg_install.roots ~context in
   let pkg_name_str = Package.Name.to_string pkg_name in
   let pkg_path_var section =
     match section with
@@ -228,7 +228,7 @@ let expand_string
       ~ocamlfind_destdir
       s
   =
-  let roots = Shared_install.roots ~context in
+  let roots = Pkg_install.roots ~context in
   let pkg_path_var pkg_str = function
     | "lib" -> Some (Path.to_string (Path.relative ocamlfind_destdir pkg_str))
     | "share" -> Some (Path.to_string (Path.relative roots.share_root pkg_str))
