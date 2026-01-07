@@ -116,7 +116,6 @@ Check build directory was created:
 
   $ ls _build/default/duniverse/make-pkg.1.0.0/
   Makefile
-  _build
   opam
 
 Now test that edits to non-dune packages in duniverse are picked up:

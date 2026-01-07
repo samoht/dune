@@ -2,6 +2,14 @@ open Import
 module Vendor = Dune_pkg.Vendor
 module Vendor_stanza = Dune_lang.Vendor_stanza
 
+(* Extract all package names from an opam dependency formula.
+   This ignores version constraints and filters - just collects the names. *)
+let extract_dep_names (formula : OpamTypes.filtered_formula) =
+  let names = ref [] in
+  OpamFormula.iter (fun (name, _condition) -> names := name :: !names) formula;
+  !names
+;;
+
 (* Package sandbox context: _build/pkg/ *)
 let pkg_sandbox_context =
   let name = Context_name.of_string "pkg" in
@@ -426,6 +434,16 @@ let build_opam_package ~context ~pkg_name ~pkg_version ~source_dir ~opam_file =
   let* vendored_map = get_vendored_map () in
   let build_cmds = OpamFile.OPAM.build opam_file in
   let install_cmds = OpamFile.OPAM.install opam_file in
+  (* Extract dependencies from the opam file and filter to vendored packages *)
+  let opam_depends = OpamFile.OPAM.depends opam_file in
+  let dep_names = extract_dep_names opam_depends in
+  let vendored_deps =
+    List.filter_map dep_names ~f:(fun opam_name ->
+      let name = Package.Name.of_string (OpamPackage.Name.to_string opam_name) in
+      match Vendored_map.find vendored_map name with
+      | None -> None
+      | Some info -> Some (name, info))
+  in
   (* Convert vendored_map to all_packages for Pkg_opam *)
   let all_packages =
     List.fold_left
@@ -436,11 +454,12 @@ let build_opam_package ~context ~pkg_name ~pkg_version ~source_dir ~opam_file =
         | Some v -> Package.Name.Map.set acc pkg v
         | None -> acc)
   in
-  (* Get install paths *)
+  (* Get install paths - use absolute paths since vendor builds chdir
+     to the package directory *)
   let install_dir = Pkg_opam.Pkg_install.dir ~context in
-  let prefix = Path.build install_dir in
-  let roots = Pkg_opam.Pkg_install.roots_build ~context in
-  let ocamlfind_destdir = Path.build roots.lib_root in
+  let prefix = Path.of_string (Path.to_absolute_filename (Path.build install_dir)) in
+  let roots = Pkg_opam.Pkg_install.roots ~context in
+  let ocamlfind_destdir = Path.of_string (Path.to_absolute_filename roots.lib_root) in
   (* For vendor builds, use the build directory path *)
   let build_dir = Path.Build.append_source (Context_name.build_dir context) source_dir in
   let build_path = Path.build build_dir in
@@ -524,7 +543,34 @@ let build_opam_package ~context ~pkg_name ~pkg_version ~source_dir ~opam_file =
   let file_selector =
     File_selector.of_predicate_lang ~dir:build_path Predicate_lang.true_
   in
-  let deps = Action_builder.paths_matching_unit ~loc:Loc.none file_selector in
+  let source_deps = Action_builder.paths_matching_unit ~loc:Loc.none file_selector in
+  (* Build dependencies on other vendored packages *)
+  let pkg_deps =
+    List.map vendored_deps ~f:(fun (dep_name, dep_info) ->
+      match dep_info.Vendored_map.build_method with
+      | Some Vendor_stanza.Build_method.Opam_sandboxed ->
+        (* Opam-sandboxed packages: depend on their marker file *)
+        let dep_root =
+          pkg_build_root ~context ~pkg_name:dep_name ~pkg_version:dep_info.version
+        in
+        let dep_paths =
+          Paths.of_root dep_name ~root:dep_root ~relative:Path.Build.relative
+        in
+        let dep_target_dir = Paths.target_dir dep_paths in
+        let dep_cookie = Paths.install_cookie' dep_target_dir in
+        Dep.file (Path.build dep_cookie)
+      | Some Dune_native | None ->
+        (* Native dune packages: depend on @install alias in their source dir *)
+        let dir =
+          Path.Build.append_source (Context_name.build_dir context) dep_info.source_dir
+        in
+        Dep.alias (Alias.make Alias0.install ~dir))
+    |> Dep.Set.of_list
+  in
+  let deps =
+    Action_builder.O.(
+      source_deps >>> Action_builder.deps pkg_deps |> Action_builder.map ~f:(fun _ -> ()))
+  in
   let with_targets =
     let open Action_builder.With_targets.O in
     Action_builder.with_no_targets deps
