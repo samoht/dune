@@ -1,10 +1,20 @@
 open Import
 open Memo.O
 
+(* Compute vendor package marker dependencies for a list of libraries.
+   This ensures vendor packages are built before compilation that needs them. *)
+let vendor_marker_deps ~context libs =
+  let open Memo.O in
+  Memo.List.filter_map libs ~f:(fun lib ->
+    let lib_name = Lib.name lib |> Lib_name.to_string in
+    Vendor_rules.marker_for_library ~context lib_name)
+  >>| fun markers -> Dep.Set.of_list_map markers ~f:(fun m -> Dep.file (Path.build m))
+;;
+
 module Includes = struct
   type t = Command.Args.without_targets Command.Args.t Lib_mode.Cm_kind.Map.t
 
-  let make ~project ~opaque ~direct_requires ~hidden_requires lib_config
+  let make ~context ~project ~opaque ~direct_requires ~hidden_requires lib_config
     : _ Lib_mode.Cm_kind.Map.t
     =
     (* TODO: some of the requires can filtered out using [ocamldep] info *)
@@ -12,12 +22,19 @@ module Includes = struct
     let iflags direct_libs hidden_libs mode =
       Lib_flags.L.include_flags ~project ~direct_libs ~hidden_libs mode lib_config
     in
+    let context_name = Context.name context in
     let make_includes_args ~mode groups =
-      (let+ direct_libs = direct_requires
-       and+ hidden_libs = hidden_requires in
+      (let* direct_libs = direct_requires
+       and* hidden_libs = hidden_requires in
+       let all_libs = direct_libs @ hidden_libs in
+       let+ vendor_deps =
+         Resolve.Memo.lift_memo (vendor_marker_deps ~context:context_name all_libs)
+       in
        Command.Args.S
          [ iflags direct_libs hidden_libs mode
-         ; Hidden_deps (Lib_file_deps.deps (direct_libs @ hidden_libs) ~groups)
+         ; Hidden_deps (Lib_file_deps.deps all_libs ~groups)
+           (* Add vendor package marker dependencies for on-demand builds *)
+         ; Hidden_deps vendor_deps
          ])
       |> Resolve.Memo.args
       |> Command.Args.memo
@@ -27,13 +44,16 @@ module Includes = struct
          { cmi = cmi_includes
          ; cmo = cmi_includes
          ; cmx =
-             (let+ direct_libs = direct_requires
-              and+ hidden_libs = hidden_requires in
+             (let* direct_libs = direct_requires
+              and* hidden_libs = hidden_requires in
+              let libs = direct_libs @ hidden_libs in
+              let+ vendor_deps =
+                Resolve.Memo.lift_memo (vendor_marker_deps ~context:context_name libs)
+              in
               Command.Args.S
                 [ iflags direct_libs hidden_libs (Ocaml Native)
                 ; Hidden_deps
-                    (let libs = direct_libs @ hidden_libs in
-                     if opaque
+                    (if opaque
                      then
                        List.map libs ~f:(fun lib ->
                          ( lib
@@ -45,6 +65,8 @@ module Includes = struct
                        Lib_file_deps.deps
                          libs
                          ~groups:[ Lib_file_deps.Group.Ocaml Cmi; Ocaml Cmx ])
+                  (* Add vendor package marker dependencies for on-demand builds *)
+                ; Hidden_deps vendor_deps
                 ])
              |> Resolve.Memo.args
              |> Command.Args.memo
@@ -226,7 +248,13 @@ let create
   ; implements
   ; parameters
   ; includes =
-      Includes.make ~project ~opaque ~direct_requires ~hidden_requires ocaml.lib_config
+      Includes.make
+        ~context
+        ~project
+        ~opaque
+        ~direct_requires
+        ~hidden_requires
+        ocaml.lib_config
   ; preprocessing
   ; opaque
   ; stdlib
@@ -316,10 +344,12 @@ let for_module_generated_at_link_time cctx ~requires ~module_ =
     Ocaml.Version.supports_opaque_for_mli cctx.ocaml.version
   in
   let modules = singleton_modules module_ in
+  let context = Super_context.context cctx.super_context in
   let includes =
     let hidden_requires = Resolve.Memo.return [] in
     let direct_requires = requires in
     Includes.make
+      ~context
       ~project:(Scope.project cctx.scope)
       ~opaque
       ~direct_requires
