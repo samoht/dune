@@ -376,17 +376,51 @@ let build_opam_package ~context ~pkg_name ~pkg_version ~source_dir ~opam_file =
   let build_dir = Path.Build.append_source (Context_name.build_dir context) source_dir in
   let build_path = Path.build build_dir in
   let system_path = Global.env () |> Env_path.path in
-  (* Simple string replacement helper *)
-  let replace_all s ~pattern ~with_ =
-    Re.replace_string (Re.compile (Re.str pattern)) ~by:with_ s
-  in
   (* Make command - gmake on BSD, make elsewhere *)
   let make_cmd =
     match Bin.which ~path:system_path "gmake" with
     | Some _ -> "gmake"
     | None -> "make"
   in
-  (* Expand package variable like %{foo:installed}% *)
+  let bin_dir = Path.build roots.bin in
+  let sbin_dir = Path.build roots.sbin in
+  let share_root = Path.build roots.share_root in
+  let doc_root = Path.build roots.doc_root in
+  let etc_root = Path.build roots.etc_root in
+  let man_dir = Path.build roots.man in
+  let stublibs = Path.build (Path.Build.relative roots.lib_root "stublibs") in
+  let pkg_name_str = Package.Name.to_string pkg_name in
+  let pkg_version_str = Package_version.to_string pkg_version in
+  let context_str = Context_name.to_string context in
+  let pkg_path_var pkg_str = function
+    | "lib" -> Some (Path.to_string (Path.relative ocamlfind_destdir pkg_str))
+    | "share" -> Some (Path.to_string (Path.relative share_root pkg_str))
+    | "doc" -> Some (Path.to_string (Path.relative doc_root pkg_str))
+    | "etc" -> Some (Path.to_string (Path.relative etc_root pkg_str))
+    | _ -> None
+  in
+  let expand_simple_var = function
+    | "prefix" -> Some (Path.to_string prefix)
+    | "lib" -> Some (Path.to_string ocamlfind_destdir)
+    | "bin" -> Some (Path.to_string bin_dir)
+    | "sbin" -> Some (Path.to_string sbin_dir)
+    | "share" -> Some (Path.to_string share_root)
+    | "doc" -> Some (Path.to_string doc_root)
+    | "etc" -> Some (Path.to_string etc_root)
+    | "man" -> Some (Path.to_string man_dir)
+    | "stublibs" -> Some (Path.to_string stublibs)
+    | "switch" -> Some context_str
+    | "name" -> Some pkg_name_str
+    | "version" -> Some pkg_version_str
+    | "jobs" -> Some (Int.to_string !Clflags.concurrency)
+    | "make" -> Some make_cmd
+    | "_:name" -> Some pkg_name_str
+    | "_:lib" -> pkg_path_var pkg_name_str "lib"
+    | "_:share" -> pkg_path_var pkg_name_str "share"
+    | "_:doc" -> pkg_path_var pkg_name_str "doc"
+    | "_:etc" -> pkg_path_var pkg_name_str "etc"
+    | _ -> None
+  in
   let expand_pkg_var pkg_str var =
     let pkg = Package.Name.of_string pkg_str in
     match var with
@@ -397,47 +431,32 @@ let build_opam_package ~context ~pkg_name ~pkg_version ~source_dir ~opam_file =
       (match Vendored_map.version vendored_map pkg with
        | Some v -> Some (Package_version.to_string v)
        | None -> Some "")
+    | "lib" | "share" | "doc" | "etc" -> pkg_path_var pkg_str var
     | _ -> None
   in
-  (* Regex for %{pkg:var}% pattern *)
   let pkg_var_re = Re.compile (Re.Perl.re {|%\{([^:}]+):([^}]+)\}%|}) in
-  (* Expand opam variables in a string *)
+  let simple_var_re = Re.compile (Re.Perl.re {|%\{([^:}]+)\}%|}) in
   let expand_vars s =
-    (* First expand simple variables *)
-    let s = replace_all s ~pattern:"%{prefix}%" ~with_:(Path.to_string prefix) in
-    let s = replace_all s ~pattern:"%{lib}%" ~with_:(Path.to_string ocamlfind_destdir) in
-    let s = replace_all s ~pattern:"%{name}%" ~with_:(Package.Name.to_string pkg_name) in
     let s =
-      replace_all s ~pattern:"%{jobs}%" ~with_:(Int.to_string !Clflags.concurrency)
+      Re.replace simple_var_re s ~f:(fun group ->
+        let var = Re.Group.get group 1 in
+        match expand_simple_var var with
+        | Some value -> value
+        | None -> Re.Group.get group 0)
     in
-    let s = replace_all s ~pattern:"%{make}%" ~with_:make_cmd in
-    (* Then expand %{pkg:var}% patterns *)
     Re.replace pkg_var_re s ~f:(fun group ->
       let pkg_str = Re.Group.get group 1 in
       let var = Re.Group.get group 2 in
       match expand_pkg_var pkg_str var with
       | Some value -> value
-      | None -> Re.Group.get group 0 (* keep original if unknown *))
+      | None -> Re.Group.get group 0)
   in
-  (* Convert opam command to action *)
   let cmd_to_action (args, _filter) =
     let args =
       List.filter_map args ~f:(fun (arg, _filter) ->
         match (arg : OpamTypes.simple_arg) with
         | CString s -> Some (expand_vars s)
-        | CIdent i ->
-          (* Handle opam idents like %{make}% *)
-          (match i with
-           | "make" ->
-             Some
-               (match Bin.which ~path:system_path "gmake" with
-                | Some _ -> "gmake"
-                | None -> "make")
-           | "jobs" -> Some (Int.to_string !Clflags.concurrency)
-           | "name" -> Some (Package.Name.to_string pkg_name)
-           | "prefix" -> Some (Path.to_string prefix)
-           | "lib" -> Some (Path.to_string ocamlfind_destdir)
-           | _ -> None))
+        | CIdent i -> expand_simple_var i)
     in
     match args with
     | [] -> None
