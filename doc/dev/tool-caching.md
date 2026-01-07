@@ -33,6 +33,52 @@ ocamlformat from scratch, even if an identical binary exists elsewhere.
 4. **Transparent installation** - like npx, auto-install on demand
 5. **Relocatable binaries** - tools run from any location
 
+### Dev Tool Directory Structure
+
+Dev tools use the same build infrastructure as regular packages, with their own
+isolated context. The only difference is a promotion step at the end.
+
+```
+_build/
+├── tools-ocamlformat/              # Build context (isolated from project)
+├── pkg/tools-ocamlformat/          # Package builds
+│   ├── ocamlformat.0.26.2/
+│   │   ├── source/                 # Extracted source
+│   │   └── target/                 # Package's install outputs
+│   │       └── bin/ocamlformat     # Tool binary
+│   └── base.0.16.0/                # Dependencies
+│       ├── source/
+│       └── target/
+├── lock/tools-ocamlformat/         # Lock directory (auto-generated)
+└── install/
+    ├── tools-ocamlformat/          # Shared install (deps find each other)
+    │   ├── bin/
+    │   └── lib/
+    └── default/
+        └── bin/ocamlformat         # Promoted from tool's target/bin/
+```
+
+**Package Installation (dual write):**
+Packages install their outputs to BOTH locations:
+1. `_build/pkg/<ctx>/<pkg>/target/{bin,lib,...}` - per-package outputs
+2. `_build/install/<ctx>/` - shared prefix (so dependencies can find each other)
+
+**`dune tools install ocamlformat` flow:**
+1. Determine version (from `.ocamlformat` config or CLI flag)
+2. Check global cache `~/.cache/dune/tools/ocamlformat.0.26.2/`
+3. **Cache hit**: Promote directly from cache to `_build/install/default/bin/`
+4. **Cache miss**:
+   - Generate lock file in `_build/lock/tools-ocamlformat/`
+   - Build all packages in `_build/pkg/tools-ocamlformat/`
+   - Promote tool's binaries from `target/bin/` to `_build/install/default/bin/`
+   - Copy to global cache for future use
+
+**Key design points:**
+- Full isolation: each tool has its own context (different deps, OCaml version)
+- Targeted promotion: only the tool package's `target/bin/` is promoted, not deps
+- Binary only (for now): only `bin/` is promoted to default context
+- Same infrastructure: tools use the same build system as regular packages
+
 ### Two-Level Cache Model
 
 ```
@@ -41,29 +87,18 @@ ocamlformat from scratch, even if an identical binary exists elsewhere.
 ├── odoc.2.4.0-5.2.0/bin/odoc                     # compiler-dependent
 └── ocamllsp.1.18.0-5.2.0/bin/ocamllsp
 
-project/_build/install/dev-tools-ocamlformat/bin/ # Project install dir
+_build/install/default/bin/                        # Project install dir
 └── ocamlformat -> ~/.cache/dune/tools/ocamlformat.0.26.2/bin/ocamlformat
 ```
 
-**Dev Tool Directory Structure:**
-```
-_build/
-├── dev-tools-ocamlformat/          # Build context for ocamlformat
-├── pkg/dev-tools-ocamlformat/      # Package build sandbox
-│   └── {digest}/                   # Per-package source/target
-├── lock/dev-tools-ocamlformat/     # Lock directory (auto-generated)
-└── install/dev-tools-ocamlformat/  # Installed binaries
-    └── bin/ocamlformat             # Symlink to global cache
-```
-
-Each dev tool gets its own context named `dev-tools-{name}`, following the same
-structure as regular package builds.
+After promotion, binaries can optionally be cached globally and replaced with
+symlinks for cross-project sharing.
 
 **Benefits:**
 - No workspace pollution (everything in `_build/`)
 - `dune clean` removes symlinks but keeps cached binaries (fast reinstall)
 - Cross-project sharing via global cache
-- Project isolation via version-specific symlinks
+- Full isolation via per-tool contexts
 
 ### Cache Key Design
 
@@ -98,16 +133,18 @@ If the opam package definition changes, the version should change. Trust semver.
 
 When user runs `dune fmt`:
 
-1. Check `_build/install/dev-tools-ocamlformat/bin/ocamlformat` → use if exists
+1. Check `_build/install/default/bin/ocamlformat` → use if exists
 2. Parse `.ocamlformat` for version (e.g., `version = 0.26.2`)
 3. Check global cache `~/.cache/dune/tools/ocamlformat.0.26.2/`
-4. **Cache hit**: Create symlink in `_build/install/dev-tools-ocamlformat/bin/`, run
+4. **Cache hit**: Create symlink in `_build/install/default/bin/`, run
 5. **Cache miss**:
-   - Generate lock dir at `_build/lock/dev-tools-ocamlformat/`
-   - Build from source to `_build/install/dev-tools-ocamlformat/`
+   - Generate lock dir at `_build/lock/tools-ocamlformat/`
+   - Build packages in `_build/pkg/tools-ocamlformat/`
+   - Promote `_build/pkg/tools-ocamlformat/ocamlformat.0.26.2/target/bin/*`
+     to `_build/install/default/bin/`
    - Copy binary to global cache
-   - Create symlink in install dir pointing to cache
-6. Run tool from `_build/install/dev-tools-ocamlformat/bin/`
+   - Replace with symlink pointing to cache
+6. Run tool from `_build/install/default/bin/`
 
 **No files outside `_build/` in user's repo.**
 
