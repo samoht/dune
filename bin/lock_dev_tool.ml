@@ -295,3 +295,41 @@ let lock_dev_tool dev_tool =
   | Ocamlformat -> lock_ocamlformat ()
   | other -> lock_dev_tool_at_version other None
 ;;
+
+(* Get the version of a dev tool from its lock file.
+   Returns None if the lock file doesn't exist or doesn't contain the tool. *)
+let dev_tool_version dev_tool =
+  let open Memo.O in
+  let* lock_dir_opt = Dune_rules.Lock_dir.of_dev_tool_if_lock_dir_exists dev_tool in
+  match lock_dir_opt with
+  | None -> Memo.return None
+  | Some lock_dir ->
+    let package_name = Dune_pkg.Dev_tool.package_name dev_tool in
+    let* platform =
+      Pkg.Pkg_common.poll_solver_env_from_current_system () |> Memo.of_reproducible_fiber
+    in
+    let packages = Lock_dir.Packages.pkgs_on_platform_by_name lock_dir.packages ~platform in
+    (match Package_name.Map.find packages package_name with
+     | None -> Memo.return None
+     | Some pkg -> Memo.return (Some (Package_version.to_string pkg.info.version)))
+;;
+
+(* Get the OCaml version from the project's default lock file.
+   Used for compiler-dependent dev tools. *)
+let project_ocaml_version () =
+  let open Memo.O in
+  let* result = Dune_rules.Lock_dir.get Context_name.default in
+  match result with
+  | Error _ -> Memo.return None
+  | Ok lockfile ->
+    let* platform =
+      Pkg.Pkg_common.poll_solver_env_from_current_system () |> Memo.of_reproducible_fiber
+    in
+    let pkgs = Lock_dir.Packages.pkgs_on_platform_by_name lockfile.packages ~platform in
+    (match lockfile.ocaml with
+     | None -> Memo.return None
+     | Some (_loc, pkg_name) ->
+       (match Package_name.Map.find pkgs pkg_name with
+        | None -> Memo.return None
+        | Some pkg -> Memo.return (Some (Package_version.to_string pkg.info.version))))
+;;

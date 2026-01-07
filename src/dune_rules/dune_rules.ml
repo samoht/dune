@@ -61,12 +61,14 @@ module Stanzas = Stanzas
 module Lock_dir = Lock_dir
 module Pkg_dev_tool = Pkg_dev_tool
 module Pkg_build_progress = Pkg_build_progress
+module Dev_tool_cache = Dev_tool_cache
 module Compile_time = Compile_time
 module Cram_rules = Cram_rules
 module Cram_stanza = Cram_stanza
 module Instrumentation = Instrumentation
 module Sub_system_name = Sub_system_name
 module Inline_tests_info = Inline_tests_info
+module Vendor_rules = Vendor_rules
 
 module Install_rules = struct
   let install_file = Install_rules.install_file
