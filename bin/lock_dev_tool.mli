@@ -3,6 +3,13 @@ open Import
 val is_enabled : bool Lazy.t
 val lock_dev_tool : Dune_pkg.Dev_tool.t -> unit Memo.t
 
+(** Lock a dev tool with a specific version.
+    If version is None, uses the default version detection (e.g., from .ocamlformat). *)
+val lock_dev_tool_with_version
+  :  Dune_pkg.Dev_tool.t
+  -> Package_version.t option
+  -> unit Memo.t
+
 (** Get the version of a dev tool from its lock file.
     Returns None if the lock file doesn't exist or doesn't contain the tool. *)
 val dev_tool_version : Dune_pkg.Dev_tool.t -> string option Memo.t

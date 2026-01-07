@@ -84,3 +84,23 @@ The dev tool should use the global cache without creating lock directories.
 
   $ find . -maxdepth 1 -name "*.lock" -o -name "*lock*" -type d 2>/dev/null | grep -v _build || echo "No lock files outside _build"
   No lock files outside _build
+
+=== Test 6: Install specific version with --pkg-version ===
+
+Create another version of ocamlformat.
+
+  $ make_fake_ocamlformat "0.27.0"
+  $ make_ocamlformat_opam_pkg "0.27.0"
+
+Install a specific version using the --pkg-version flag.
+
+  $ dune tools install ocamlformat --pkg-version 0.27.0
+  Solution for _build/.dev-tools.locks/ocamlformat (1 package)
+  dune:
+  - ocamlformat.0.27.0
+
+Both versions should now be in the cache.
+
+  $ find fake-cache/dune/tools -name ocamlformat -type f | sort
+  fake-cache/dune/tools/ocamlformat.0.26.2/bin/ocamlformat
+  fake-cache/dune/tools/ocamlformat.0.27.0/bin/ocamlformat

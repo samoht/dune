@@ -270,12 +270,60 @@ let which_command dev_tool =
   Cmd.v info term
 ;;
 
+(* Build a dev tool with an optional specific version. *)
+let build_dev_tool_with_version_directly common dev_tool version =
+  let open Fiber.O in
+  let+ result =
+    Build.run_build_system ~common ~auto_fetch:true ~request:(fun _build_system ->
+      let open Action_builder.O in
+      let* () =
+        Lock_dev_tool.lock_dev_tool_with_version dev_tool version |> Action_builder.of_memo
+      in
+      Action_builder.path (dev_tool_exe_path dev_tool))
+  in
+  match result with
+  | Error `Already_reported -> raise Dune_util.Report_error.Already_reported
+  | Ok () ->
+    let workspace_root =
+      let wr = Common.root common in
+      Path.of_string wr.dir
+    in
+    populate_cache_sync ~workspace_root dev_tool
+;;
+
+let lock_and_build_dev_tool_with_version ~common ~config builder dev_tool version =
+  let open Fiber.O in
+  match Dune_util.Global_lock.lock ~timeout:None with
+  | Error lock_held_by ->
+    Scheduler.no_build_no_rpc ~config (fun () ->
+      let* () = Lock_dev_tool.lock_dev_tool_with_version dev_tool version |> Memo.run in
+      let+ () = build_dev_tool_via_rpc builder lock_held_by dev_tool in
+      let workspace_root =
+        let wr = Common.root common in
+        Path.of_string wr.dir
+      in
+      populate_cache_sync ~workspace_root dev_tool)
+  | Ok () ->
+    Scheduler.go_with_rpc_server ~common ~config (fun () ->
+      build_dev_tool_with_version_directly common dev_tool version)
+;;
+
 let install_command dev_tool =
   let exe_name = Pkg_dev_tool.exe_name dev_tool in
   let term =
-    let+ builder = Common.Builder.term in
+    let+ builder = Common.Builder.term
+    and+ version =
+      Arg.(
+        value
+        & opt (some string) None
+        & info
+            [ "pkg-version" ]
+            ~docv:"VERSION"
+            ~doc:(Some (sprintf "Install a specific version of %s" exe_name)))
+    in
     let common, config = Common.init builder in
-    lock_and_build_dev_tool ~common ~config builder dev_tool
+    let version = Option.map version ~f:Package_version.of_string in
+    lock_and_build_dev_tool_with_version ~common ~config builder dev_tool version
   in
   let info =
     let doc = sprintf "Install %s as a dev tool" exe_name in

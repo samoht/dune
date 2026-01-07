@@ -296,6 +296,10 @@ let lock_dev_tool dev_tool =
   | other -> lock_dev_tool_at_version other None
 ;;
 
+let lock_dev_tool_with_version dev_tool version =
+  lock_dev_tool_at_version dev_tool version
+;;
+
 (* Get the version of a dev tool from its lock file.
    Returns None if the lock file doesn't exist or doesn't contain the tool. *)
 let dev_tool_version dev_tool =
