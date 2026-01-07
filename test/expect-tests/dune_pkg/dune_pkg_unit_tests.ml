@@ -1,7 +1,8 @@
 open Stdune
 module Checksum = Dune_pkg.Checksum
 module Lock_dir = Dune_pkg.Lock
-module Dependency = Dune_pkg.Lock.Dependency
+module Pkg = Dune_pkg.Pkg
+module Dependency = Pkg.Dependency
 module Opam_repo = Dune_pkg.Opam_repo
 module Expanded_variable_bindings = Dune_pkg.Solver_stats.Expanded_variable_bindings
 module Package_variable_name = Dune_lang.Package_variable_name
@@ -133,13 +134,13 @@ let%expect_test "encode/decode round trip test for lockdir with no deps" =
 ;;
 
 let empty_package name ~version =
-  { Lock_dir.Pkg.build_command = Lock_dir.Conditional_choice.empty
-  ; install_command = Lock_dir.Conditional_choice.empty
-  ; depends = Lock_dir.Conditional_choice.empty
-  ; post_depends = Lock_dir.Conditional_choice.empty
+  { Pkg.build_command = Pkg.Conditional_choice.empty
+  ; install_command = Pkg.Conditional_choice.empty
+  ; depends = Pkg.Conditional_choice.empty
+  ; post_depends = Pkg.Conditional_choice.empty
   ; depexts = []
   ; info =
-      { Lock_dir.Pkg_info.name
+      { Pkg.Info.name
       ; version
       ; dev = false
       ; avoid = false
@@ -238,7 +239,7 @@ let%expect_test "encode/decode round trip test for lockdir with complex deps" =
   let module Action = Dune_lang.Action in
   let module String_with_vars = Dune_lang.String_with_vars in
   let make_conditional value =
-    Lock_dir.Conditional_choice.singleton Dune_pkg.Solver_env.empty value
+    Pkg.Conditional_choice.singleton Dune_pkg.Solver_env.empty value
   in
   let lock_dir =
     let pkg_a =
@@ -251,7 +252,7 @@ let%expect_test "encode/decode round trip test for lockdir with complex deps" =
         { pkg with
           build_command =
             make_conditional
-              (Lock_dir.Build_command.Action
+              (Pkg.Build_command.Action
                  Action.(Progn [ Echo [ String_with_vars.make_text Loc.none "hello" ] ]))
         ; install_command =
             make_conditional
@@ -284,7 +285,7 @@ let%expect_test "encode/decode round trip test for lockdir with complex deps" =
       ( name
       , let pkg = empty_package name ~version:(Package_version.of_string "dev") in
         { pkg with
-          install_command = Lock_dir.Conditional_choice.empty
+          install_command = Pkg.Conditional_choice.empty
         ; depends = make_conditional [ { Dependency.loc = Loc.none; name = fst pkg_a } ]
         ; info =
             { pkg.info with
@@ -348,12 +349,12 @@ let%expect_test "encode/decode round trip test for lockdir with complex deps" =
               map
                 { "0.1.0" :
                     { build_command =
-                        [ { condition = [ map {} ]
+                        [ { condition = []
                           ; value = Action [ "progn"; [ "echo"; "hello" ] ]
                           }
                         ]
                     ; install_command =
-                        [ { condition = [ map {} ]
+                        [ { condition = []
                           ; value = [ "system"; "echo 'world'" ]
                           }
                         ]
@@ -383,7 +384,7 @@ let%expect_test "encode/decode round trip test for lockdir with complex deps" =
                     { build_command = []
                     ; install_command = []
                     ; depends =
-                        [ { condition = [ map {} ]
+                        [ { condition = []
                           ; value =
                               [ { loc = "complex_lock_dir/b.pkg:3"; name = "a" }
                               ]
@@ -415,7 +416,7 @@ let%expect_test "encode/decode round trip test for lockdir with complex deps" =
                     { build_command = []
                     ; install_command = []
                     ; depends =
-                        [ { condition = [ map {} ]
+                        [ { condition = []
                           ; value =
                               [ { loc = "complex_lock_dir/c.pkg:3"; name = "a" }
                               ; { loc = "complex_lock_dir/c.pkg:3"; name = "b" }

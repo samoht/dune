@@ -6,7 +6,7 @@ include struct
   open Dune_pkg
   module Checksum = Checksum
   module Rev_store = Rev_store
-  module Pkg = Lock_dir.Pkg
+  module Pkg = Pkg
   module OpamUrl = OpamUrl
   module Source = Source
   module Ocamlformat = Ocamlformat
@@ -159,7 +159,7 @@ let extract_checksums_and_urls (lockdir : Dune_pkg.Lock.t) =
   Dune_pkg.Lock.Packages.to_pkg_list lockdir.packages
   |> List.fold_left
        ~init:(Checksum.Map.empty, Dune_digest.Map.empty)
-       ~f:(fun acc (package : Lock_dir.Pkg.t) ->
+       ~f:(fun acc (package : Pkg.t) ->
          let sources =
            let sources = package.info.extra_sources |> List.rev_map ~f:snd in
            match package.info.source with
@@ -189,11 +189,11 @@ let find_checksum, find_url =
           Dune_pkg.Dev_tool.all
           ~init:(Checksum.Map.empty, Digest.Map.empty)
           ~f:(fun acc dev_tool ->
-            let dir = Pkg_dev_tool.lock_dir dev_tool |> Path.build in
+            let dir = Dev_tool.lock_dir dev_tool |> Path.build in
             let exists = Path.Untracked.exists dir in
             match exists with
             | false -> Memo.return acc
-            | true -> Pkg_dev_tool.load_lock_dir dev_tool >>| add_checksums_and_urls acc)
+            | true -> Dev_tool.load_lock_dir dev_tool >>| add_checksums_and_urls acc)
       in
       Per_context.list ()
       >>= Memo.parallel_map ~f:(fun ctx_name ->

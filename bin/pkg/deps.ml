@@ -1,11 +1,12 @@
 open Import
 open Pkg_common
 module Lock_dir = Dune_pkg.Lock
+module Pkg = Dune_pkg.Pkg
 
 (* Build dependency graph from lock directory *)
 module Dep_graph = struct
   type t =
-    { packages : Lock_dir.Pkg.t Package_name.Map.t
+    { packages : Pkg.t Package_name.Map.t
     ; reverse_deps : Package_name.Set.t Package_name.Map.t
     }
 
@@ -17,10 +18,10 @@ module Dep_graph = struct
     let reverse_deps =
       Package_name.Map.fold packages ~init:Package_name.Map.empty ~f:(fun pkg acc ->
         let deps =
-          Lock_dir.Conditional_choice.choose_for_platform pkg.depends ~platform
+          Pkg.Conditional_choice.choose_for_platform pkg.depends ~platform
           |> Option.value ~default:[]
         in
-        List.fold_left deps ~init:acc ~f:(fun acc (dep : Lock_dir.Dependency.t) ->
+        List.fold_left deps ~init:acc ~f:(fun acc (dep : Pkg.Dependency.t) ->
           Package_name.Map.update acc dep.name ~f:(function
             | None -> Some (Package_name.Set.singleton pkg.info.name)
             | Some set -> Some (Package_name.Set.add set pkg.info.name))))
@@ -28,10 +29,10 @@ module Dep_graph = struct
     { packages; reverse_deps }
   ;;
 
-  let deps_of _t (pkg : Lock_dir.Pkg.t) ~platform =
-    Lock_dir.Conditional_choice.choose_for_platform pkg.depends ~platform
+  let deps_of _t (pkg : Pkg.t) ~platform =
+    Pkg.Conditional_choice.choose_for_platform pkg.depends ~platform
     |> Option.value ~default:[]
-    |> List.map ~f:(fun (d : Lock_dir.Dependency.t) -> d.name)
+    |> List.map ~f:(fun (d : Pkg.Dependency.t) -> d.name)
   ;;
 
   let dependents_of t name =
@@ -44,11 +45,11 @@ end
 let print_flat ~graph =
   let sorted_pkgs =
     Package_name.Map.values graph.Dep_graph.packages
-    |> List.sort ~compare:(fun (a : Lock_dir.Pkg.t) (b : Lock_dir.Pkg.t) ->
+    |> List.sort ~compare:(fun (a : Pkg.t) (b : Pkg.t) ->
       Package_name.compare a.info.name b.info.name)
   in
   let lines =
-    List.map sorted_pkgs ~f:(fun (pkg : Lock_dir.Pkg.t) ->
+    List.map sorted_pkgs ~f:(fun (pkg : Pkg.t) ->
       Pp.textf
         "%s.%s"
         (Package_name.to_string pkg.info.name)

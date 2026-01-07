@@ -1,5 +1,6 @@
 open Import
 module Lock_dir = Dune_pkg.Lock
+module Pkg = Dune_pkg.Pkg
 module Vendor = Dune_pkg.Vendor
 module Package_version = Dune_pkg.Package_version
 
@@ -20,7 +21,7 @@ let patch_path ~patches_dir name version =
 (* Find a package in the lock directory by name *)
 let find_package lock_dir name =
   let all_pkgs = Lock_dir.Packages.to_pkg_list lock_dir.Lock_dir.packages in
-  List.find all_pkgs ~f:(fun pkg -> Package_name.equal pkg.Lock_dir.Pkg.info.name name)
+  List.find all_pkgs ~f:(fun pkg -> Package_name.equal pkg.Pkg.info.name name)
 ;;
 
 (* Common setup for patch commands *)

@@ -25,7 +25,7 @@ let version_by_package_name ~platform local_packages (lock_dir : Lock.t) =
   in
   let from_lock_dir =
     Lock.Packages.pkgs_on_platform_by_name ~platform lock_dir.packages
-    |> Package_name.Map.map ~f:(fun (pkg : Lock.Pkg.t) -> pkg.info.version)
+    |> Package_name.Map.map ~f:(fun (pkg : Pkg.t) -> pkg.info.version)
   in
   let exception Duplicate_package of Package_name.t in
   try
@@ -126,7 +126,7 @@ let check_for_unnecessary_packges_in_lock_dir
       [ Pp.text
           "The lockdir contains packages which are not among the transitive dependencies \
            of any local package:"
-      ; Pp.enumerate packages ~f:(fun (package : Lock.Pkg.t) ->
+      ; Pp.enumerate packages ~f:(fun (package : Pkg.t) ->
           Pp.textf
             "%s.%s"
             (Package_name.to_string package.info.name)

@@ -1,6 +1,7 @@
 open Dune_config
 open Import
 module Lock_dir = Dune_pkg.Lock
+module Pkg_spec = Dune_pkg.Pkg
 module Pin = Dune_pkg.Pin
 
 let is_enabled =
@@ -54,7 +55,7 @@ let make_local_package_wrapping_dev_tool ~dev_tool ~dev_tool_version ~extra_depe
     Package_name.of_string (Package_name.to_string dev_tool_pkg_name ^ "_dev_tool_wrapper")
   in
   { Dune_pkg.Local_package.name = local_package_name
-  ; version = Dune_pkg.Lock.Pkg_info.default_version
+  ; version = Dune_pkg.Pkg.Info.default_version
   ; dependencies =
       Dune_pkg.Dependency_formula.of_dependencies (dependency :: extra_dependencies)
   ; conflicts = []
@@ -83,7 +84,7 @@ let solve ~dev_tool ~local_packages =
       Workspace.add_repo workspace Dune_pkg.Pkg_workspace.Repository.binary_packages
     | `Disabled -> workspace
   and* compiler_pins = compiler_pins in
-  let lock_dir = Dune_rules.Pkg_dev_tool.lock_dir dev_tool |> Path.build in
+  let lock_dir = Dune_rules.Dev_tool.lock_dir dev_tool |> Path.build in
   Memo.of_reproducible_fiber
   @@ Pkg.Lock.solve
        workspace
@@ -161,7 +162,7 @@ let extra_dependencies dev_tool =
 
 let lockdir_status dev_tool =
   let open Memo.O in
-  let dev_tool_lock_dir = Dune_rules.Pkg_dev_tool.lock_dir dev_tool in
+  let dev_tool_lock_dir = Dune_rules.Dev_tool.lock_dir dev_tool in
   let lock_dir_exists = dev_tool_lock_dir |> Path.build |> Path.exists in
   match lock_dir_exists with
   | false -> Memo.return `No_lockdir
@@ -201,7 +202,7 @@ let lockdir_status dev_tool =
               | None -> Memo.return `No_compiler_lockfile_in_lockdir
               | Some pkg ->
                 let+ ocaml_compiler = compiler_package () in
-                (match Lock_dir.Pkg.equal pkg ocaml_compiler with
+                (match Pkg_spec.equal pkg ocaml_compiler with
                  | true -> `Lockdir_ok_with_tool_pkg pkg
                  | false ->
                    `Dev_tool_needs_to_be_relocked_because_project_compiler_version_changed
@@ -228,7 +229,7 @@ let lock_dev_tool_at_version dev_tool version =
   let* need_to_solve =
     lockdir_status dev_tool
     >>| function
-    | `Lockdir_ok_with_tool_pkg (pkg : Dune_pkg.Lock.Pkg.t) ->
+    | `Lockdir_ok_with_tool_pkg (pkg : Pkg_spec.t) ->
       (match version with
        | None -> false
        | Some version ->
@@ -299,7 +300,7 @@ let lock_dev_tool_with_version dev_tool version =
    Returns None if the lock file doesn't exist or doesn't contain the tool. *)
 let dev_tool_version dev_tool =
   let open Memo.O in
-  let* lock_dir_opt = Dune_rules.Pkg_dev_tool.load_lock_dir_if_exists dev_tool in
+  let* lock_dir_opt = Dune_rules.Dev_tool.load_lock_dir_if_exists dev_tool in
   match lock_dir_opt with
   | None -> Memo.return None
   | Some lock_dir ->

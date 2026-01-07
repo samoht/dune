@@ -20,7 +20,7 @@ a lockdir containing an "ocaml" lockfile.
   $ dune build
 
   $ DUNE_CONFIG__LOCK_DEV_TOOL=enabled dune ocaml doc
-  Solution for _build/.dev-tools.locks/odoc (4 packages)
+  Solution for _build/lock/tools-odoc (4 packages)
   opam:
   - ocaml.5.2.0
   - ocaml-base-compiler.5.2.0

@@ -115,7 +115,14 @@ let poll_handling_rpc_build_requests ~(common : Common.t) =
        run_build_system ~common ~auto_fetch:true ~request, outcome)
 ;;
 
-let run_build_command_poll_eager ~(common : Common.t) ~config ~auto_fetch ~request : unit =
+let run_build_command_poll_eager
+      ~(common : Common.t)
+      ~config
+      ~auto_fetch
+      ~auto_lock:_
+      ~request
+  : unit
+  =
   Scheduler.go_with_rpc_server_and_console_status_reporting ~common ~config (fun () ->
     let open Fiber.O in
     let+ () =
@@ -124,12 +131,14 @@ let run_build_command_poll_eager ~(common : Common.t) ~config ~auto_fetch ~reque
     ())
 ;;
 
-let run_build_command_poll_passive ~common ~config ~auto_fetch:_ ~request:_ : unit =
+let run_build_command_poll_passive ~common ~config ~auto_fetch:_ ~auto_lock:_ ~request:_
+  : unit
+  =
   Scheduler.go_with_rpc_server_and_console_status_reporting ~common ~config (fun () ->
     poll_handling_rpc_build_requests ~common)
 ;;
 
-let run_build_command_once ~(common : Common.t) ~config ~auto_fetch ~request =
+let run_build_command_once ~(common : Common.t) ~config ~auto_fetch ~auto_lock:_ ~request =
   let open Fiber.O in
   let once () =
     let+ res = run_build_system ~common ~auto_fetch ~request in
@@ -140,7 +149,7 @@ let run_build_command_once ~(common : Common.t) ~config ~auto_fetch ~request =
   Scheduler.go_with_rpc_server ~common ~config once
 ;;
 
-let run_build_command ~(common : Common.t) ~config ~auto_fetch ~request =
+let run_build_command ~(common : Common.t) ~config ~auto_fetch ~auto_lock ~request =
   (match Common.watch common with
    | Yes Eager -> run_build_command_poll_eager
    | Yes Passive -> run_build_command_poll_passive
@@ -148,6 +157,7 @@ let run_build_command ~(common : Common.t) ~config ~auto_fetch ~request =
     ~common
     ~config
     ~auto_fetch
+    ~auto_lock
     ~request
 ;;
 
@@ -212,6 +222,21 @@ let build =
             [ "auto-fetch" ]
             ~env:(Cmd.Env.info ~doc Common.auto_fetch_env)
             ~doc:(Some doc))
+    and+ auto_lock_opt =
+      let modes = Dune_config.Auto_lock.all in
+      let doc =
+        Printf.sprintf
+          "Control automatic locking behavior (%s). $(b,disabled): use system packages. \
+           $(b,enabled): auto-lock if missing. $(b,always): always re-solve."
+          (Arg.doc_alts_enum modes)
+      in
+      Arg.(
+        value
+        & opt (some (enum modes)) None
+        & info
+            [ "auto-lock" ]
+            ~env:(Cmd.Env.info ~doc Common.auto_lock_env)
+            ~doc:(Some doc))
     in
     let targets = List.concat [ targets; aliases; aliases_rec ] in
     let targets =
@@ -257,7 +282,10 @@ let build =
     | Ok () ->
       let request setup = Target.interpret_targets (Common.root common) setup targets in
       let auto_fetch = Option.value auto_fetch_opt ~default:config.auto_fetch in
-      run_build_command ~common ~config ~auto_fetch ~request
+      let auto_lock = Option.value auto_lock_opt ~default:config.auto_lock in
+      (* Override Clflags.auto_lock if CLI option was provided *)
+      Option.iter auto_lock_opt ~f:(fun v -> Dune_rules.Clflags.auto_lock := v);
+      run_build_command ~common ~config ~auto_fetch ~auto_lock ~request
   in
   Cmd.v (Cmd.info "build" ~doc ~man ~envs:Common.envs) term
 ;;

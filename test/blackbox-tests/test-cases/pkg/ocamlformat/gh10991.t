@@ -18,7 +18,7 @@ Initial file:
   let () = print_endline "Hello, world"
 
   $ DUNE_CONFIG__LOCK_DEV_TOOL=enabled dune fmt
-  Solution for _build/.dev-tools.locks/ocamlformat (1 package)
+  Solution for _build/lock/tools-ocamlformat (1 package)
   opam:
   - ocamlformat.0.0.1
   File "foo.ml", line 1, characters 0-0:

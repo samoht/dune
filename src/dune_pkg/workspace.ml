@@ -91,9 +91,9 @@ let dev_tool_path_to_source_dir path =
       [ "external", Path.External.to_dyn path ]
   | In_build_dir b ->
     (match Path.Build.explode b with
-     (* Dev tool lock dir: _build/dev-tools-{name}/.lock/... *)
-     | ctx_name :: ".lock" :: components
-       when String.is_prefix ctx_name ~prefix:"dev-tools-" ->
+     (* Dev tool lock dir: _build/tools-{name}/.lock/... *)
+     | ctx_name :: ".lock" :: components when String.is_prefix ctx_name ~prefix:"tools-"
+       ->
        let build_as_source = Path.build_dir |> Path.to_string |> Path.Source.of_string in
        Path.Source.L.relative build_as_source (ctx_name :: ".lock" :: components)
      | components ->

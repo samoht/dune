@@ -62,7 +62,12 @@ let term =
             "No browser could be found, you will have to open the documentation yourself."
         ]
   in
-  Build.run_build_command ~common ~config ~auto_fetch:true ~request
+  Build.run_build_command
+    ~common
+    ~config
+    ~auto_fetch:true
+    ~auto_lock:config.auto_lock
+    ~request
 ;;
 
 let cmd = Cmd.v info term

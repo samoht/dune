@@ -1,10 +1,4 @@
 open Import
-module Pkg = Dune_pkg.Pkg
-module Pkg_info = Dune_pkg.Pkg.Info
-module Build_command = Dune_pkg.Pkg.Build_command
-module Depexts = Dune_pkg.Pkg.Depexts
-module Conditional_choice = Dune_pkg.Pkg.Conditional_choice
-module Dependency = Dune_pkg.Pkg.Dependency
 
 type t := Dune_pkg.Lock.t
 

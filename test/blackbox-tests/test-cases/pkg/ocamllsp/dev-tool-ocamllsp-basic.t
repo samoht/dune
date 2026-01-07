@@ -20,7 +20,7 @@ a lockdir containing an "ocaml" lockfile.
   $ dune build
 
   $ dune tools exec ocamllsp
-  Solution for _build/.dev-tools.locks/ocaml-lsp-server (4 packages)
+  Solution for _build/lock/tools-ocaml-lsp-server (4 packages)
   opam:
   - ocaml.5.2.0
   - ocaml-base-compiler.5.2.0

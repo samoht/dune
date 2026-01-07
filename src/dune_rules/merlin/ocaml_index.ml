@@ -3,13 +3,13 @@ open Memo.O
 
 let ocaml_index_dev_tool_exe_path_building_if_necessary () =
   let open Action_builder.O in
-  let path = Path.build (Pkg_dev_tool.exe_path Ocaml_index) in
+  let path = Path.build (Dev_tool.exe_path Ocaml_index) in
   let+ () = Action_builder.path path in
   Ok path
 ;;
 
 let ocaml_index_dev_tool_exists () =
-  Pkg_dev_tool.lock_dir Ocaml_index |> Path.build |> Path.Untracked.exists
+  Dev_tool.lock_dir Ocaml_index |> Path.build |> Path.Untracked.exists
 ;;
 
 let ocaml_index sctx ~dir =

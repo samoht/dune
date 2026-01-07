@@ -1468,7 +1468,10 @@ let init_with_root ~(root : Workspace_root.t) (builder : Builder.t) =
   Dune_rules.Clflags.promote_install_files := c.builder.promote_install_files;
   Dune_engine.Clflags.always_show_command_line := c.builder.always_show_command_line;
   Dune_rules.Clflags.ignore_promoted_rules := c.builder.ignore_promoted_rules;
-  Dune_rules.Clflags.ignore_lock_dir := c.builder.ignore_lock_dir;
+  Dune_rules.Clflags.auto_lock
+  := if c.builder.ignore_lock_dir
+     then Dune_config.Auto_lock.Disabled
+     else config.auto_lock;
   Source.Clflags.on_missing_dune_project_file
   := if c.builder.require_dune_project_file then Error else Warn;
   (Dune_engine.Clflags.can_go_in_shared_cache_default
@@ -1545,6 +1548,7 @@ let help_secs =
 ;;
 
 let auto_fetch_env = "DUNE_CONFIG__AUTO_FETCH"
+let auto_lock_env = "DUNE_CONFIG__AUTO_LOCK"
 
 let envs =
   Cmd.Env.
@@ -1565,6 +1569,11 @@ let envs =
           "If set to $(b,disabled), automatic fetching of missing dune packages to \
            duniverse is disabled. If set to $(b,enabled), it is enabled (default)."
         auto_fetch_env
+    ; info
+        ~doc:
+          "Controls automatic locking behavior. $(b,disabled): use system packages \
+           (default). $(b,enabled): auto-lock if missing. $(b,always): always re-solve."
+        auto_lock_env
     ]
 ;;
 

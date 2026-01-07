@@ -148,7 +148,7 @@ let requires ~loc ~db ~libs =
 
 let utop_dev_tool_lock_dir_exists =
   Memo.Lazy.create (fun () ->
-    let path = Pkg_dev_tool.lock_dir Utop in
+    let path = Dev_tool.lock_dir Utop in
     Memo.return (path |> Path.build |> Path.Untracked.exists))
 ;;
 

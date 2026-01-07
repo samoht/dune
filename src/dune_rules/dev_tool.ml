@@ -1,7 +1,7 @@
 open Import
 include Dune_pkg.Dev_tool
 
-let context_name_prefix = "dev-tools"
+let context_name_prefix = "tools"
 
 (* Each dev tool gets its own isolated context for building. *)
 let context_name t =
@@ -40,8 +40,9 @@ let load_lock_dir_if_exists t =
   Lock_dir.load_if_exists path
 ;;
 
+(* Tool binaries are promoted to the default context's install dir.
+   This is the final location where the tool is available in PATH. *)
 let exe_path t =
-  let ctx = context_name t in
-  let install_dir = Install.Context.dir ~context:ctx in
+  let install_dir = Install.Context.dir ~context:Context_name.default in
   Path.Build.L.relative install_dir (exe_path_components_within_package t)
 ;;

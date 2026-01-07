@@ -85,6 +85,18 @@ module Dune_config : sig
     end
   end
 
+  module Auto_lock : sig
+    type t =
+      | Disabled
+      | Enabled
+      | Always
+
+    val all : (string * t) list
+    val equal : t -> t -> bool
+    val to_string : t -> string
+    val to_dyn : t -> Dyn.t
+  end
+
   module type S = sig
     type 'a field
 
@@ -100,7 +112,7 @@ module Dune_config : sig
       ; action_stderr_on_success : Action_output_on_success.t field
       ; project_defaults : Project_defaults.t field
       ; pkg_enabled : Pkg_enabled.t field
-      ; auto_lock : bool field
+      ; auto_lock : Auto_lock.t field
       ; auto_fetch : bool field
       ; experimental : (string * (Loc.t * string)) list field
       }

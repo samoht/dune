@@ -19,7 +19,10 @@ val debug_artifact_substitution : bool ref
 (** Print package output when building with package management *)
 val debug_package_logs : bool ref
 
-(** Whether we are ignoring "dune.lock/". *)
-val ignore_lock_dir : bool ref
+(** Controls automatic locking behavior:
+    - Disabled: use system packages (ignore lock dir)
+    - Enabled: auto-lock if missing
+    - Always: always re-solve *)
+val auto_lock : Dune_config_file.Dune_config.Auto_lock.t ref
 
 val concurrency : int ref

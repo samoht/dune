@@ -132,7 +132,7 @@ let find_local_packages =
   >>| Package.Name.Map.map ~f:Dune_pkg.Local_package.of_package
 ;;
 
-let pp_package { Lock_dir.Pkg.info = { Lock_dir.Pkg_info.name; version; avoid; _ }; _ } =
+let pp_package { Dune_pkg.Pkg.info = { Dune_pkg.Pkg.Info.name; version; avoid; _ }; _ } =
   let warn =
     if avoid
     then Pp.tag User_message.Style.Warning (Pp.text " (this version should be avoided)")

@@ -57,11 +57,16 @@ let runtest_term =
   let auto_fetch = Option.value auto_fetch_opt ~default:config.auto_fetch in
   match Dune_util.Global_lock.lock ~timeout:None with
   | Ok () ->
-    Build.run_build_command ~common ~config ~auto_fetch ~request:(fun setup ->
-      Runtest_common.make_request
-        ~scontexts:setup.scontexts
-        ~to_cwd:(Common.root common).to_cwd
-        ~test_paths)
+    Build.run_build_command
+      ~common
+      ~config
+      ~auto_fetch
+      ~auto_lock:config.auto_lock
+      ~request:(fun setup ->
+        Runtest_common.make_request
+          ~scontexts:setup.scontexts
+          ~to_cwd:(Common.root common).to_cwd
+          ~test_paths)
   | Error lock_held_by ->
     Scheduler.no_build_no_rpc ~config (fun () ->
       let open Fiber.O in

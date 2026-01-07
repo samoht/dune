@@ -245,6 +245,35 @@ module Dune_config = struct
     let decode = enum all
   end
 
+  module Auto_lock = struct
+    type t =
+      | Disabled
+      | Enabled
+      | Always
+
+    let all = [ "disabled", Disabled; "enabled", Enabled; "always", Always ]
+
+    let equal a b =
+      match a, b with
+      | Disabled, Disabled | Enabled, Enabled | Always, Always -> true
+      | _, _ -> false
+    ;;
+
+    let to_string = function
+      | Disabled -> "disabled"
+      | Enabled -> "enabled"
+      | Always -> "always"
+    ;;
+
+    let to_dyn = function
+      | Disabled -> Dyn.variant "Disabled" []
+      | Enabled -> Dyn.variant "Enabled" []
+      | Always -> Dyn.variant "Always" []
+    ;;
+
+    let decode = enum all
+  end
+
   module type S = sig
     type 'a field
 
@@ -260,7 +289,7 @@ module Dune_config = struct
       ; action_stderr_on_success : Action_output_on_success.t field
       ; project_defaults : Project_defaults.t field
       ; pkg_enabled : Pkg_enabled.t field
-      ; auto_lock : bool field
+      ; auto_lock : Auto_lock.t field
       ; auto_fetch : bool field
       ; experimental : (string * (Loc.t * string)) list field
       }
@@ -312,7 +341,7 @@ module Dune_config = struct
            action_stderr_on_success
       && field Project_defaults.equal t.project_defaults project_defaults
       && field Pkg_enabled.equal t.pkg_enabled pkg_enabled
-      && field Bool.equal t.auto_lock auto_lock
+      && field Auto_lock.equal t.auto_lock auto_lock
       && field Bool.equal t.auto_fetch auto_fetch
       && field
            (List.equal
@@ -397,7 +426,7 @@ module Dune_config = struct
           , field Action_output_on_success.to_dyn action_stderr_on_success )
         ; "project_defaults", field Project_defaults.to_dyn project_defaults
         ; "pkg_enabled", field Pkg_enabled.to_dyn pkg_enabled
-        ; "auto_lock", field Dyn.bool auto_lock
+        ; "auto_lock", field Auto_lock.to_dyn auto_lock
         ; "auto_fetch", field Dyn.bool auto_fetch
         ; ( "experimental"
           , field Dyn.(list (pair string (fun (_, v) -> string v))) experimental )
@@ -512,7 +541,7 @@ module Dune_config = struct
         ; license = Some [ "LICENSE" ]
         }
     ; pkg_enabled = Unset
-    ; auto_lock = false
+    ; auto_lock = Auto_lock.Disabled
     ; auto_fetch = true
     ; experimental = []
     }
@@ -581,8 +610,7 @@ module Dune_config = struct
       field_o "action_stderr_on_success" (3, 0) Action_output_on_success.decode
     and+ project_defaults = field_o "project_defaults" (3, 17) Project_defaults.decode
     and+ pkg_enabled = field_o "pkg" (3, 20) Pkg_enabled.decode
-    and+ auto_lock =
-      field_o "auto_lock" (3, 20) (enum [ "enabled", true; "disabled", false ])
+    and+ auto_lock = field_o "auto_lock" (3, 20) Auto_lock.decode
     and+ auto_fetch =
       field_o "auto_fetch" (3, 20) (enum [ "enabled", true; "disabled", false ])
     and+ experimental =

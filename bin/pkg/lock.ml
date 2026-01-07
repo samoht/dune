@@ -4,6 +4,7 @@ open Pkg_common
 module Package_version = Dune_pkg.Package_version
 module Opam_repo = Dune_pkg.Opam_repo
 module Lock_dir = Dune_pkg.Lock
+module Pkg = Dune_pkg.Pkg
 module Pin_stanza = Dune_lang.Pin_stanza
 module Pin = Dune_pkg.Pin
 module Solver_env = Dune_pkg.Solver_env
@@ -245,7 +246,7 @@ let summary_message
   if portable_lock_dir
   then (
     let pkgs_by_platform = Lock_dir.Packages.pkgs_by_platform lock_dir.packages in
-    let opam_package_of_pkg (pkg : Lock_dir.Pkg.t) =
+    let opam_package_of_pkg (pkg : Pkg.t) =
       OpamPackage.create
         (Dune_pkg.Package_name.to_opam_package_name pkg.info.name)
         (Dune_pkg.Package_version.to_opam_package_version pkg.info.version)

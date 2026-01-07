@@ -22,7 +22,7 @@ val opam_package_to_lock_file_pkg
   -> Resolved_package.t
   -> portable_lock_dir:bool
   -> allow_missing_deps:bool
-  -> (Lock.Pkg.t, User_message.t) result
+  -> (Pkg.t, User_message.t) result
 
 (** [file_to_lock ~loc ~solver_env file] loads the repos at their pinned hashes,
     looks up each package from the single-file lock format, and converts them
@@ -60,7 +60,7 @@ val read_disk_fiber_with_opam_files
   -> Path.t
   -> (Lock.t * (Package_name.t * string) list) Fiber.t
 
-(** [pkg_of_local_opam_file ~loc ~name ~version ~opam_file] creates a Lock.Pkg.t
+(** [pkg_of_local_opam_file ~loc ~name ~version ~opam_file] creates a Pkg.t
     from a local opam file. Used for vendored opam packages that don't go through
     the solver. Build and install commands are extracted directly from the opam file. *)
 val pkg_of_local_opam_file
@@ -68,4 +68,4 @@ val pkg_of_local_opam_file
   -> name:Package_name.t
   -> version:Package_version.t
   -> opam_file:OpamFile.OPAM.t
-  -> (Lock.Pkg.t, User_message.t) result
+  -> (Pkg.t, User_message.t) result

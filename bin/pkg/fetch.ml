@@ -1,6 +1,7 @@
 open Import
 module Lock_dir = Dune_pkg.Lock
 module Lock_pkg = Dune_pkg.Lock_pkg
+module Pkg = Dune_pkg.Pkg
 module Source = Dune_pkg.Source
 module Vendor = Dune_pkg.Vendor
 module Vendor_rules = Dune_rules.Vendor_rules
@@ -280,7 +281,7 @@ let fetch_source_group ~rev_store ~platform ~patches_dir ~pkgs_by_name group =
         match Package_name.Map.find pkgs_by_name name with
         | None -> Fiber.return ()
         | Some pkg ->
-          let { Lock_dir.Pkg_info.extra_sources; _ } = pkg.Lock_dir.Pkg.info in
+          let { Pkg.Info.extra_sources; _ } = pkg.Pkg.info in
           Fiber.sequential_iter extra_sources ~f:(fun extra ->
             let local_path, _ = extra in
             verbose (sprintf "  extra-source: %s" (Path.Local.to_string local_path));
@@ -340,7 +341,7 @@ let fetch_duniverse ~lock_dir_path ~solver_env () =
   in
   let all_pkgs = Lock_dir.Packages.to_pkg_list lock_dir.packages in
   let fetchable_pkgs =
-    List.filter all_pkgs ~f:(fun (pkg : Lock_dir.Pkg.t) -> Option.is_some pkg.info.source)
+    List.filter all_pkgs ~f:(fun (pkg : Pkg.t) -> Option.is_some pkg.info.source)
   in
   let no_source_count = List.length all_pkgs - List.length fetchable_pkgs in
   if List.is_empty fetchable_pkgs
@@ -363,13 +364,13 @@ let fetch_duniverse ~lock_dir_path ~solver_env () =
     (* Build map for classifying packages *)
     let pkg_classifications =
       List.fold_left fetchable_pkgs ~init:Package_name.Map.empty ~f:(fun acc pkg ->
-        let name = pkg.Lock_dir.Pkg.info.name in
+        let name = pkg.Pkg.info.name in
         Package_name.Map.set acc name (Vendor.classify_build_method pkg))
     in
     (* Build map for looking up packages by name *)
     let pkgs_by_name =
       List.fold_left fetchable_pkgs ~init:Package_name.Map.empty ~f:(fun acc pkg ->
-        Package_name.Map.add_exn acc pkg.Lock_dir.Pkg.info.name pkg)
+        Package_name.Map.add_exn acc pkg.Pkg.info.name pkg)
     in
     Dune_engine.Progress.reset ();
     Dune_engine.Progress.set_total (List.length source_groups);
@@ -480,7 +481,7 @@ let auto_fetch_missing ~lock_dir_path ~solver_env () =
   let all_pkgs = Lock_dir.Packages.to_pkg_list lock_dir.packages in
   (* Filter to packages with sources (both dune and opam packages) *)
   let fetchable_pkgs =
-    List.filter all_pkgs ~f:(fun (pkg : Lock_dir.Pkg.t) -> Option.is_some pkg.info.source)
+    List.filter all_pkgs ~f:(fun (pkg : Pkg.t) -> Option.is_some pkg.info.source)
   in
   (* Group by source and filter to groups whose directory is missing *)
   let source_groups = Vendor.group_by_source fetchable_pkgs in
@@ -500,7 +501,7 @@ let auto_fetch_missing ~lock_dir_path ~solver_env () =
     (* Build map for classifying packages *)
     let pkg_classifications =
       List.fold_left fetchable_pkgs ~init:Package_name.Map.empty ~f:(fun acc pkg ->
-        let name = pkg.Lock_dir.Pkg.info.name in
+        let name = pkg.Pkg.info.name in
         Package_name.Map.set acc name (Vendor.classify_build_method pkg))
     in
     (* Group all fetchable packages by source for vendor stanza generation *)
@@ -508,7 +509,7 @@ let auto_fetch_missing ~lock_dir_path ~solver_env () =
     (* Build map for looking up packages by name *)
     let pkgs_by_name =
       List.fold_left fetchable_pkgs ~init:Package_name.Map.empty ~f:(fun acc pkg ->
-        Package_name.Map.add_exn acc pkg.Lock_dir.Pkg.info.name pkg)
+        Package_name.Map.add_exn acc pkg.Pkg.info.name pkg)
     in
     Dune_engine.Progress.reset ();
     Dune_engine.Progress.set_total (List.length missing_groups);

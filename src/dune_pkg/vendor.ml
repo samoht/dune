@@ -66,7 +66,7 @@ type source_group =
 let group_by_source pkgs =
   let groups =
     List.fold_left pkgs ~init:Source_key_map.empty ~f:(fun acc pkg ->
-      let { Lock.Pkg_info.name; version; source; _ } = pkg.Lock.Pkg.info in
+      let { Pkg.Info.name; version; source; _ } = pkg.Pkg.info in
       match source with
       | None -> acc
       | Some source ->
@@ -136,11 +136,11 @@ let rec action_uses_dune (action : Action.t) =
   | Format_dune_file _ -> false
 ;;
 
-let classify_build_method (pkg : Lock.Pkg.t) =
+let classify_build_method (pkg : Pkg.t) =
   let uses_dune =
-    Lock.Conditional_choice.exists pkg.build_command ~f:(function
-      | Lock.Build_command.Dune -> true
-      | Lock.Build_command.Action action -> action_uses_dune action)
+    Pkg.Conditional_choice.exists pkg.build_command ~f:(function
+      | Pkg.Build_command.Dune -> true
+      | Pkg.Build_command.Action action -> action_uses_dune action)
   in
   if uses_dune then Dune_native else Opam_sandboxed
 ;;
@@ -179,9 +179,9 @@ let rec extract_patches_from_action (action : Action.t) =
   | Format_dune_file _ -> []
 ;;
 
-let get_patches (pkg : Lock.Pkg.t) ~platform =
-  match Lock.Conditional_choice.choose_for_platform pkg.build_command ~platform with
+let get_patches (pkg : Pkg.t) ~platform =
+  match Pkg.Conditional_choice.choose_for_platform pkg.build_command ~platform with
   | None -> []
-  | Some Lock.Build_command.Dune -> []
-  | Some (Lock.Build_command.Action action) -> extract_patches_from_action action
+  | Some Pkg.Build_command.Dune -> []
+  | Some (Pkg.Build_command.Action action) -> extract_patches_from_action action
 ;;

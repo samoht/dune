@@ -256,7 +256,7 @@ let odoc_base_flags quiet build_dir =
 
 let odoc_dev_tool_exe_path_building_if_necessary () =
   let open Action_builder.O in
-  let path = Path.build (Pkg_dev_tool.exe_path Odoc) in
+  let path = Path.build (Dev_tool.exe_path Odoc) in
   let+ () = Action_builder.path path in
   Ok path
 ;;

@@ -12,7 +12,10 @@ module Solver_env_disjunction = struct
     let solver_env_with_only_platform_specific_vars =
       Solver_env.remove_all_except_platform_specific solver_env
     in
-    [ solver_env_with_only_platform_specific_vars ]
+    (* Normalize: empty solver env means "all platforms", same as empty list *)
+    if Solver_env.is_empty solver_env_with_only_platform_specific_vars
+    then []
+    else [ solver_env_with_only_platform_specific_vars ]
   ;;
 
   let to_dyn = Dyn.list Solver_env.to_dyn
@@ -221,6 +224,15 @@ module Info = struct
       ; Package_variable_name.dev, B t.dev
       ]
   ;;
+
+  let remove_locs t =
+    { t with
+      source = Option.map ~f:Source.remove_locs t.source
+    ; extra_sources =
+        List.map t.extra_sources ~f:(fun (local, source) ->
+          local, Source.remove_locs source)
+    }
+  ;;
 end
 
 module Build_command = struct
@@ -235,24 +247,84 @@ module Build_command = struct
     | _, _ -> false
   ;;
 
+  let remove_locs = function
+    | Dune -> Dune
+    | Action a -> Action (Action.remove_locs a)
+  ;;
+
   let to_dyn = function
     | Dune -> Dyn.variant "Dune" []
     | Action a -> Dyn.variant "Action" [ Action.to_dyn a ]
   ;;
+
+  module Fields = struct
+    let dune = "dune"
+    let action = "action"
+    let build = "build"
+  end
+
+  let encode_non_portable t =
+    let open Encoder in
+    match t with
+    | None -> field_o Fields.build Encoder.unit None
+    | Some Dune -> field_b Fields.dune true
+    | Some (Action a) -> field Fields.build Action.encode a
+  ;;
+
+  let encode_portable t =
+    let open Encoder in
+    Dune_lang.List
+      (record_fields
+         [ (match t with
+            | Dune -> field_b Fields.dune true
+            | Action a -> field Fields.action Action.encode a)
+         ])
+  ;;
+
+  let decode_portable =
+    let open Decoder in
+    enter
+    @@ fields
+    @@ fields_mutually_exclusive
+         [ ( Fields.action
+           , let+ pkg = Action.decode_pkg in
+             Action pkg )
+         ; ( Fields.dune
+           , let+ () = return () in
+             Dune )
+         ]
+  ;;
 end
 
 module Dependency = struct
-  type t = Package_name.t
+  type t =
+    { loc : Loc.t
+    ; name : Package_name.t
+    }
 
-  let equal = Package_name.equal
-  let to_dyn = Package_name.to_dyn
+  let equal { loc; name } t = Loc.equal loc t.loc && Package_name.equal name t.name
+  let remove_locs { name; loc = _ } = { name; loc = Loc.none }
+
+  let to_dyn { loc; name } =
+    Dyn.record [ "loc", Loc.to_dyn_hum loc; "name", Package_name.to_dyn name ]
+  ;;
+
+  let decode =
+    let open Decoder in
+    let+ loc, name = located Package_name.decode in
+    { loc; name }
+  ;;
+
+  let encode { name; loc = _ } = Package_name.encode name
 end
 
 module Dependencies = struct
   type t = Dependency.t list
 
   let equal = List.equal Dependency.equal
+  let remove_locs = List.map ~f:Dependency.remove_locs
   let to_dyn = Dyn.list Dependency.to_dyn
+  let encode t = Dune_lang.List (List.map t ~f:Dependency.encode)
 end
 
 module Depexts = struct
@@ -274,6 +346,11 @@ module Depexts = struct
       | `Conditional a, `Conditional b -> Slang.Blang.equal a b
       | _, _ -> false
     ;;
+
+    let remove_locs = function
+      | `Always -> `Always
+      | `Conditional condition -> `Conditional (Slang.Blang.remove_locs condition)
+    ;;
   end
 
   type t =
@@ -292,7 +369,144 @@ module Depexts = struct
     List.equal String.equal external_package_names t.external_package_names
     && Enabled_if.equal enabled_if t.enabled_if
   ;;
+
+  let remove_locs t = { t with enabled_if = Enabled_if.remove_locs t.enabled_if }
+
+  let encode { external_package_names; enabled_if } =
+    let open Encoder in
+    let external_package_names = list string external_package_names in
+    match enabled_if with
+    | `Always -> external_package_names
+    | `Conditional condition ->
+      Dune_lang.List [ external_package_names; Slang.Blang.encode condition ]
+  ;;
+
+  let decode =
+    let open Decoder in
+    enter
+      ((let+ external_package_names = enter @@ repeat string
+        and+ condition = Slang.Blang.decode in
+        { external_package_names; enabled_if = `Conditional condition })
+       <|>
+       let+ external_package_names = repeat string in
+       { external_package_names; enabled_if = `Always })
+  ;;
 end
+
+module Conditional_choice_or_all_platforms = struct
+  (* Either a choice of value or a single value to use in all cases. The
+     [All_platforms _] case will be used to reduce the verbosity of lockfiles
+     where a value is the same for all solver environments under which the
+     lockdir is valid. This type is a convenience for encoding and decoding
+     lockfiles but doesn't appear in the representation of a package. *)
+  type 'a t =
+    | Choice of 'a Conditional_choice.t
+    | All_platforms of 'a
+
+  let of_conditional_choice ~solved_for_platforms = function
+    | [] -> None
+    | [ { Conditional.condition; value } ] as choice ->
+      if Solver_env_disjunction.equal condition solved_for_platforms
+      then Some (All_platforms value)
+      else Some (Choice choice)
+    | choice -> Some (Choice choice)
+  ;;
+
+  let to_conditional_choice ~solved_for_platforms = function
+    | Choice choice -> choice
+    | All_platforms value -> [ { Conditional.value; condition = solved_for_platforms } ]
+  ;;
+
+  let decode decode_value =
+    let open Decoder in
+    sum
+      [ ( "choice"
+        , let+ choice = repeat (Conditional.decode decode_value) in
+          Choice choice )
+      ; ( "all_platforms"
+        , let+ value = decode_value in
+          All_platforms value )
+      ]
+  ;;
+
+  let encode encode_value t =
+    let open Encoder in
+    match t with
+    | Choice choice ->
+      Dune_lang.List
+        (string "choice" :: List.map ~f:(Conditional.encode encode_value) choice)
+    | All_platforms value -> Dune_lang.List [ string "all_platforms"; encode_value value ]
+  ;;
+
+  let encode_field ~solved_for_platforms name encode_value conditional_choice =
+    let open Encoder in
+    field_o
+      name
+      (encode encode_value)
+      (of_conditional_choice ~solved_for_platforms conditional_choice)
+  ;;
+end
+
+module Enabled_on_platforms = struct
+  (* A package's availability on various platforms. Either it's available on
+     all platforms the lockdir was solved for or it's only available on a
+     subset of these platforms. *)
+  type t =
+    | All
+    | Only of Solver_env_disjunction.t
+
+  let of_solver_env_disjunction ~solved_for_platforms solver_env_disjunction =
+    if Solver_env_disjunction.equal solver_env_disjunction solved_for_platforms
+    then All
+    else Only solver_env_disjunction
+  ;;
+
+  let to_solver_env_disjunction ~solved_for_platforms = function
+    | All -> solved_for_platforms
+    | Only solver_envs -> solver_envs
+  ;;
+
+  let encode t =
+    let open Encoder in
+    match t with
+    | All -> string "all"
+    | Only solver_envs ->
+      Dune_lang.List (string "only" :: List.map ~f:Solver_env.encode solver_envs)
+  ;;
+
+  let decode =
+    let open Decoder in
+    sum
+      [ "all", return All
+      ; ( "only"
+        , let+ solver_envs = repeat (enter Solver_env.decode) in
+          Only solver_envs )
+      ]
+  ;;
+end
+
+let decode_build_command_fields ~portable_lock_dir =
+  let open Decoder in
+  let parse_action =
+    if portable_lock_dir
+    then Conditional_choice_or_all_platforms.decode Build_command.decode_portable
+    else
+      let+ action = Action.decode_pkg in
+      Conditional_choice_or_all_platforms.Choice
+        (Conditional_choice.singleton_all_platforms (Build_command.Action action))
+  in
+  fields_mutually_exclusive
+    ~default:None
+    [ ( Build_command.Fields.build
+      , let+ action = parse_action in
+        Some action )
+    ; ( Build_command.Fields.dune
+      , let+ () = return () in
+        Some
+          (Conditional_choice_or_all_platforms.Choice
+             (Conditional_choice.singleton_all_platforms Build_command.Dune)) )
+    ]
+;;
 
 type t =
   { build_command : Build_command.t Conditional_choice.t
@@ -400,10 +614,359 @@ let to_dyn
     ]
 ;;
 
+let remove_locs
+      { build_command
+      ; install_command
+      ; depends
+      ; post_depends
+      ; depexts
+      ; info
+      ; exported_env
+      ; enabled_on_platforms
+      }
+  =
+  { info = Info.remove_locs info
+  ; exported_env =
+      List.map exported_env ~f:(Action.Env_update.map ~f:String_with_vars.remove_locs)
+  ; depends = Conditional_choice.map depends ~f:Dependencies.remove_locs
+  ; post_depends = Conditional_choice.map post_depends ~f:Dependencies.remove_locs
+  ; depexts = List.map depexts ~f:Depexts.remove_locs
+  ; build_command = Conditional_choice.map build_command ~f:Build_command.remove_locs
+  ; install_command = Conditional_choice.map install_command ~f:Action.remove_locs
+  ; enabled_on_platforms
+  }
+;;
+
 let is_enabled_on_platform t ~platform =
   (* XXX: currently treat empty lists of platforms as if the platform is
      enabled on all platforms to simplify supporting both portable and
      non-portable lockdirs with the same code. *)
   List.is_empty t.enabled_on_platforms
   || Solver_env_disjunction.matches_platform t.enabled_on_platforms ~platform
+;;
+
+let in_source_tree path =
+  match (path : Path.t) with
+  | In_source_tree s -> s
+  | In_build_dir b ->
+    (match Path.Build.explode b with
+     (* Lock dir: _build/lock/<ctx>/<lock-dir-name>/... *)
+     | "lock" :: _ctx :: lock_dir_components ->
+       Path.Source.L.relative Path.Source.root lock_dir_components
+     | build_components ->
+       Code_error.raise
+         "Unexpected location of lock directory in build directory"
+         [ "path", Path.Build.to_dyn b
+         ; "build_components", Dyn.(list string) build_components
+         ])
+  | External e -> Workspace.dev_tool_path_to_source_dir e
+;;
+
+let compute_missing_checksum t ~pinned =
+  let open Fiber.O in
+  let+ source =
+    match t.info.source with
+    | None -> Fiber.return None
+    | Some source ->
+      Source.compute_missing_checksum source t.info.name ~pinned >>| Option.some
+  in
+  { t with info = { t.info with source } }
+;;
+
+module Fields = struct
+  let version = "version"
+  let build = "build"
+  let install = "install"
+  let depends = "depends"
+  let post_depends = "post_depends"
+  let depexts = "depexts"
+  let source = "source"
+  let dev = "dev"
+  let avoid = "avoid"
+  let exported_env = "exported_env"
+  let extra_sources = "extra_sources"
+  let enabled_on_platforms = "enabled_on_platforms"
+end
+
+let decode ~portable_lock_dir =
+  let open Decoder in
+  let parse_install_command =
+    if portable_lock_dir
+    then Conditional_choice_or_all_platforms.decode Action.decode_pkg
+    else
+      let+ action = Action.decode_pkg in
+      Conditional_choice_or_all_platforms.Choice
+        (Conditional_choice.singleton_all_platforms action)
+  in
+  let parse_depends =
+    if portable_lock_dir
+    then Conditional_choice_or_all_platforms.decode (enter @@ repeat Dependency.decode)
+    else
+      let+ depends = repeat Dependency.decode in
+      Conditional_choice_or_all_platforms.Choice
+        (Conditional_choice.singleton_all_platforms depends)
+  in
+  let parse_depexts =
+    if portable_lock_dir
+    then repeat Depexts.decode
+    else
+      let+ external_package_names = repeat string in
+      [ { Depexts.external_package_names; enabled_if = `Always } ]
+  in
+  let empty_choice = Conditional_choice_or_all_platforms.Choice [] in
+  enter
+  @@ fields
+  @@ let+ version = field Fields.version Package_version.decode
+     and+ install_command =
+       field ~default:empty_choice Fields.install parse_install_command
+     and+ build_command = decode_build_command_fields ~portable_lock_dir
+     and+ depends = field ~default:empty_choice Fields.depends parse_depends
+     and+ post_depends = field ~default:empty_choice Fields.post_depends parse_depends
+     and+ depexts = field ~default:[] Fields.depexts parse_depexts
+     and+ source = field_o Fields.source Source.decode
+     and+ dev = field_b Fields.dev
+     and+ avoid = field_b Fields.avoid
+     and+ exported_env =
+       field Fields.exported_env ~default:[] (repeat Action.Env_update.decode)
+     and+ extra_sources =
+       field
+         Fields.extra_sources
+         ~default:[]
+         (repeat (pair (plain_string Path.Local.parse_string_exn) Source.decode))
+     and+ enabled_on_platforms =
+       field
+         Fields.enabled_on_platforms
+         ~default:Enabled_on_platforms.All
+         Enabled_on_platforms.decode
+     in
+     fun ~lock_dir ~solved_for_platforms name ->
+       let install_command =
+         Conditional_choice_or_all_platforms.to_conditional_choice
+           ~solved_for_platforms
+           install_command
+       in
+       let build_command =
+         match build_command with
+         | None -> []
+         | Some build_command ->
+           Conditional_choice_or_all_platforms.to_conditional_choice
+             ~solved_for_platforms
+             build_command
+       in
+       let depends =
+         Conditional_choice_or_all_platforms.to_conditional_choice
+           ~solved_for_platforms
+           depends
+       in
+       let post_depends =
+         Conditional_choice_or_all_platforms.to_conditional_choice
+           ~solved_for_platforms
+           post_depends
+       in
+       let info =
+         let make_source f =
+           lock_dir |> Path.to_absolute_filename |> Path.External.of_string |> f
+         in
+         let source = Option.map source ~f:make_source in
+         let extra_sources =
+           List.map extra_sources ~f:(fun (path, source) -> path, make_source source)
+         in
+         { Info.name; version; dev; avoid; source; extra_sources }
+       in
+       let enabled_on_platforms =
+         Enabled_on_platforms.to_solver_env_disjunction
+           ~solved_for_platforms
+           enabled_on_platforms
+       in
+       { build_command
+       ; depends
+       ; post_depends
+       ; depexts
+       ; install_command
+       ; info
+       ; exported_env
+       ; enabled_on_platforms
+       }
+;;
+
+let encode_extra_source (local, source) : Dune_sexp.t =
+  List
+    [ Dune_sexp.atom_or_quoted_string (Path.Local.to_string local); Source.encode source ]
+;;
+
+let encode
+      ~portable_lock_dir
+      ~solved_for_platforms
+      { build_command
+      ; install_command
+      ; depends
+      ; post_depends
+      ; depexts
+      ; info = { Info.name = _; extra_sources; version; dev; avoid; source }
+      ; exported_env
+      ; enabled_on_platforms
+      }
+  =
+  let open Encoder in
+  let encode_deps_field name deps =
+    let deps =
+      match deps with
+      | [ { Conditional.value = []; _ } ] ->
+        (* Omit the dependencies field to reduce noise in the case
+           where there is explicitly an empty list of dependencies. *)
+        []
+      | other -> other
+    in
+    Conditional_choice_or_all_platforms.encode_field
+      ~solved_for_platforms
+      name
+      Dependencies.encode
+      deps
+  in
+  let install_command, build_command, depends, post_depends, depexts, enabled_on_platforms
+    =
+    if portable_lock_dir
+    then (
+      let encode_field n v c =
+        Conditional_choice_or_all_platforms.encode_field ~solved_for_platforms n v c
+      in
+      ( encode_field Fields.install Action.encode install_command
+      , encode_field Fields.build Build_command.encode_portable build_command
+      , encode_deps_field Fields.depends depends
+      , encode_deps_field Fields.post_depends post_depends
+      , field_l Fields.depexts Depexts.encode depexts
+      , match
+          Enabled_on_platforms.of_solver_env_disjunction
+            ~solved_for_platforms
+            enabled_on_platforms
+        with
+        | All ->
+          (* Omit the field if it's enabled everywhere to reduce noise. The
+             parser will assume [All] by default. *)
+          []
+        | other -> [ field Fields.enabled_on_platforms Enabled_on_platforms.encode other ]
+      ))
+    else
+      ( field_o
+          Fields.install
+          Action.encode
+          (Conditional_choice.get_value_ensuring_at_most_one_choice install_command)
+      , Build_command.encode_non_portable
+          (Conditional_choice.get_value_ensuring_at_most_one_choice build_command)
+      , field_l
+          Fields.depends
+          Package_name.encode
+          (Conditional_choice.get_value_ensuring_at_most_one_choice depends
+           |> Option.value ~default:[]
+           |> List.map ~f:(fun { Dependency.name; _ } -> name))
+      , field_l
+          Fields.post_depends
+          Package_name.encode
+          (Conditional_choice.get_value_ensuring_at_most_one_choice post_depends
+           |> Option.value ~default:[]
+           |> List.map ~f:(fun { Dependency.name; _ } -> name))
+      , field_l
+          Fields.depexts
+          string
+          (match depexts with
+           | [] -> []
+           | [ { Depexts.external_package_names; _ } ] -> external_package_names
+           | _ ->
+             Code_error.raise
+               "When using non-portable lockdirs it's expected that at most a single set \
+                of depexts will be stored in each lockfile."
+               [ "depexts", Dyn.list Depexts.to_dyn depexts ])
+      , [] )
+  in
+  record_fields
+    ([ field Fields.version Package_version.encode version
+     ; install_command
+     ; build_command
+     ; depends
+     ; post_depends
+     ; depexts
+     ; field_o Fields.source Source.encode source
+     ; field_b Fields.dev dev
+     ; field_b Fields.avoid avoid
+     ; field_l Fields.exported_env Action.Env_update.encode exported_env
+     ; field_l Fields.extra_sources encode_extra_source extra_sources
+     ]
+     @ enabled_on_platforms)
+;;
+
+(* More general version of [files_dir] which works on generic paths *)
+let files_dir package_name maybe_package_version ~lock_dir =
+  (* TODO(steve): Once portable lockdirs are enabled by default, make the
+     package version non-optional *)
+  let extension = ".files" in
+  match maybe_package_version with
+  | None -> Path.relative lock_dir (Package_name.to_string package_name ^ extension)
+  | Some package_version ->
+    Path.relative
+      lock_dir
+      (Package_name.to_string package_name
+       ^ "."
+       ^ Package_version.to_string package_version
+       ^ extension)
+;;
+
+let source_files_dir package_name maybe_package_version ~lock_dir =
+  let source = in_source_tree lock_dir in
+  let package_name = Package_name.to_string package_name in
+  match maybe_package_version with
+  | Some package_version ->
+    Path.Source.relative
+      source
+      (sprintf "%s.%s.files" package_name (Package_version.to_string package_version))
+  | None -> Path.Source.relative source (sprintf "%s.files" package_name)
+;;
+
+(* Combine the platform-specific parts of a pair of [t]s, raising a code
+   error if the packages differ in any way apart from their platform-specific
+   fields. *)
+let merge_conditionals a b =
+  let build_command =
+    Conditional_choice.merge_combining_conditions
+      ~value_equal:Build_command.equal
+      a.build_command
+      b.build_command
+  in
+  let install_command =
+    Conditional_choice.merge_combining_conditions
+      ~value_equal:Action.equal
+      a.install_command
+      b.install_command
+  in
+  let depends =
+    Conditional_choice.merge_combining_conditions
+      ~value_equal:Dependencies.equal
+      a.depends
+      b.depends
+  in
+  let post_depends =
+    Conditional_choice.merge_combining_conditions
+      ~value_equal:Dependencies.equal
+      a.post_depends
+      b.post_depends
+  in
+  let enabled_on_platforms = a.enabled_on_platforms @ b.enabled_on_platforms in
+  let ret =
+    { a with build_command; install_command; depends; post_depends; enabled_on_platforms }
+  in
+  if
+    not
+      (equal
+         ret
+         { b with
+           build_command
+         ; install_command
+         ; depends
+         ; post_depends
+         ; enabled_on_platforms
+         })
+  then
+    Code_error.raise
+      "Packages differ in a non-platform-specific field"
+      [ "package_1", to_dyn a; "package_2", to_dyn b ];
+  ret
 ;;

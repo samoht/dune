@@ -12,5 +12,6 @@ val run_build_command
   :  common:Common.t
   -> config:Dune_config.t
   -> auto_fetch:bool
+  -> auto_lock:Dune_config.Auto_lock.t
   -> request:(Dune_rules.Main.build_system -> unit Action_builder.t)
   -> unit

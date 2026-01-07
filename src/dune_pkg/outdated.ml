@@ -84,7 +84,7 @@ let explain_results_to_user results ~transitive ~lock_dir_path =
 let better_candidate
       ~repos
       ~(local_packages : Local_package.t Package_name.Map.t)
-      (pkg : Lock.Pkg.t)
+      (pkg : Pkg.t)
   =
   let open Fiber.O in
   let pkg_name = pkg.info.name |> Package_name.to_string |> OpamPackage.Name.of_string in

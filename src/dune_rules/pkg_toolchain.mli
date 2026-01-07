@@ -24,7 +24,7 @@ val is_compiler_and_toolchains_enabled : Package.Name.t -> bool
     toolchain directory. This will be something like
     [base_dir/ocaml-base-compiler.5.2.1.XXXXXXXX] where
     XXXXXXXX is a hash of the package's lockfile. *)
-val installation_prefix : Lock_dir.Pkg.t -> Path.Outside_build_dir.t
+val installation_prefix : Dune_pkg.Pkg.t -> Path.Outside_build_dir.t
 
 val install_roots
   :  prefix:Path.Outside_build_dir.t
@@ -32,16 +32,16 @@ val install_roots
 
 (** Check if a toolchain is already installed in the cache. Returns true
     if the install cookie exists, indicating a successful prior installation. *)
-val is_installed : Lock_dir.Pkg.t -> bool
+val is_installed : Dune_pkg.Pkg.t -> bool
 
 (** Get the cache directory path for a toolchain package *)
-val cache_dir : Lock_dir.Pkg.t -> Path.t
+val cache_dir : Dune_pkg.Pkg.t -> Path.t
 
 (** Create an action that populates the shared install directory from the global
     cache. Copies cached contents to install_dir, and creates target_dir for
     dependency tracking. *)
 val populate_from_cache_action
-  :  Lock_dir.Pkg.t
+  :  Dune_pkg.Pkg.t
   -> install_dir:Path.Build.t
   -> target_dir:Path.Build.t
   -> Dune_lang.Action.t

@@ -16,11 +16,126 @@ Package resolution is a deterministic process with three levels of reproducibili
 The current `dune.lock/` directory sits between 2 and 3 - it stores full package
 specs that duplicate info from the opam repo. We should move to pure approach 2.
 
+## Auto-Lock on Build
+
+When `dune build` runs and no lock file exists (or dependencies changed), dune can
+automatically invoke the solver for the **current OS/platform only**. This produces
+a single-platform lock file optimized for the developer's machine.
+
+### Configuration
+
+Add `auto_lock` option to `~/.config/dune/config`:
+
+```lisp
+(auto_lock enabled)   ; or: disabled (default), prompt
+```
+
+**Behavior:**
+- `enabled`: Automatically lock when needed, single platform (current host)
+- `disabled`: Error if lock file missing/outdated (current behavior)
+- `prompt`: Ask user before locking
+
+### Implementation
+
+1. **Add config field** (`src/dune_config_file/dune_config_file.ml`):
+   ```ocaml
+   type auto_lock = Enabled | Disabled | Prompt
+   ```
+
+2. **Check in build flow** (`src/dune_rules/pkg_rules.ml`):
+   - Before loading lock dir, check if it exists/is fresh
+   - If missing and `auto_lock = Enabled`, invoke solver with current platform
+   - Solver uses `Sys` to detect current os/arch
+
+3. **Single-platform solver call**:
+   ```ocaml
+   let current_platform = Solver_env.of_current_system () in
+   Solver.solve ~platforms:[current_platform] ...
+   ```
+
+**Files:**
+- `src/dune_config_file/dune_config_file.ml` - add `auto_lock` field
+- `src/dune_rules/pkg_rules.ml` - check lock freshness, trigger auto-lock
+- `src/dune_pkg/solver.ml` - `of_current_system` helper
+- `src/dune_pkg/solver_env.ml` - detect current os/arch
+
+## Updating Dependencies
+
+Like other package managers (`cargo update`, `bundle update`, `poetry update`), dune
+provides commands to update locked dependencies to newer versions.
+
+### Commands
+
+```bash
+dune pkg update                    # Update all packages to latest versions
+dune pkg update fmt cmdliner       # Update specific packages only
+dune pkg lock                      # Re-lock (same as update if lock exists)
+```
+
+### CI Mode: Test with Latest Dependencies
+
+For CI pipelines that want to test compatibility with the latest opam packages:
+
+```bash
+dune pkg update && dune build
+```
+
+### The `--auto-lock` Flag
+
+A single flag controls locking behavior:
+
+```bash
+dune build --auto-lock=disabled   # No pkg management, use system/opam (default)
+dune build --auto-lock=enabled    # Auto-lock if missing, use existing if present
+dune build --auto-lock=always     # Always re-solve with latest opam repo
+```
+
+| Mode | Lock file | Dependencies from | Use case |
+|------|-----------|-------------------|----------|
+| `disabled` | Ignored | System findlib/opam | Traditional workflow (default) |
+| `enabled` | Create if missing | Lock or fresh solve | Dev with pkg management |
+| `always` | Overwritten | Fresh solve | CI compat testing |
+
+### CI Workflow Example
+
+```yaml
+# .github/workflows/compat.yml
+name: Compatibility Check
+on:
+  schedule:
+    - cron: '0 0 * * *'  # nightly
+
+jobs:
+  test-latest-deps:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: dune build --auto-lock=always
+```
+
+### Global Configuration
+
+Set default in `~/.config/dune/config`:
+
+```lisp
+(auto_lock disabled)   ; No pkg management, use system/opam (current default)
+(auto_lock enabled)    ; Auto-lock if missing, use existing if present
+(auto_lock always)     ; Always re-solve (CI mode)
+```
+
+**Environment variable** (useful for CI):
+
+```bash
+DUNE_CONFIG__AUTO_LOCK=always dune build
+```
+
+**Precedence:** CLI flag > config file > environment variable > default (`disabled`)
+
 ## Workflow
 
 **Simple case (most users):**
 1. User has dune-project with dependencies
-2. `dune pkg lock` → creates dune.lock for current platform/compiler
+2. `dune pkg lock` → creates dune.lock for current platform/compiler (or auto-lock on build)
 3. `dune build` works
 4. No dune-workspace needed
 

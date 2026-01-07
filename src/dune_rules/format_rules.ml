@@ -39,7 +39,7 @@ module Ocamlformat = struct
     match Config.get Compile_time.lock_dev_tools with
     | `Enabled -> Memo.return true
     | `Disabled ->
-      let path = Pkg_dev_tool.lock_dir Ocamlformat in
+      let path = Dev_tool.lock_dir Ocamlformat in
       Memo.return (path |> Path.build |> Path.Untracked.exists)
   ;;
 
@@ -60,7 +60,7 @@ module Ocamlformat = struct
   ;;
 
   let action_when_ocamlformat_is_locked ~input ~output kind =
-    let path = Path.build @@ Pkg_dev_tool.exe_path Ocamlformat in
+    let path = Path.build @@ Dev_tool.exe_path Ocamlformat in
     let dir = Path.Build.parent_exn input in
     let action =
       (* An action which runs at on the file at [input] and stores the
@@ -91,7 +91,7 @@ module Ocamlformat = struct
     ( Dune_lang.Action.chdir
         (S.make_pform Loc.none (Var Workspace_root))
         (Dune_lang.Action.run
-           (S.make_text Loc.none (Pkg_dev_tool.exe_name Ocamlformat))
+           (S.make_text Loc.none (Dev_tool.exe_name Ocamlformat))
            [ S.make_text Loc.none (flag_of_kind kind)
            ; S.make_pform Loc.none (Var Input_file)
            ])

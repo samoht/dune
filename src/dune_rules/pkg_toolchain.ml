@@ -1,4 +1,5 @@
 open Import
+module Pkg = Dune_pkg.Pkg
 
 let base_dir =
   lazy
@@ -38,7 +39,7 @@ let relocatable_base_version version =
 (* Get a readable platform identifier from enabled_on_platforms.
    For cross-compilation, different platforms need different cache entries.
    Returns something like "-macos-arm64" or "-linux-x86_64". *)
-let platform_suffix (pkg : Lock_dir.Pkg.t) =
+let platform_suffix (pkg : Pkg.t) =
   match pkg.enabled_on_platforms with
   | [] -> ""
   | [ platform ] ->
@@ -63,7 +64,7 @@ let platform_suffix (pkg : Lock_dir.Pkg.t) =
     "-" ^ String.sub hash ~pos:0 ~len:(min 8 (String.length hash))
 ;;
 
-let pkg_dir (pkg : Lock_dir.Pkg.t) =
+let pkg_dir (pkg : Pkg.t) =
   (* The name of this package's directory within the toolchains directory.
 
      For relocatable-compiler packages, we use the base OCaml version plus
@@ -88,9 +89,7 @@ let pkg_dir (pkg : Lock_dir.Pkg.t) =
       (* Non-relocatable: include hash to ensure correctness *)
       (* TODO should include resolved deps *)
       let pkg_digest =
-        Dune_digest.Feed.compute_digest
-          Lock_dir.Pkg.digest_feed
-          (Lock_dir.Pkg.remove_locs pkg)
+        Dune_digest.Feed.compute_digest Pkg.digest_feed (Pkg.remove_locs pkg)
       in
       sprintf
         "%s.%s-%s"

@@ -1,5 +1,6 @@
 module Vendor = Vendor
 module Fetch = Fetch
+module Pkg = Pkg
 module Pkg_cache = Pkg_cache
 module Checksum = Checksum
 module Source = Source

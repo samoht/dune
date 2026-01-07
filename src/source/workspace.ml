@@ -749,8 +749,8 @@ let source_path_of_lock_dir_path path =
     (match Path.Build.explode b with
      (* Regular lock dir: _build/lock/<ctx>/<lock-name> *)
      | [ "lock"; _ctx_name; lock_dir ] -> Path.Source.of_string lock_dir
-     (* Dev tool lock dir: _build/lock/dev-tools-{name}/ *)
-     | [ "lock"; ctx_name ] when String.is_prefix ctx_name ~prefix:"dev-tools-" ->
+     (* Dev tool lock dir: _build/lock/tools-{name}/ *)
+     | [ "lock"; ctx_name ] when String.is_prefix ctx_name ~prefix:"tools-" ->
        Path.Source.L.relative Path.Source.root [ "_build"; "lock"; ctx_name ]
      | components ->
        Code_error.raise

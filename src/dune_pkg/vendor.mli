@@ -23,13 +23,13 @@ type source_group =
   ; primary_version : Package_version.t
   }
 
-val group_by_source : Lock.Pkg.t list -> source_group list
+val group_by_source : Pkg.t list -> source_group list
 val source_group_dir : source_group -> Path.Source.t
 val source_group_packages : source_group -> (Package_name.t * Package_version.t) list
-val classify_build_method : Lock.Pkg.t -> build_method
+val classify_build_method : Pkg.t -> build_method
 
 val classify_build_method_all
-  :  Lock.Pkg.t Package_name.Map.t
+  :  Pkg.t Package_name.Map.t
   -> build_method Package_name.Map.t
 
-val get_patches : Lock.Pkg.t -> platform:Solver_env.t -> String_with_vars.t list
+val get_patches : Pkg.t -> platform:Solver_env.t -> String_with_vars.t list

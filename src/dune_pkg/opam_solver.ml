@@ -77,7 +77,7 @@ module Context = struct
         }
 
   let local_package_default_version =
-    Package_version.to_opam_package_version Lock.Pkg_info.default_version
+    Package_version.to_opam_package_version Pkg.Info.default_version
   ;;
 
   type candidates =
@@ -1659,7 +1659,7 @@ let reject_unreachable_packages =
           Code_error.raise
             "package is both local and returned by solver"
             [ "name", Package_name.to_dyn name ]
-        | Some (lock_dir_pkg : Lock.Pkg.t), None -> Some lock_dir_pkg.info.version
+        | Some (lock_dir_pkg : Pkg.t), None -> Some lock_dir_pkg.info.version
         | None, Some (pkg : Local_package.For_solver.t) -> Some pkg.version)
     in
     let pkgs_by_name =
@@ -1670,20 +1670,20 @@ let reject_unreachable_packages =
           Code_error.raise
             "package is both local and returned by solver"
             [ "name", Package_name.to_dyn name ]
-        | Some (pkg : Lock.Pkg.t), None ->
+        | Some (pkg : Pkg.t), None ->
           (* Include both regular and post deps in reachability calculation.
              Post deps don't affect build order but need to be reachable. *)
           let regular_deps =
-            Lock.Conditional_choice.choose_for_platform pkg.depends ~platform:solver_env
+            Pkg.Conditional_choice.choose_for_platform pkg.depends ~platform:solver_env
             |> Option.value ~default:[]
-            |> List.map ~f:(fun (depend : Lock.Dependency.t) -> depend.name)
+            |> List.map ~f:(fun (depend : Pkg.Dependency.t) -> depend.name)
           in
           let post_deps =
-            Lock.Conditional_choice.choose_for_platform
+            Pkg.Conditional_choice.choose_for_platform
               pkg.post_depends
               ~platform:solver_env
             |> Option.value ~default:[]
-            |> List.map ~f:(fun (depend : Lock.Dependency.t) -> depend.name)
+            |> List.map ~f:(fun (depend : Pkg.Dependency.t) -> depend.name)
           in
           Some (regular_deps @ post_deps)
         | None, Some (pkg : Local_package.For_solver.t) ->
@@ -1921,7 +1921,7 @@ let solve_lock_dir
          (* This doesn't allow the compiler to live in the source tree. Oh
          well, it's not possible now anyway. *)
          match
-           Package_name.Map.filter_map pkgs_by_name ~f:(fun (pkg : Lock.Pkg.t) ->
+           Package_name.Map.filter_map pkgs_by_name ~f:(fun (pkg : Pkg.t) ->
              match
                let version = Package_version.to_opam_package_version pkg.info.version in
                resolve_package pkg.info.name version |> package_kind
@@ -1945,13 +1945,13 @@ let solve_lock_dir
          and* ocaml = ocaml in
          let+ () =
            Package_name.Map.values pkgs_by_name
-           |> Result.List.map ~f:(fun { Lock.Pkg.depends; info = { name; _ }; _ } ->
+           |> Result.List.map ~f:(fun { Pkg.depends; info = { name; _ }; _ } ->
              match
-               Lock.Conditional_choice.choose_for_platform depends ~platform:solver_env
+               Pkg.Conditional_choice.choose_for_platform depends ~platform:solver_env
              with
              | None -> Ok ()
              | Some depends ->
-               Result.List.map depends ~f:(fun { Lock.Dependency.name = dep_name; loc } ->
+               Result.List.map depends ~f:(fun { Pkg.Dependency.name = dep_name; loc } ->
                  match
                    (not (is_dune dep_name))
                    && Package_name.Map.mem local_packages dep_name
@@ -1992,11 +1992,9 @@ let solve_lock_dir
          | Error e -> Fiber.return (Error e)
          | Ok pkgs_by_name ->
            let+ files =
-             Package_name.Map.to_list_map
-               pkgs_by_name
-               ~f:(fun name (package : Lock.Pkg.t) ->
-                 Package_version.to_opam_package_version package.info.version
-                 |> resolve_package name)
+             Package_name.Map.to_list_map pkgs_by_name ~f:(fun name (package : Pkg.t) ->
+               Package_version.to_opam_package_version package.info.version
+               |> resolve_package name)
              |> files
            in
            files

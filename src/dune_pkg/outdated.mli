@@ -10,7 +10,7 @@ type t
 val find
   :  repos:Opam_repo.t list
   -> local_packages:Local_package.t Package_name.Map.t
-  -> Lock.Pkg.t Package_name.Map.t
+  -> Pkg.t Package_name.Map.t
   -> t Fiber.t
 
 (** [pp t ~transitive ~lock_dir_path] returns a specially constructed user message

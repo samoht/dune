@@ -1,17 +1,17 @@
 open Import
-module Pkg_dev_tool = Dune_rules.Pkg_dev_tool
+module Dev_tool = Dune_rules.Dev_tool
 module Dev_tool_cache = Dune_rules.Dev_tool_cache
 
 let dev_tool_bin_dirs =
-  List.map Pkg_dev_tool.all ~f:(fun tool ->
-    Pkg_dev_tool.exe_path tool |> Path.Build.parent_exn |> Path.build)
+  List.map Dev_tool.all ~f:(fun tool ->
+    Dev_tool.exe_path tool |> Path.Build.parent_exn |> Path.build)
 ;;
 
 let add_dev_tools_to_path env =
   List.fold_left dev_tool_bin_dirs ~init:env ~f:(fun acc dir -> Env_path.cons acc ~dir)
 ;;
 
-let dev_tool_exe_path dev_tool = Path.build @@ Pkg_dev_tool.exe_path dev_tool
+let dev_tool_exe_path dev_tool = Path.build @@ Dev_tool.exe_path dev_tool
 
 let dev_tool_build_target dev_tool =
   Dune_lang.Dep_conf.File
@@ -33,14 +33,14 @@ let get_expected_version_from_config dev_tool =
 (* Find a package by name in the lock file packages. *)
 let find_pkg_in_packages packages pkg_name =
   Dune_pkg.Lock.Packages.to_pkg_list packages
-  |> List.find_opt ~f:(fun (pkg : Dune_pkg.Lock.Pkg.t) ->
+  |> List.find_opt ~f:(fun (pkg : Dune_pkg.Pkg.t) ->
     Package_name.equal pkg.info.name pkg_name)
 ;;
 
 (* Read version from a dev tool's lock file synchronously.
    Returns None if the lock file doesn't exist. *)
 let read_dev_tool_version_sync ~workspace_root dev_tool =
-  let lock_dir = Pkg_dev_tool.lock_dir dev_tool in
+  let lock_dir = Dev_tool.lock_dir dev_tool in
   let lock_dir_str =
     Filename.concat (Path.to_string workspace_root) (Path.Build.to_string lock_dir)
   in
@@ -53,7 +53,7 @@ let read_dev_tool_version_sync ~workspace_root dev_tool =
     | Ok { packages; _ } ->
       let pkg_name = Dune_pkg.Dev_tool.package_name dev_tool in
       find_pkg_in_packages packages pkg_name
-      |> Option.map ~f:(fun (pkg : Dune_pkg.Lock.Pkg.t) ->
+      |> Option.map ~f:(fun (pkg : Dune_pkg.Pkg.t) ->
         Package_version.to_string pkg.info.version))
 ;;
 
@@ -72,7 +72,7 @@ let read_project_ocaml_version_sync ~workspace_root =
        | None -> None
        | Some (_loc, pkg_name) ->
          find_pkg_in_packages packages pkg_name
-         |> Option.map ~f:(fun (pkg : Dune_pkg.Lock.Pkg.t) ->
+         |> Option.map ~f:(fun (pkg : Dune_pkg.Pkg.t) ->
            Package_version.to_string pkg.info.version)))
 ;;
 
@@ -98,7 +98,7 @@ let create_install_symlink ~workspace_root dev_tool ~cached_exe_path =
 let populate_cache_sync ~workspace_root dev_tool =
   (* The install directory for the dev tool context contains the built tool.
      Path: workspace_root/_build/install/dev-tools-{name}/ *)
-  let ctx = Pkg_dev_tool.context_name dev_tool in
+  let ctx = Dev_tool.context_name dev_tool in
   let source_dir_build = Install.Context.dir ~context:ctx in
   let source_dir_str =
     Filename.concat
@@ -181,7 +181,7 @@ let lock_and_build_dev_tool ~common ~config builder dev_tool =
 ;;
 
 let run_dev_tool_from_path workspace_root dev_tool ~exe_path_string ~args =
-  let exe_name = Pkg_dev_tool.exe_name dev_tool in
+  let exe_name = Dev_tool.exe_name dev_tool in
   Console.print_user_message
     (Dune_rules.Pkg_build_progress.format_user_message
        ~verb:"Running"
@@ -246,7 +246,7 @@ let get_cached_exe_path ~workspace_root dev_tool =
 
 let which_command dev_tool =
   let exe_path = dev_tool_exe_path dev_tool in
-  let exe_name = Pkg_dev_tool.exe_name dev_tool in
+  let exe_name = Dev_tool.exe_name dev_tool in
   let term =
     let+ builder = Common.Builder.term
     and+ allow_not_installed =
@@ -354,7 +354,7 @@ let parse_tool_spec spec =
 ;;
 
 let install_command dev_tool =
-  let exe_name = Pkg_dev_tool.exe_name dev_tool in
+  let exe_name = Dev_tool.exe_name dev_tool in
   let term =
     let+ builder = Common.Builder.term
     and+ version_suffix =
@@ -407,7 +407,7 @@ let install_unified_command =
 ;;
 
 let exec_command dev_tool =
-  let exe_name = Pkg_dev_tool.exe_name dev_tool in
+  let exe_name = Dev_tool.exe_name dev_tool in
   let term =
     let+ builder = Common.Builder.term
     (* CR-someday Alizter: document this option *)
