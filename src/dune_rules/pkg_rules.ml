@@ -74,27 +74,24 @@ module Pkg_digest = struct
     type t =
       { name : Package.Name.t
       ; version : Package_version.t
-      ; lockfile_and_dependency_digest : Dune_digest.t
-        (* A hash of the package's lockfile as well as of the digests of all
-           the package's dependencies. *)
       }
 
-    let equal { name; version; _ } t =
+    let equal { name; version } t =
       Package.Name.equal name t.name && Package_version.equal version t.version
     ;;
 
-    let compare { name; version; _ } t =
+    let compare { name; version } t =
       let open Ordering.O in
       let= () = Package.Name.compare name t.name in
       Package_version.compare version t.version
     ;;
 
-    let to_dyn { name; version; _ } =
+    let to_dyn { name; version } =
       Dyn.record
         [ "name", Package.Name.to_dyn name; "version", Package_version.to_dyn version ]
     ;;
 
-    let hash { name; version; _ } =
+    let hash { name; version } =
       Tuple.T2.hash Package.Name.hash Package_version.hash (name, version)
     ;;
   end
@@ -102,12 +99,11 @@ module Pkg_digest = struct
   include T
   include Comparable.Make (T)
 
-  let to_string { name; version; lockfile_and_dependency_digest = _ } =
+  let to_string { name; version } =
     sprintf "%s.%s" (Package.Name.to_string name) (Package_version.to_string version)
   ;;
 
   let of_string s =
-    (* Parse "<name>.<version>" using OpamPackage for proper handling. *)
     match OpamPackage.of_string_opt s with
     | Some pkg ->
       let name =
@@ -117,31 +113,12 @@ module Pkg_digest = struct
         Package_version.of_string
           (OpamPackage.Version.to_string (OpamPackage.version pkg))
       in
-      (* Digest is not used for identity - only name and version matter *)
-      let lockfile_and_dependency_digest = Dune_digest.string "" in
-      { name; version; lockfile_and_dependency_digest }
-    | None -> User_error.raise [ Pp.textf "Failed to parse %S as <name>.<version>" s ]
+      { name; version }
+    | None ->
+      { name = Package.Name.of_string s; version = Package_version.of_string "dev" }
   ;;
 
-  let digest_feed =
-    Digest_feed.tuple3
-      Package.Name.digest_feed
-      Package_version.digest_feed
-      Digest_feed.digest
-    |> Digest_feed.contramap ~f:(fun { name; version; lockfile_and_dependency_digest } ->
-      name, version, lockfile_and_dependency_digest)
-  ;;
-
-  let create lockfile_pkg depends_pkg_digests =
-    let lockfile_and_dependency_digest =
-      Digest_feed.compute_digest
-        (Digest_feed.tuple2 Pkg.digest_feed (Digest_feed.list digest_feed))
-        (Pkg.remove_locs lockfile_pkg, depends_pkg_digests)
-    in
-    let name = lockfile_pkg.info.name in
-    let version = lockfile_pkg.info.version in
-    { name; version; lockfile_and_dependency_digest }
-  ;;
+  let create ~name ~version = { name; version }
 end
 
 module Paths = struct
@@ -1292,9 +1269,7 @@ module DB = struct
                      ))
           in
           let pkg_digest =
-            Pkg_digest.create
-              pkg
-              (List.map deps ~f:(fun { dep_pkg_digest; _ } -> dep_pkg_digest))
+            Pkg_digest.create ~name:pkg.info.name ~version:pkg.info.version
           in
           { pkg; deps; has_dune_dep; pkg_digest })
       in
@@ -2758,22 +2733,9 @@ let setup_pkg_context_rules ctx ~dir ~components =
          Gen_rules.Build_only_sub_dirs.singleton ~dir Subdir_set.empty
        in
        (* Parse pkg_dir to get name.version for Paths computation *)
-       let pkg_name, pkg_version =
-         match OpamPackage.of_string_opt pkg_dir_string with
-         | Some pkg ->
-           ( Package.Name.of_string (OpamPackage.Name.to_string (OpamPackage.name pkg))
-           , Package_version.of_string
-               (OpamPackage.Version.to_string (OpamPackage.version pkg)) )
-         | None -> Package.Name.of_string pkg_dir_string, Package_version.of_string "dev"
-       in
+       let pkg_digest = Pkg_digest.of_string pkg_dir_string in
        let paths =
-         Paths.make
-           { name = pkg_name
-           ; version = pkg_version
-           ; lockfile_and_dependency_digest = Dune_digest.string ""
-           }
-           (Dependencies ctx)
-           ~relative:Path.Build.relative
+         Paths.make pkg_digest (Dependencies ctx) ~relative:Path.Build.relative
        in
        let directory_targets = Path.Build.Map.singleton paths.target_dir Loc.none in
        Memo.return (Gen_rules.make ~directory_targets ~build_dir_only_sub_dirs rules)
