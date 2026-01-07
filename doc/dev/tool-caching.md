@@ -43,25 +43,36 @@ _build/
 ├── tools-ocamlformat/              # Build context (isolated from project)
 ├── pkg/tools-ocamlformat/          # Package builds
 │   ├── ocamlformat.0.26.2/
-│   │   ├── source/                 # Extracted source
-│   │   └── target/                 # Package's install outputs
-│   │       └── bin/ocamlformat     # Tool binary
-│   └── base.0.16.0/                # Dependencies
+│   │   ├── source/                 # Extracted source + build
+│   │   └── target/
+│   │       ├── cookie              # Dune rule tracking
+│   │       └── ocamlformat.install # Copied from source (file tracking)
+│   └── base.0.16.0/
 │       ├── source/
 │       └── target/
+│           ├── cookie
+│           └── base.install
 ├── lock/tools-ocamlformat/         # Lock directory (auto-generated)
 └── install/
-    ├── tools-ocamlformat/          # Shared install (deps find each other)
-    │   ├── bin/
-    │   └── lib/
+    ├── tools-ocamlformat/          # Shared install prefix (OPAM_SWITCH_PREFIX)
+    │   ├── bin/ocamlformat         # All packages install here
+    │   └── lib/...
     └── default/
-        └── bin/ocamlformat         # Promoted from tool's target/bin/
+        └── bin/ocamlformat         # Promoted from tools-ocamlformat
 ```
 
-**Package Installation (dual write):**
-Packages install their outputs to BOTH locations:
-1. `_build/pkg/<ctx>/<pkg>/target/{bin,lib,...}` - per-package outputs
-2. `_build/install/<ctx>/` - shared prefix (so dependencies can find each other)
+**Package Installation:**
+All packages install to the shared prefix `_build/install/<ctx>/` (like opam's
+OPAM_SWITCH_PREFIX). This ensures packages can find their dependencies.
+
+**Tracking Installed Files:**
+To know which files each package installed:
+1. Package build generates `<pkg>.install` in source directory
+2. Copy `<pkg>.install` to `target/<pkg>.install`
+3. For promotion, read `target/<pkg>.install` to find installed files
+
+**Requirement:** Dev tools must generate `.install` files. This is standard for
+well-behaved OCaml packages (ocamlformat, odoc, ocamllsp all do).
 
 **`dune tools install ocamlformat` flow:**
 1. Determine version (from `.ocamlformat` config or CLI flag)
@@ -70,12 +81,16 @@ Packages install their outputs to BOTH locations:
 4. **Cache miss**:
    - Generate lock file in `_build/lock/tools-ocamlformat/`
    - Build all packages in `_build/pkg/tools-ocamlformat/`
-   - Promote tool's binaries from `target/bin/` to `_build/install/default/bin/`
+   - Packages install to `_build/install/tools-ocamlformat/`
+   - Read `target/ocamlformat.install` to find tool's installed files
+   - Promote only the tool's files to `_build/install/default/`
    - Copy to global cache for future use
 
 **Key design points:**
 - Full isolation: each tool has its own context (different deps, OCaml version)
-- Targeted promotion: only the tool package's `target/bin/` is promoted, not deps
+- Shared install prefix: packages install to `_build/install/<ctx>/` (opam compatible)
+- .install file tracking: know exactly which files belong to each package
+- Targeted promotion: only the tool package's files are promoted, not deps
 - Binary only (for now): only `bin/` is promoted to default context
 - Same infrastructure: tools use the same build system as regular packages
 
