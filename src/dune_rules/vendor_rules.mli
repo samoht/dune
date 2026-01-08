@@ -136,7 +136,7 @@ val build_opam_package
   -> (Path.Build.t * Action.Full.t Action_builder.With_targets.t) Memo.t
 
 (** Set up rules for a vendor package in the pkg context.
-    Called from pkg_rules when handling _build/pkg/<ctx>/<name>.<version>/.
+    Called from pkg_rules when handling _build/.pkgs/<ctx>/<name>.<version>/.
     Returns None if the package directory doesn't correspond to a vendor package.
     Returns the build action with targets for the cookie file. *)
 val setup_vendor_package_rules

@@ -260,7 +260,7 @@ Two modes:
 ### Default: Minimal Lock (Approach 2)
 - Lock file pins repo hash + versions
 - Opam-repo cached in `~/.cache/dune/` (works offline after first fetch)
-- Sources fetched on demand to `_build/pkg/<context>/<name>.<version>-<digest>/source/`
+- Sources fetched on demand to `_build/.pkgs/<context>/<name>.<version>-<digest>/source/`
 
 ### Optional: Full Vendor (Approach 3)
 - Run `dune pkg fetch` to download sources to `duniverse/`
@@ -359,7 +359,7 @@ val load_package_at_hash
 ### Phase 2: Add Derivation from Repo
 - Modify `Opam_repo` to support lookup by hash
 - Add `derive` function
-- Cache derived Lock.t in `_build/lock/<context>/`
+- Cache derived Lock.t in `_build/.locks/<context>/`
 
 ### Phase 3: Integration
 - Modify `Write_disk.prepare` to use file format

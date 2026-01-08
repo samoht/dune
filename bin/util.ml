@@ -7,13 +7,6 @@ type checked =
   | In_source_dir of Path.Source.t
   | External of Path.External.t
 
-let is_pkg_context ctx =
-  Context_name.equal ctx Dune_rules.Private_context.t.name
-  || Context_name.equal ctx Dune_rules.Pkg_rules.context.name
-  || Context_name.equal ctx Dune_rules.Lock_dir.context.name
-  || Context_name.equal ctx Dune_rules.Fetch_rules.context.name
-;;
-
 let check_path contexts =
   let contexts =
     Dune_engine.Context_name.Map.of_list_map_exn contexts ~f:(fun c -> Context.name c, c)
@@ -49,19 +42,11 @@ let check_path contexts =
        | Other _ -> internal_path ()
        | Alias (_, _) -> internal_path ()
        | Anonymous_action _ -> internal_path ()
+       | Pkgs (ctx, src_path) | Locks (ctx, src_path) ->
+         In_pkg_dir (context_exn ctx, src_path)
        | Regular (name, src) ->
          (match Install.Context.analyze_path name src with
           | Invalid -> internal_path ()
           | Install (ctx, path) -> In_install_dir (context_exn ctx, path)
-          | Normal (ctx, src_path) ->
-            if is_pkg_context ctx
-            then (
-              (* For pkg contexts like _build/pkg/<ctx>/..., extract the actual context
-                 from the first component of src_path *)
-              match Path.Source.split_first_component src_path with
-              | Some (ctx_name, rest) ->
-                let build_ctx = Context_name.of_string ctx_name in
-                In_pkg_dir (context_exn build_ctx, Path.Source.of_local rest)
-              | None -> internal_path ())
-            else In_build_dir (context_exn ctx, src_path)))
+          | Normal (ctx, src_path) -> In_build_dir (context_exn ctx, src_path)))
 ;;

@@ -2,7 +2,6 @@ open Import
 
 type t := Dune_pkg.Lock.t
 
-val context : Build_context.t
 val build_dir : Context_name.t -> Path.Build.t
 val get_with_path : Context_name.t -> (Path.t * t, User_message.t) result Memo.t
 val get : Context_name.t -> (t, User_message.t) result Memo.t

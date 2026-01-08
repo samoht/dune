@@ -1,12 +1,7 @@
 open Import
 open Memo.O
 
-let context =
-  let name = Context_name.of_string "pkg" in
-  Build_context.create ~name
-;;
-
-let build_dir ctx = Path.Build.relative context.build_dir (Context_name.to_string ctx)
+let build_dir ctx = Path.Build.relative Dpath.Build.pkgs_dir (Context_name.to_string ctx)
 
 include struct
   open Dune_pkg
@@ -2530,7 +2525,7 @@ module Vendor_build = struct
       | Some v -> Package_version.of_string (OpamPackage.Version.to_string v)
       | None -> Package_version.of_string "dev"
     in
-    (* Marker is at _build/pkg/<ctx>/<name>.<version>/target/cookie *)
+    (* Marker is at _build/.pkgs/<ctx>/<name>.<version>/target/cookie *)
     Vendor_rules.marker_for_package ~context:ctx_name pkg_name
     >>| function
     | Some marker -> marker
@@ -2545,12 +2540,7 @@ module Vendor_build = struct
       let pkg_context =
         Vendor_rules.Paths.of_root
           pkg_name
-          ~root:
-            (Path.Build.relative
-               (Path.Build.relative
-                  (Path.Build.of_string "_build/pkg")
-                  (Context_name.to_string ctx_name))
-               pkg_dir)
+          ~root:(Path.Build.relative (build_dir ctx_name) pkg_dir)
           ~relative:Path.Build.relative
       in
       Vendor_rules.Paths.install_cookie' (Vendor_rules.Paths.target_dir pkg_context)
@@ -2711,14 +2701,14 @@ let setup_package_rules (db : DB.t) ~package_universe ~dir ~pkg_digest
 let setup_pkg_context_rules ctx ~dir ~components =
   match components with
   | [] ->
-    (* _build/pkg/<ctx>/ - list all package digests *)
+    (* _build/.pkgs/<ctx>/ - list all package digests *)
     Gen_rules.make
       ~build_dir_only_sub_dirs:
         (Gen_rules.Build_only_sub_dirs.singleton ~dir Subdir_set.all)
       (Memo.return Rules.empty)
     |> Memo.return
   | [ pkg_dir_string ] ->
-    (* _build/pkg/<ctx>/<pkg_dir>/ - set up package build rules.
+    (* _build/.pkgs/<ctx>/<pkg_dir>/ - set up package build rules.
        First check if this is a vendor package, then try lock file packages. *)
     let* vendor_rules =
       Vendor_rules.setup_vendor_package_rules ~context:ctx ~pkg_dir:pkg_dir_string

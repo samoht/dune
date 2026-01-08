@@ -650,8 +650,9 @@ let in_source_tree path =
   | In_source_tree s -> s
   | In_build_dir b ->
     (match Path.Build.explode b with
-     (* Lock dir: _build/lock/<ctx>/<lock-dir-name>/... *)
-     | "lock" :: _ctx :: lock_dir_components ->
+     (* Lock dir: _build/.locks/<ctx>/<lock-dir-name>/... *)
+     | locks_dir :: _ctx :: lock_dir_components
+       when String.equal locks_dir Dpath.Build.locks_dir_basename ->
        Path.Source.L.relative Path.Source.root lock_dir_components
      | build_components ->
        Code_error.raise

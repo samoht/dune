@@ -480,9 +480,12 @@ end = struct
     let head_target = Targets.Validated.head targets in
     let* execution_parameters =
       match Dpath.Target_dir.of_target targets.root with
-      | Regular (With_context (context, _)) | Anonymous_action (With_context (context, _))
-        -> (Build_config.get ()).execution_parameters context ~dir:targets.root
-      | Anonymous_action Root | Regular Root | Invalid _ ->
+      | Regular (With_context (context, _))
+      | Anonymous_action (With_context (context, _))
+      | Pkgs (With_context (context, _))
+      | Locks (With_context (context, _)) ->
+        (Build_config.get ()).execution_parameters context ~dir:targets.root
+      | Anonymous_action Root | Regular Root | Pkgs Root | Locks Root | Invalid _ ->
         Code_error.raise
           "invalid dir for rule execution"
           [ "dir", Path.Build.to_dyn targets.root ]

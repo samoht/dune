@@ -3,12 +3,7 @@ open Memo.O
 open Dune_pkg
 include Dune_pkg.Lock
 
-let context =
-  let name = Context_name.of_string "lock" in
-  Build_context.create ~name
-;;
-
-let build_dir ctx = Path.Build.relative context.build_dir (Context_name.to_string ctx)
+let build_dir ctx = Path.Build.relative Dpath.Build.locks_dir (Context_name.to_string ctx)
 
 module Sys_vars = struct
   type t =

@@ -5,12 +5,18 @@ module Build = struct
 
   let anonymous_actions_dir_basename = ".actions"
   let anonymous_actions_dir = Path.Build.(relative root) anonymous_actions_dir_basename
+  let pkgs_dir_basename = ".pkgs"
+  let pkgs_dir = Path.Build.(relative root) pkgs_dir_basename
+  let locks_dir_basename = ".locks"
+  let locks_dir = Path.Build.(relative root) locks_dir_basename
 end
 
 type target_kind =
   | Regular of Context_name.t * Path.Source.t
   | Alias of Context_name.t * Path.Source.t
   | Anonymous_action of Context_name.t
+  | Pkgs of Context_name.t * Path.Source.t
+  | Locks of Context_name.t * Path.Source.t
   | Other of Path.Build.t
 
 module Target_dir = struct
@@ -25,22 +31,33 @@ module Target_dir = struct
 
   type t =
     | Anonymous_action of context_related
+    | Pkgs of context_related
+    | Locks of context_related
     | Regular of context_related
     | Invalid of Path.Build.t
 
   (* _build/foo or _build/install/foo where foo is invalid *)
+
+  (* Helper for special directories like .actions, .pkgs, .locks that contain
+     contexts as subdirectories: _build/<special>/<ctx>/... *)
+  let parse_special_dir sub ~constructor =
+    match Path.Local.split_first_component sub with
+    | None -> constructor Root
+    | Some (ctx, fn) ->
+      let ctx = Context_name.of_string ctx in
+      constructor (With_context (ctx, Path.Source.of_local fn))
+  ;;
 
   let of_target fn =
     match Path.Build.extract_first_component fn with
     | None -> Regular Root
     | Some (name, sub) ->
       if name = Build.anonymous_actions_dir_basename
-      then (
-        match Path.Local.split_first_component sub with
-        | None -> Anonymous_action Root
-        | Some (ctx, fn) ->
-          let ctx = Context_name.of_string ctx in
-          Anonymous_action (With_context (ctx, Path.Source.of_local fn)))
+      then parse_special_dir sub ~constructor:(fun x -> Anonymous_action x)
+      else if name = Build.pkgs_dir_basename
+      then parse_special_dir sub ~constructor:(fun x -> Pkgs x)
+      else if name = Build.locks_dir_basename
+      then parse_special_dir sub ~constructor:(fun x -> Locks x)
       else (
         match Context_name.of_string_opt name with
         | None -> Invalid fn
@@ -57,8 +74,10 @@ let is_digest s = String.length s = 32
 
 let analyse_target (fn as original_fn) : target_kind =
   match Target_dir.of_target fn with
-  | Invalid _ | Regular Root | Anonymous_action Root -> Other fn
+  | Invalid _ | Regular Root | Anonymous_action Root | Pkgs Root | Locks Root -> Other fn
   | Regular (With_context (ctx, src_dir)) -> Regular (ctx, src_dir)
+  | Pkgs (With_context (ctx, src_dir)) -> Pkgs (ctx, src_dir)
+  | Locks (With_context (ctx, src_dir)) -> Locks (ctx, src_dir)
   | Anonymous_action (With_context (ctx, fn)) ->
     if Path.Source.is_root fn
     then Other original_fn
@@ -84,6 +103,10 @@ let describe_target fn =
   | Anonymous_action ctx -> sprintf "<internal-action>%s" (ctx_suffix ctx)
   | Regular (ctx, fn) ->
     sprintf "%s%s" (Path.Source.to_string_maybe_quoted fn) (ctx_suffix ctx)
+  | Pkgs (ctx, fn) ->
+    sprintf ".pkgs/%s%s" (Path.Source.to_string_maybe_quoted fn) (ctx_suffix ctx)
+  | Locks (ctx, fn) ->
+    sprintf ".locks/%s%s" (Path.Source.to_string_maybe_quoted fn) (ctx_suffix ctx)
   | Other fn -> Path.Build.to_string_maybe_quoted fn
 ;;
 

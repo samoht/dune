@@ -2,10 +2,9 @@
 
 open Import
 
-val context : Build_context.t
 val build_dir : Context_name.t -> Path.Build.t
 
-(** Set up package build rules for a directory under _build/pkg/<ctx>/...
+(** Set up package build rules for a directory under _build/.pkgs/<ctx>/...
     Handles both vendor packages and lock file packages. *)
 val setup_pkg_context_rules
   :  Context_name.t

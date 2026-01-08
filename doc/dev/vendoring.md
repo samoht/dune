@@ -11,7 +11,7 @@ of the main project, with selective library exposure and sandbox modes.
 ## Overview
 
 **All locked dependencies are fetched to `duniverse/`** - both dune-buildable and
-non-dune packages. Non-dune packages are built in a sandbox under `_build/pkg/`.
+non-dune packages. Non-dune packages are built in a sandbox under `_build/.pkgs/`.
 
 ```
 project/
@@ -21,14 +21,14 @@ project/
     zarith.1.14/              # Non-dune package → built in pkg sandbox
     dune                      # Generated vendor stanzas
   _build/
-    pkg/default/              # Package builds
+    .pkgs/default/            # Package builds
       zarith.1.14-<digest>/   # <name>.<version>-<lockfile+deps digest>
         source/               # Linked/copied from duniverse/ (rule inputs)
         target/               # Build artifacts (rule outputs)
     install/default/          # Shared install prefix
 ```
 
-Sources are always in `_build/pkg/<ctx>/<digest>/source/` for proper rule
+Sources are always in `_build/.pkgs/<ctx>/<digest>/source/` for proper rule
 input/output tracking. For vendored packages, this is linked from `duniverse/`.
 
 This enables:
@@ -375,7 +375,7 @@ This approach:
 
 ### Current Behavior
 
-Currently `@pkg-install` builds and installs locked packages into `_build/pkg/default/`.
+Currently `@pkg-install` builds and installs locked packages into `_build/.pkgs/default/`.
 This is used to prebuild dependencies before building the main project.
 
 ### New Behavior
@@ -402,7 +402,7 @@ Keep `@pkg-install` rather than removing it because:
 
 | Scenario | `@pkg-install` builds |
 |----------|----------------------|
-| Lock dir only (no duniverse) | Packages in `_build/pkg/<ctx>/` |
+| Lock dir only (no duniverse) | Packages in `_build/.pkgs/<ctx>/` |
 | Duniverse only | All libraries in `duniverse/` |
 | Both | Both (lock packages + duniverse) |
 | Additional vendor dirs | Includes all vendor stanza directories |

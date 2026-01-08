@@ -13,5 +13,6 @@ let create ~name =
 let of_build_path p =
   match Dpath.analyse_target p with
   | Regular (name, _) | Alias (name, _) | Anonymous_action name -> Some (create ~name)
+  | Pkgs (name, _) | Locks (name, _) -> Some (create ~name)
   | Other _ -> None
 ;;

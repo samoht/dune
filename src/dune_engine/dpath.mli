@@ -9,6 +9,8 @@ module Target_dir : sig
 
   type t =
     | Anonymous_action of context_related
+    | Pkgs of context_related
+    | Locks of context_related
     | Regular of context_related
     | Invalid of Path.Build.t
 
@@ -19,6 +21,8 @@ type target_kind =
   | Regular of Context_name.t * Path.Source.t
   | Alias of Context_name.t * Path.Source.t
   | Anonymous_action of Context_name.t
+  | Pkgs of Context_name.t * Path.Source.t
+  | Locks of Context_name.t * Path.Source.t
   | Other of Path.Build.t
 
 type 'build path_kind =
@@ -44,4 +48,8 @@ module Build : sig
 
   val anonymous_actions_dir : t
   val anonymous_actions_dir_basename : Filename.t
+  val pkgs_dir : t
+  val pkgs_dir_basename : Filename.t
+  val locks_dir : t
+  val locks_dir_basename : Filename.t
 end

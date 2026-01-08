@@ -505,13 +505,9 @@ let is_local t =
   | External _ -> false
   | In_source_tree _ -> true
   | In_build_dir dir ->
-    (match Path.Build.extract_build_context dir with
-     | None -> true
-     | Some (name, _) ->
-       let ctx_name = Context_name.of_string name in
-       not
-         (Context_name.equal ctx_name Pkg_rules.context.name
-          || Context_name.equal ctx_name Lock_dir.context.name))
+    (match Dpath.Target_dir.of_target dir with
+     | Pkgs _ | Locks _ -> false
+     | Anonymous_action _ | Regular _ | Invalid _ -> true)
 ;;
 
 let resolve_main_module_name t =

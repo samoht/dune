@@ -747,11 +747,17 @@ let source_path_of_lock_dir_path path =
   | In_source_tree s -> s
   | In_build_dir b ->
     (match Path.Build.explode b with
-     (* Regular lock dir: _build/lock/<ctx>/<lock-name> *)
-     | [ "lock"; _ctx_name; lock_dir ] -> Path.Source.of_string lock_dir
-     (* Dev tool lock dir: _build/lock/tools-{name}/ *)
-     | [ "lock"; ctx_name ] when String.is_prefix ctx_name ~prefix:"tools-" ->
-       Path.Source.L.relative Path.Source.root [ "_build"; "lock"; ctx_name ]
+     (* Regular lock dir: _build/.locks/<ctx>/<lock-name> *)
+     | [ locks_dir; _ctx_name; lock_dir ]
+       when String.equal locks_dir Dpath.Build.locks_dir_basename ->
+       Path.Source.of_string lock_dir
+     (* Dev tool lock dir: _build/.locks/tools-{name}/ *)
+     | [ locks_dir; ctx_name ]
+       when String.equal locks_dir Dpath.Build.locks_dir_basename
+            && String.is_prefix ctx_name ~prefix:"tools-" ->
+       Path.Source.L.relative
+         Path.Source.root
+         [ "_build"; Dpath.Build.locks_dir_basename; ctx_name ]
      | components ->
        Code_error.raise
          "Unsupported build path"

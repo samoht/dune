@@ -26,17 +26,22 @@ let implicit_default_alias dir =
 ;;
 
 let execution_parameters =
-  let f context path =
-    let path = Path.Build.drop_build_context_exn path in
+  let is_under_special_dir dir =
+    match Path.Build.extract_first_component dir with
+    | Some (name, _) ->
+      String.equal name Dpath.Build.pkgs_dir_basename
+      || String.equal name Dpath.Build.locks_dir_basename
+    | None -> false
+  in
+  let f _context dir =
     let open Memo.O in
     let* ep = Execution_parameters.default in
-    if
-      Context_name.equal context Pkg_rules.context.name
-      || Context_name.equal context Lock_dir.context.name
+    if is_under_special_dir dir
     then Memo.return ep
-    else
+    else (
+      let path = Path.Build.drop_build_context_exn dir in
       let+ dir = Source_tree.nearest_dir path in
-      Dune_project.update_execution_parameters (Source_tree.Dir.project dir) ep
+      Dune_project.update_execution_parameters (Source_tree.Dir.project dir) ep)
   in
   let memo =
     let module Input = struct
@@ -95,9 +100,7 @@ let init
          let open Memo.O in
          let+ contexts = Workspace.workspace () >>| Workspace.build_contexts in
          let open Dune_engine.Build_config.Gen_rules.Context_type in
-         (Pkg_rules.context, Empty)
-         :: (Lock_dir.context, Empty)
-         :: (Install.Context.install_context, Empty)
+         (Install.Context.install_context, Empty)
          :: (Fetch_rules.context, Empty)
          :: List.map contexts ~f:(fun ctx -> ctx, With_sources)))
     ~cache_config

@@ -48,12 +48,22 @@ end
 
 module Dir_triage = struct
   module Build_directory = struct
-    (* invariant: [dir = context_name / sub_dir] *)
+    module Kind = struct
+      type t =
+        | Regular
+        | Pkgs
+        | Locks
+    end
+
+    (* invariant: [dir = context_name / sub_dir] for Regular,
+       [dir = .pkgs / context_name / sub_dir] for Pkgs,
+       [dir = .locks / context_name / sub_dir] for Locks *)
     type t =
       { dir : Path.Build.t
       ; context_name : Context_name.t
       ; context_type : Context_type.t
       ; sub_dir : Path.Source.t
+      ; kind : Kind.t
       }
 
     (* It's ok to only compare and hash the [dir] field because of the
@@ -107,7 +117,10 @@ let get_dir_triage ~dir =
   | Build (Regular Root) ->
     let+ contexts = Memo.Lazy.force (Build_config.get ()).contexts in
     let allowed_subdirs =
-      [ Path.Build.basename Dpath.Build.anonymous_actions_dir ]
+      [ Path.Build.basename Dpath.Build.anonymous_actions_dir
+      ; Dpath.Build.pkgs_dir_basename
+      ; Dpath.Build.locks_dir_basename
+      ]
       @ (Context_name.Map.keys contexts |> List.map ~f:Context_name.to_string)
       |> Subdir_set.of_list
       |> Subdir_set.to_dir_set
@@ -118,6 +131,42 @@ let get_dir_triage ~dir =
     Code_error.raise
       "Called get_dir_triage on an anonymous action directory"
       [ "dir", Path.Build.to_dyn build_dir ]
+  | Build (Pkgs Root) ->
+    (* _build/.pkgs/ - list all contexts *)
+    let+ contexts = Memo.Lazy.force (Build_config.get ()).contexts in
+    let allowed_subdirs =
+      Context_name.Map.keys contexts
+      |> List.map ~f:Context_name.to_string
+      |> Subdir_set.of_list
+      |> Subdir_set.to_dir_set
+    in
+    Dir_triage.Known (Loaded.no_rules ~allowed_subdirs)
+  | Build (Pkgs (With_context (context_name, sub_dir))) ->
+    let+ contexts = Memo.Lazy.force (Build_config.get ()).contexts in
+    (match Context_name.Map.find contexts context_name with
+     | None -> Dir_triage.no_rules
+     | Some ((_ : Build_context.t), context_type) ->
+       let dir = Path.as_in_build_dir_exn dir in
+       Dir_triage.Build_directory
+         { dir; context_name; context_type; sub_dir; kind = Pkgs })
+  | Build (Locks Root) ->
+    (* _build/.locks/ - list all contexts *)
+    let+ contexts = Memo.Lazy.force (Build_config.get ()).contexts in
+    let allowed_subdirs =
+      Context_name.Map.keys contexts
+      |> List.map ~f:Context_name.to_string
+      |> Subdir_set.of_list
+      |> Subdir_set.to_dir_set
+    in
+    Dir_triage.Known (Loaded.no_rules ~allowed_subdirs)
+  | Build (Locks (With_context (context_name, sub_dir))) ->
+    let+ contexts = Memo.Lazy.force (Build_config.get ()).contexts in
+    (match Context_name.Map.find contexts context_name with
+     | None -> Dir_triage.no_rules
+     | Some ((_ : Build_context.t), context_type) ->
+       let dir = Path.as_in_build_dir_exn dir in
+       Dir_triage.Build_directory
+         { dir; context_name; context_type; sub_dir; kind = Locks })
   | Build (Invalid _) ->
     Memo.return @@ Dir_triage.Known (Loaded.no_rules ~allowed_subdirs:Dir_set.empty)
   | Build (Regular (With_context (context_name, sub_dir))) ->
@@ -127,7 +176,8 @@ let get_dir_triage ~dir =
      | Some ((_ : Build_context.t), context_type) ->
        (* In this branch, [dir] is in the build directory. *)
        let dir = Path.as_in_build_dir_exn dir in
-       Dir_triage.Build_directory { dir; context_name; context_type; sub_dir })
+       Dir_triage.Build_directory
+         { dir; context_name; context_type; sub_dir; kind = Regular })
 ;;
 
 let describe_rule (rule : Rule.t) =
@@ -235,7 +285,7 @@ let no_rule_found ~loc fn =
   in
   match Dpath.analyse_target fn with
   | Other _ -> fail fn ~loc
-  | Regular (ctx, _) ->
+  | Regular (ctx, _) | Pkgs (ctx, _) | Locks (ctx, _) ->
     if Context_name.Map.mem contexts ctx
     then fail fn ~loc
     else
@@ -437,7 +487,7 @@ end = struct
       let module Source_tree = (val (Build_config.get ()).source_tree) in
       let corresponding_source_dir =
         match Dpath.analyse_target dir with
-        | Alias _ | Anonymous_action _ | Other _ -> Memo.return None
+        | Alias _ | Anonymous_action _ | Other _ | Pkgs _ | Locks _ -> Memo.return None
         | Regular (_ctx, sub_dir) -> Source_tree.find_dir sub_dir
       in
       corresponding_source_dir
@@ -570,8 +620,12 @@ end = struct
     ;;
 
     let call_rules_generator
-          ({ Dir_triage.Build_directory.dir; context_name; context_type = _; sub_dir } as
-           d)
+          ({ Dir_triage.Build_directory.dir
+           ; context_name
+           ; context_type = _
+           ; sub_dir
+           ; kind = _
+           } as d)
       =
       let (module RG : Rule_generator) = (Build_config.get ()).rule_generator in
       let sub_dir_components = Path.Source.explode sub_dir in
@@ -704,7 +758,12 @@ end = struct
   ;;
 
   let descendants_to_keep
-        { Dir_triage.Build_directory.dir; context_name = _; context_type; sub_dir }
+        { Dir_triage.Build_directory.dir
+        ; context_name = _
+        ; context_type
+        ; sub_dir
+        ; kind = _
+        }
         (build_dir_only_sub_dirs : Subdir_set.t)
         ~source_dirs
         rules_produced
@@ -793,8 +852,8 @@ end = struct
   ;;
 
   let load_build_directory_exn
-        ({ Dir_triage.Build_directory.dir; context_name; context_type; sub_dir } as
-         build_dir)
+        ({ Dir_triage.Build_directory.dir; context_name; context_type; sub_dir; kind = _ }
+         as build_dir)
     =
     (* Load all the rules *)
     Gen_rules.gen_rules build_dir

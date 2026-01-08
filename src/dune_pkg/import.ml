@@ -26,6 +26,7 @@ include struct
   open Dune_engine
   module Process = Process
   module Display = Display
+  module Dpath = Dpath
 end
 
 module OpamUrl = OpamUrl0

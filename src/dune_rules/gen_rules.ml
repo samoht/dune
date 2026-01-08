@@ -735,11 +735,11 @@ let raise_on_lock_dir_out_of_sync =
   |> Staged.unstage
 ;;
 
-(* Handle _build/pkg/<ctx>/{digest}/ directories *)
+(* Handle _build/.pkgs/<ctx>/{digest}/ directories *)
 let pkg_context_rules ~dir components =
   match components with
   | [] ->
-    (* _build/pkg/ - list all contexts *)
+    (* _build/.pkgs/ - list all contexts *)
     let+ context_dirs =
       let+ workspace = Workspace.workspace () in
       Workspace.build_contexts workspace
@@ -751,16 +751,16 @@ let pkg_context_rules ~dir components =
     in
     Gen_rules.make ~build_dir_only_sub_dirs (Memo.return Rules.empty)
   | ctx_name :: rest ->
-    (* _build/pkg/<ctx>/... *)
+    (* _build/.pkgs/<ctx>/... *)
     let ctx = Context_name.of_string ctx_name in
     Pkg_rules.setup_pkg_context_rules ctx ~dir ~components:rest
 ;;
 
-(* Handle _build/lock/<ctx>/ directories *)
+(* Handle _build/.locks/<ctx>/ directories *)
 let lock_context_rules ~dir components =
   match components with
   | [] ->
-    (* _build/lock/ - list all contexts *)
+    (* _build/.locks/ - list all contexts *)
     let+ context_dirs =
       let+ workspace = Workspace.workspace () in
       Workspace.build_contexts workspace
@@ -772,7 +772,7 @@ let lock_context_rules ~dir components =
     in
     Gen_rules.make ~build_dir_only_sub_dirs (Memo.return Rules.empty)
   | ctx_name :: [] ->
-    (* _build/lock/<ctx>/ - set up lock directory rules *)
+    (* _build/.locks/<ctx>/ - set up lock directory rules *)
     let ctx = Context_name.of_string ctx_name in
     (match Dev_tool.of_context_name ctx with
      | Some _dev_tool ->
@@ -784,6 +784,19 @@ let lock_context_rules ~dir components =
   | _ :: _ ->
     (* Subdirectories within lock dir - redirect to parent *)
     Memo.return @@ Gen_rules.redirect_to_parent Gen_rules.Rules.empty
+;;
+
+(* Check if a directory is under a special build directory like .pkgs or .locks *)
+let is_under_pkgs_dir dir =
+  match Path.Build.extract_first_component dir with
+  | Some (name, _) -> String.equal name Dpath.Build.pkgs_dir_basename
+  | None -> false
+;;
+
+let is_under_locks_dir dir =
+  match Path.Build.extract_first_component dir with
+  | Some (name, _) -> String.equal name Dpath.Build.locks_dir_basename
+  | None -> false
 ;;
 
 let gen_rules ctx ~dir components =
@@ -810,9 +823,9 @@ let gen_rules ctx ~dir components =
           ~build_dir_only_sub_dirs:(Gen_rules.Build_only_sub_dirs.singleton ~dir subdirs)
           ~directory_targets
           (Memo.return rules)))
-  else if Context_name.equal ctx Pkg_rules.context.name
+  else if is_under_pkgs_dir dir
   then pkg_context_rules ~dir components
-  else if Context_name.equal ctx Lock_dir.context.name
+  else if is_under_locks_dir dir
   then lock_context_rules ~dir components
   else if Context_name.equal ctx Fetch_rules.context.name
   then Fetch_rules.gen_rules ~dir ~components

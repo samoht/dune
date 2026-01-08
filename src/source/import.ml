@@ -13,6 +13,7 @@ include struct
   module Build_system = Build_system
   module Fs_cache = Fs_cache
   module Build_context = Build_context
+  module Dpath = Dpath
   include No_io
 end
 

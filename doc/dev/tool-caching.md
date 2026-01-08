@@ -40,7 +40,7 @@ isolated context. The only difference is a promotion step at the end.
 
 ```
 _build/
-├── pkg/tools-ocamlformat/            # Package builds (context = tools-ocamlformat)
+├── .pkgs/tools-ocamlformat/          # Package builds (context = tools-ocamlformat)
 │   ├── ocamlformat.0.26.2-<digest>/  # <name>.<version>-<lockfile+deps digest>
 │   │   ├── source/                   # Fetched & extracted source
 │   │   └── target/
@@ -51,7 +51,7 @@ _build/
 │       └── target/
 │           ├── cookie
 │           └── base.install
-├── lock/tools-ocamlformat/           # Lock directory (auto-generated)
+├── .locks/tools-ocamlformat/         # Lock directory (auto-generated)
 └── install/
     ├── tools-ocamlformat/            # Shared install prefix (OPAM_SWITCH_PREFIX)
     │   ├── bin/ocamlformat           # All packages install here
@@ -81,8 +81,8 @@ well-behaved OCaml packages (ocamlformat, odoc, ocamllsp all do).
 2. Check global cache `~/.cache/dune/tools/ocamlformat.0.26.2/`
 3. **Cache hit**: Promote directly from cache to `_build/install/default/bin/`
 4. **Cache miss**:
-   - Generate lock file in `_build/lock/tools-ocamlformat/`
-   - Build all packages in `_build/pkg/tools-ocamlformat/`
+   - Generate lock file in `_build/.locks/tools-ocamlformat/`
+   - Build all packages in `_build/.pkgs/tools-ocamlformat/`
    - Packages install to `_build/install/tools-ocamlformat/`
    - Read `target/ocamlformat.install` to find tool's installed files
    - Promote only the tool's files to `_build/install/default/`
@@ -155,9 +155,9 @@ When user runs `dune fmt`:
 3. Check global cache `~/.cache/dune/tools/ocamlformat.0.26.2/`
 4. **Cache hit**: Create symlink in `_build/install/default/bin/`, run
 5. **Cache miss**:
-   - Generate lock dir at `_build/lock/tools-ocamlformat/`
-   - Build packages in `_build/pkg/tools-ocamlformat/`
-   - Promote `_build/pkg/tools-ocamlformat/ocamlformat.0.26.2-<digest>/target/bin/*`
+   - Generate lock dir at `_build/.locks/tools-ocamlformat/`
+   - Build packages in `_build/.pkgs/tools-ocamlformat/`
+   - Promote `_build/.pkgs/tools-ocamlformat/ocamlformat.0.26.2-<digest>/target/bin/*`
      to `_build/install/default/bin/`
    - Copy binary to global cache
    - Replace with symlink pointing to cache

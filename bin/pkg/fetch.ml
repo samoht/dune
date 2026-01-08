@@ -7,7 +7,6 @@ module Vendor = Dune_pkg.Vendor
 module Vendor_rules = Dune_rules.Vendor_rules
 module Rev_store = Dune_pkg.Rev_store
 module OpamUrl = Dune_pkg.OpamUrl
-module Pkg_cache = Dune_pkg.Pkg_cache
 module Solver_env = Dune_pkg.Solver_env
 module Package_version = Dune_pkg.Package_version
 

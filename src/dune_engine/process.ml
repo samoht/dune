@@ -390,7 +390,7 @@ end = struct
           (match Dpath.analyse_target path with
            | Other path ->
              split_paths (Path.Build.to_string path :: targets_acc) ctxs_acc rest
-           | Regular (ctx, filename) ->
+           | Regular (ctx, filename) | Pkgs (ctx, filename) | Locks (ctx, filename) ->
              split_paths
                (Path.Source.to_string filename :: targets_acc)
                (add_ctx ctx ctxs_acc)

@@ -10,16 +10,10 @@ let extract_dep_names (formula : OpamTypes.filtered_formula) =
   !names
 ;;
 
-(* Package sandbox context: _build/pkg/ *)
-let pkg_sandbox_context =
-  let name = Context_name.of_string "pkg" in
-  Build_context.create ~name
-;;
-
-(* Path to a package's build directory: _build/pkg/<ctx>/<name>.<version>/ *)
+(* Path to a package's build directory: _build/.pkgs/<ctx>/<name>.<version>/ *)
 let pkg_build_root ~context ~pkg_name ~pkg_version =
   let ctx_dir =
-    Path.Build.relative pkg_sandbox_context.build_dir (Context_name.to_string context)
+    Path.Build.relative Dpath.Build.pkgs_dir (Context_name.to_string context)
   in
   let pkg_dir =
     sprintf
@@ -153,7 +147,7 @@ let read_project_name dir =
    The cache maps library names to directory names in duniverse/. *)
 let lib_cache_file =
   lazy
-    (let pkg_dir = Path.build (Path.Build.relative Path.Build.root "pkg") in
+    (let pkg_dir = Path.build Dpath.Build.pkgs_dir in
      Path.relative pkg_dir "lib-cache")
 ;;
 
@@ -409,7 +403,7 @@ let marker_for_package ~context pkg_name =
       | None -> Package_version.of_string "dev"
       | Some info -> info.version
     in
-    (* _build/pkg/<ctx>/<name>.<version>/target/cookie *)
+    (* _build/.pkgs/<ctx>/<name>.<version>/target/cookie *)
     let root = pkg_build_root ~context ~pkg_name ~pkg_version:version in
     let paths = Paths.of_root pkg_name ~root ~relative:Path.Build.relative in
     Some (Paths.install_cookie' (Paths.target_dir paths)))
@@ -520,7 +514,7 @@ let build_opam_package ~context ~pkg_name ~pkg_version ~source_dir ~opam_file =
   let progress_installing =
     Pkg_build_progress.progress_action pkg_name pkg_version `Installing
   in
-  (* _build/pkg/<ctx>/<name>.<version>/target/cookie *)
+  (* _build/.pkgs/<ctx>/<name>.<version>/target/cookie *)
   let root = pkg_build_root ~context ~pkg_name ~pkg_version in
   let paths = Paths.of_root pkg_name ~root ~relative:Path.Build.relative in
   let target_dir = Paths.target_dir paths in
