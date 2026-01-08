@@ -85,15 +85,16 @@ Package which has boolean where string was expected. This should be caught while
   > ]
   > EOF
 
-  $ solve standard-dune with-interpolation with-percent-sign variable-types
+  $ solve --format=directory standard-dune with-interpolation with-percent-sign variable-types
   Solution for dune.lock (4 packages):
   dune:
   - standard-dune.0.0.1
-  
+
   opam:
   - variable-types.0.0.1
   - with-interpolation.0.0.1
   - with-percent-sign.0.0.1
+
 
   $ cat ${default_lock_dir}/standard-dune.0.0.1.pkg
   (version 0.0.1)
@@ -142,21 +143,21 @@ Package which has boolean where string was expected. This should be caught while
        (run echo %{os_family}))))))
 
   $ solve with-malformed-interpolation
-  File "$TESTCASE_ROOT/mock-opam-repository/packages/with-malformed-interpolation/with-malformed-interpolation.0.0.1/opam", line 1, characters 0-0:
+  File "packages/with-malformed-interpolation/with-malformed-interpolation.0.0.1/opam", line 1, characters 0-0:
   Error: Encountered malformed variable interpolation while processing commands
   for package with-malformed-interpolation.0.0.1.
   The variable interpolation:
   %{prefix
   [1]
 
-  $ solve exercise-filters
+  $ solve --format=directory exercise-filters
   Solution for dune.lock (1 package):
   opam:
   - exercise-filters.0.0.1
 
   $ cat ${default_lock_dir}/exercise-filters.0.0.1.pkg
   (version 0.0.1)
-  
+
   (build
    (all_platforms
     ((action
@@ -193,9 +194,10 @@ Package which has boolean where string was expected. This should be caught while
        (when
         (and %{pkg:foo:installed} %{pkg:bar:installed} %{pkg:baz:installed})
         (run echo m)))))))
+
 
 Test that if opam filter translation is disabled the output doesn't contain any translated filters:
-  $ solve exercise-filters
+  $ solve --format=directory exercise-filters
   Solution for dune.lock (1 package):
   opam:
   - exercise-filters.0.0.1
@@ -239,7 +241,7 @@ Test that if opam filter translation is disabled the output doesn't contain any 
         (and %{pkg:foo:installed} %{pkg:bar:installed} %{pkg:baz:installed})
         (run echo m)))))))
 
-  $ solve exercise-term-filters
+  $ solve --format=directory exercise-term-filters
   Solution for dune.lock (1 package):
   opam:
   - exercise-term-filters.0.0.1
@@ -260,9 +262,7 @@ Test that if opam filter translation is disabled the output doesn't contain any 
         c))))))
 
   $ solve filter-error-bool-where-string-expected
-  File "$TESTCASE_ROOT/mock-opam-repository/packages/filter-error-bool-where-string-expected/filter-error-bool-where-string-expected.0.0.1/opam", line 3, characters 33-34:
-  3 |   [ "echo" "a" ] { foo:version < (foo = bar) }
-                                       ^
+  File "$TESTCASE_ROOT/packages/filter-error-bool-where-string-expected/filter-error-bool-where-string-expected.0.0.1/opam", line 3, characters 33-34:
   Error: unable to parse opam file
   Parse error
   [1]
@@ -284,7 +284,7 @@ Package with package conjunction and string selections inside variable interpola
   > ]
   > EOF
 
-  $ solve_project <<EOF
+  $ solve_project --format=directory <<EOF
   > (lang dune 3.8)
   > (package (name x) (depends package-conjunction-and-string-selection))
   > EOF
