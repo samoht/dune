@@ -51,6 +51,7 @@ Create a package that uses relative paths:
 
   $ build_pkg good-pkg
   $ show_pkg_targets good-pkg | grep '\.pc'
+  /lib/bad-pkg/bad.pc
   /lib/good-pkg/good.pc
 
 Test 4: Sandbox isolation (TODO - currently not isolating /tmp)

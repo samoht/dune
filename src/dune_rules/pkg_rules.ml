@@ -2232,6 +2232,18 @@ let build_only_rule context_name ~source_deps (pkg : Resolved_pkg.t) =
     |> Action_builder.return
     |> Action_builder.with_no_targets
   in
+  (* Create install directories before build - some packages copy files during build.
+     TODO: remove when we have proper bubblewrap sandboxing that enforces build/install
+     separation. Packages should only write to target_dir during build. *)
+  let mkdir_install_dirs =
+    let install_paths = Paths.install_paths pkg.paths in
+    Install_action.installable_sections
+    |> List.rev_map ~f:(fun section ->
+      Install.Paths.get install_paths section |> Path.as_in_build_dir_exn |> Action.mkdir)
+    |> Action.progn
+    |> Action.Full.make ~sandbox:build_sandbox
+    |> Action_builder.With_targets.return
+  in
   (* Create marker file to signal build completion *)
   let marker_action =
     Action.write_file (build_marker_path pkg) ""
@@ -2240,7 +2252,11 @@ let build_only_rule context_name ~source_deps (pkg : Resolved_pkg.t) =
     |> Action_builder.with_file_targets ~file_targets:[ build_marker_path pkg ]
   in
   let actions =
-    [ copy_action; [ progress_building ]; build_action; [ marker_action ] ]
+    [ copy_action
+    ; [ progress_building; mkdir_install_dirs ]
+    ; build_action
+    ; [ marker_action ]
+    ]
     |> List.concat
     |> Action_builder.progn
   in

@@ -1,9 +1,10 @@
-Test that we run the build command
+Test that we run the build and install commands
 
   $ make_lockdir
   $ make_lockpkg test <<EOF
   > (version 0.0.1)
-  > (build
+  > (build (run true))
+  > (install
   >  (progn
   >   (run mkdir -p %{prefix}/bin)
   >   (run touch %{prefix}/bin/foo)))
@@ -11,13 +12,14 @@ Test that we run the build command
 
   $ build_pkg test
 
-The pkg directory contains source and target dirs with a cookie for dependency tracking:
+The pkg directory contains build marker and cookie for dependency tracking:
 
   $ show_pkg test
   
+  /.dune-pkg-build-done
+  /cookie
   /source
-  /target
-  /target/cookie
+
 
 
 The build output goes to the shared install directory:

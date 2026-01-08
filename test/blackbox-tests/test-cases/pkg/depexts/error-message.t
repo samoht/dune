@@ -24,20 +24,13 @@ fail because the source has an invalid dune-project.
   > }
   > EOF
 
-Make a project that uses the foo library:
+Make a project that depends on the foo package:
   $ cat > dune-project <<EOF
   > (lang dune 3.13)
   > (package
   >  (name bar)
+  >  (allow_empty)
   >  (depends foo))
-  > EOF
-  $ cat > dune <<EOF
-  > (executable
-  >  (public_name bar)
-  >  (libraries foo))
-  > EOF
-  $ cat > bar.ml <<EOF
-  > let () = print_endline "hello"
   > EOF
 
 Solve to create a proper lock directory with dependency hash:
@@ -46,17 +39,17 @@ Solve to create a proper lock directory with dependency hash:
   dune:
   - foo.0.0.1
 
-Build the project, when it fails building 'foo' package, it shows the depexts
+Build the packages, when it fails building 'foo' package, it shows the depexts
 error message.
-  $ dune build
-  File "dune.lock/foo.0.0.1.pkg", line 3, characters 6-10:
-  3 |  (run dune build))
-            ^^^^
+  $ dune build @pkg-install
+  File "dune.lock/foo.0.0.1.pkg", line 4, characters 30-34:
+  4 |  (all_platforms ((action (run dune build)))))
+                                    ^^^^
   Error: Logs for package foo
   File "dune-project", line 1, characters 0-0:
   Error: Invalid first line, expected: (lang <lang> <version>)
-
-  Hint: Missing system dependencies: gnupg, unzip
-  To install:
+  
+  Hint: Missing system dependencies: gnupg, unzipTo install:
     brew install gnupg unzip
   [1]
+
