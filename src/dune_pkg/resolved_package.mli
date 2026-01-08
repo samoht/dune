@@ -15,6 +15,7 @@ val git_repo
   -> Rev_store.At_rev.t
   -> files_dir:Path.Local.t option
   -> url:OpamUrl.t option
+  -> repo_dir:Path.t option
   -> t
 
 val local_fs

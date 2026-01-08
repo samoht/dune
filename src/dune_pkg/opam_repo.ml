@@ -199,20 +199,21 @@ let load_opam_package_from_dir ~(dir : Path.t) package =
 
 let load_packages_from_git rev_store opam_packages =
   let+ contents =
-    List.map opam_packages ~f:(fun (file, _, _, _) -> file)
+    List.map opam_packages ~f:(fun (file, _, _, _, _) -> file)
     |> Rev_store.content_of_files rev_store
   in
   List.map2
     opam_packages
     contents
-    ~f:(fun (opam_file, package, rev, files_dir) opam_file_contents ->
+    ~f:(fun (opam_file, package, rev, files_dir, repo_dir) opam_file_contents ->
       Resolved_package.git_repo
         package
         ~opam_file:(Rev_store.File.path opam_file)
         ~opam_file_contents
         rev
         ~files_dir:(Some files_dir)
-        ~url:None)
+        ~url:None
+        ~repo_dir)
 ;;
 
 let all_packages_in_dir_at_path ~dir ~path loc =
@@ -300,7 +301,17 @@ let load_all_versions_by_keys ts =
     OpamPackage.Version.Map.values ts
     |> List.partition_map ~f:(fun (repo, (pkg : Key.t)) ->
       match pkg with
-      | Git (file, pkg, rev, files_dir) -> Left (file, pkg, rev, files_dir)
+      | Git (file, pkg, rev, files_dir) ->
+        (* Include repo_dir for local file:// URLs to enable source snippets in error messages *)
+        let repo_dir =
+          match repo.serializable with
+          | Some url ->
+            (match OpamUrl0.local_or_git_path (OpamUrl.of_string url) with
+             | Some path -> Some (Path.of_string path)
+             | None -> None)
+          | None -> None
+        in
+        Left (file, pkg, rev, files_dir, repo_dir)
       | Directory pkg -> Right (repo, pkg))
   in
   let from_dirs =
@@ -320,7 +331,7 @@ let load_all_versions_by_keys ts =
     | packages ->
       let* rev_store = Rev_store.get in
       let+ resolved_packages = load_packages_from_git rev_store packages in
-      List.map2 resolved_packages packages ~f:(fun resolved_package (_, pkg, _, _) ->
+      List.map2 resolved_packages packages ~f:(fun resolved_package (_, pkg, _, _, _) ->
         pkg, resolved_package)
   in
   from_dirs @ from_git

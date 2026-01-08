@@ -15,6 +15,10 @@ val is_version_control : t -> bool
 (** [is_file t] is true iff [t] is a url beginning with "file://" *)
 val is_local : t -> bool
 
+(** [local_or_git_path t] returns the local filesystem path for file:// or
+    git+file:// URLs. Returns [None] for remote URLs. *)
+val local_or_git_path : t -> string option
+
 (* [classify t loc] attempts to classify the url [t] by what sort of object it
    refers to. This function returns [`Path p] for a URL pointing to a local
    file system or [`Git] if it's a git repository (remote or otherwise) or

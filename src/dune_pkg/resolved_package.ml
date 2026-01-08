@@ -59,8 +59,14 @@ let read_opam_file package ~opam_file_path ~opam_file_contents ~url =
   | Some url -> OpamFile.OPAM.with_url (OpamFile.URL.create url) opam_file
 ;;
 
-let git_repo package ~opam_file ~opam_file_contents rev ~files_dir ~url =
-  let opam_file_path = Path.of_local opam_file in
+let git_repo package ~opam_file ~opam_file_contents rev ~files_dir ~url ~repo_dir =
+  (* For error messages, use the full path including repo_dir if available.
+     This allows dune to display source snippets in parse errors. *)
+  let opam_file_path =
+    match repo_dir with
+    | Some dir -> Path.append_local dir opam_file
+    | None -> Path.of_local opam_file
+  in
   let opam_file = read_opam_file package ~opam_file_path ~opam_file_contents ~url in
   let loc = Loc.in_file opam_file_path in
   Rest

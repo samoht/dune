@@ -31,6 +31,10 @@ let is_version_control t =
 let is_local t = String.equal t.transport "file"
 let is_supported_archive t = Option.is_some (Archive_driver.choose_for_filename t.path)
 
+(* Extract local path for file:// or git+file:// URLs.
+   For git+file:// URLs like "git+file:///path/to/repo#hash", returns "/path/to/repo" *)
+let local_or_git_path t = if String.equal t.transport "file" then Some t.path else None
+
 let classify url loc =
   match (url : t).backend with
   | `rsync when is_local url -> `Path (Path.of_string url.path)

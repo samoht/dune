@@ -93,6 +93,7 @@ let resolve_package { Local_package.loc; url = loc_url, url; name; version; orig
           ; "files", Dyn.list Path.Local.to_dyn files
           ]
     in
+    let repo_dir = OpamUrl0.local_or_git_path url |> Option.map ~f:Path.of_string in
     Resolved_package.git_repo
       package
       ~opam_file:opam_file_path
@@ -100,4 +101,5 @@ let resolve_package { Local_package.loc; url = loc_url, url; name; version; orig
       rev
       ~files_dir
       ~url:(Some url)
+      ~repo_dir
 ;;
