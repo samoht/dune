@@ -1,5 +1,9 @@
 export XDG_CACHE_HOME="$PWD/.cache"
 
+# Prevent git from walking up past the test directory and finding the sandbox's
+# fake .git file (which is an empty file that stops git from escaping).
+export GIT_CEILING_DIRECTORIES="$PWD"
+
 # Set the default platform for the purposes of solving dependencies so that the
 # output of tests is platform-independent.
 export DUNE_CONFIG__OS=linux
@@ -68,7 +72,8 @@ mkrepo() {
   local repo_dir
   repo_dir=$(dirname "$mock_packages")
   # Initialize as git repo for single-file lock format (needs commit hashes)
-  (cd "$repo_dir" && git init -q && git config user.email "test@test" && git config user.name "test")
+  # Make an initial commit so the repo has a valid HEAD
+  (cd "$repo_dir" && git init -q && git config user.email "test@test" && git config user.name "test" && git commit -q --allow-empty -m "Initial commit")
 }
 
 mkpkg() {
@@ -82,11 +87,13 @@ mkpkg() {
   mkdir -p $mock_packages/$name/$name.$version
   echo 'opam-version: "2.0"' > $mock_packages/$name/$name.$version/opam
   cat >>$mock_packages/$name/$name.$version/opam
-  # Commit the package so single-file format can derive from repo hash
-  # Get the repo directory (parent of packages dir)
+  # Commit the package so single-file format can derive from repo hash.
+  # Only do this if we're in a git repository (i.e., mkrepo was called).
   local repo_dir
   repo_dir=$(dirname "$mock_packages")
-  (cd "$repo_dir" && git add -A && git commit -q -m "Add $name.$version" 2>/dev/null || true)
+  if [ -d "$repo_dir/.git" ]; then
+    (cd "$repo_dir" && git add -A && git commit -q -m "Add $name.$version" >/dev/null 2>&1 || true)
+  fi
 }
 
 mk_ocaml() {
