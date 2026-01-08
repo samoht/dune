@@ -23,6 +23,68 @@ end
 module Vendor_stanza = Dune_lang.Vendor_stanza
 module Variable = Pkg_opam.Variable
 
+(* Relocatability check - ensures package outputs don't contain absolute paths.
+   Packages that embed absolute paths in their outputs are not relocatable and
+   cannot be shared across different project locations via the build cache. *)
+module Relocatable_check = struct
+  (* File extensions that are text files we should check for absolute paths *)
+  let text_extensions = [ ".pc"; ".ml"; ".mli"; ".sh"; ".conf"; ".config" ]
+
+  (* Filenames (without extension) that should be checked *)
+  let text_filenames = [ "META"; "dune-package" ]
+
+  let is_text_file path =
+    let basename = Path.basename path in
+    let has_text_ext =
+      List.exists text_extensions ~f:(fun ext -> String.is_suffix basename ~suffix:ext)
+    in
+    let is_text_name = List.mem text_filenames basename ~equal:String.equal in
+    let is_dune_file = String.is_prefix basename ~prefix:"dune-" in
+    has_text_ext || is_text_name || is_dune_file
+  ;;
+
+  let check_file ~prefix_path path =
+    if is_text_file path && Path.Untracked.exists path
+    then (
+      let content = Io.read_file path in
+      (* Use Re for substring matching *)
+      let re = Re.str prefix_path |> Re.compile in
+      if Re.execp re content then Some path else None)
+    else None
+  ;;
+
+  let rec scan_dir ~prefix_path dir =
+    match Path.Untracked.readdir_unsorted_with_kinds dir with
+    | Error _ -> []
+    | Ok entries ->
+      List.concat_map entries ~f:(fun (name, kind) ->
+        let path = Path.relative dir name in
+        match kind with
+        | Unix.S_REG -> Option.to_list (check_file ~prefix_path path)
+        | Unix.S_DIR -> scan_dir ~prefix_path path
+        | _ -> [])
+  ;;
+
+  let check ~pkg_name ~prefix ~install_dir =
+    let prefix_path = Path.to_absolute_filename prefix in
+    let bad_files = scan_dir ~prefix_path install_dir in
+    match bad_files with
+    | [] -> ()
+    | files ->
+      User_error.raise
+        [ Pp.textf
+            "Package %s is not relocatable. The following files contain absolute paths \
+             that would prevent sharing via the build cache:"
+            (Package.Name.to_string pkg_name)
+        ; Pp.enumerate files ~f:(fun p -> Pp.verbatim (Path.to_string p))
+        ; Pp.nop
+        ; Pp.text
+            "Packages should use relative paths or respect BUILD_PATH_PREFIX_MAP for \
+             reproducible builds."
+        ]
+  ;;
+end
+
 module Package_universe = struct
   (* A type of group of packages that are co-installed. Multiple different
      versions of a package may be co-installed into the same universe.
@@ -1136,14 +1198,21 @@ module Action_expander = struct
     }
   ;;
 
-  (* Pkg rules use no sandbox so packages can access the shared install directory.
-     This differs from dune's normal sandbox which remaps paths - pkg rules need
-     cross-package access via PREFIX which doesn't work with path remapping. *)
-  let default_sandbox = Sandbox_mode.Set.singleton Sandbox_mode.none
+  (* Install commands use no sandbox because they write to the shared PREFIX
+     directory. Build commands can be sandboxed since they only read from PREFIX. *)
+  let install_sandbox = Sandbox_mode.Set.singleton Sandbox_mode.none
+
+  (* Build commands can use any sandbox mode - they only read from PREFIX,
+     not write to it. PREFIX is an absolute path outside the sandbox. *)
+  let build_sandbox =
+    Sandbox_mode.Set.of_func (function
+      | Some Sandbox_mode.Symlink | Some Copy | Some Hardlink -> true
+      | None | Some Patch_back_source_tree -> false)
+  ;;
 
   let expand
         ?(can_go_in_shared_cache = true)
-        ?(sandbox = default_sandbox)
+        ~sandbox
         ?(chdir = true)
         context
         (pkg : Resolved_pkg.t)
@@ -1169,10 +1238,10 @@ module Action_expander = struct
   ;;
 
   let build_command context (pkg : Resolved_pkg.t) =
-    (* Build commands run sandboxed for isolation, like opam does.
-       Packages can still access PREFIX via absolute path. *)
+    (* Build commands run sandboxed for isolation. They can still access
+       PREFIX via absolute path since it's outside the sandbox. *)
     Option.map pkg.build_command ~f:(function
-      | Action action -> expand ~sandbox:default_sandbox context pkg action
+      | Action action -> expand ~sandbox:build_sandbox context pkg action
       | Dune ->
         (* CR-someday rgrinberg: respect [dune subst] settings. *)
         Command.run_dyn_prog
@@ -1183,10 +1252,10 @@ module Action_expander = struct
   ;;
 
   let install_command context (pkg : Resolved_pkg.t) =
-    (* Install commands also run sandboxed like build commands.
-       Packages access PREFIX via absolute path which works from within sandbox. *)
+    (* Install commands run without sandbox because they write to the shared
+       PREFIX directory which is outside the package's target directory. *)
     Option.map pkg.install_command ~f:(fun action ->
-      expand ~sandbox:default_sandbox context pkg action)
+      expand ~sandbox:install_sandbox context pkg action)
   ;;
 
   let exported_env (expander : Expander.t) (env : _ Env_update.t) =
@@ -1768,6 +1837,8 @@ module Install_action = struct
         config_file : 'path
       ; (* where we are supposed to put the installed artifacts *)
         target_dir : 'target
+      ; (* the PREFIX path for relocatability checking *)
+        prefix : 'path
       ; (* if the package's installation prefix is outside the build
            dir, it's stored here and will be used instead of [target_dir]
            as the location of insntalled artifacts *)
@@ -1784,6 +1855,7 @@ module Install_action = struct
           ({ install_file
            ; config_file
            ; target_dir
+           ; prefix
            ; prefix_outside_build_dir = _
            ; install_action = _
            ; package = _
@@ -1795,6 +1867,7 @@ module Install_action = struct
         install_file = f install_file
       ; config_file = f config_file
       ; target_dir = g target_dir
+      ; prefix = f prefix
       }
     ;;
 
@@ -1804,6 +1877,7 @@ module Install_action = struct
           { install_file
           ; config_file
           ; target_dir
+          ; prefix
           ; prefix_outside_build_dir
           ; install_action
           ; package
@@ -1816,6 +1890,7 @@ module Install_action = struct
         [ path install_file
         ; path config_file
         ; target target_dir
+        ; path prefix
         ; (match
              Option.map
                prefix_outside_build_dir
@@ -2025,6 +2100,7 @@ module Install_action = struct
           ; install_file
           ; config_file
           ; target_dir
+          ; prefix
           ; prefix_outside_build_dir
           ; install_action
           }
@@ -2115,16 +2191,22 @@ module Install_action = struct
           Install_cookie.dump cookie_file cookies)
       in
       (* For toolchain packages, also write cookie to cache location for persistence *)
-      let+ () =
+      let* () =
         match prefix_outside_build_dir with
         | None -> Fiber.return ()
-        | Some prefix ->
+        | Some prefix_dir ->
           let cache_cookie =
-            Path.outside_build_dir (Path.Outside_build_dir.relative prefix "cookie")
+            Path.outside_build_dir (Path.Outside_build_dir.relative prefix_dir "cookie")
           in
           Async.async (fun () ->
             cache_cookie |> Path.parent_exn |> Path.mkdir_p;
             Install_cookie.dump cache_cookie cookies)
+      in
+      (* Check that installed files don't contain absolute paths (relocatability check) *)
+      let+ () =
+        Async.async (fun () ->
+          let install_dir = Path.build target_dir in
+          Relocatable_check.check ~pkg_name:package ~prefix ~install_dir)
       in
       Dune_engine.Progress.finish_target ~name:(Package.Name.to_string package)
     ;;
@@ -2132,11 +2214,12 @@ module Install_action = struct
 
   module A = Action_ext.Make (Spec)
 
-  let action (p : Path.Build.t Paths.t) install_action ~prefix_outside_build_dir =
+  let action (p : Path.Build.t Paths.t) install_action ~prefix ~prefix_outside_build_dir =
     A.action
       { Spec.install_file = Path.build @@ Paths.install_file p
       ; config_file = Path.build @@ Paths.config_file p
       ; target_dir = p.target_dir
+      ; prefix
       ; prefix_outside_build_dir
       ; install_action
       ; package = p.name
@@ -2264,10 +2347,10 @@ let files path =
   Dep.Set.of_source_files ~files ~empty_directories, files
 ;;
 
-(* Sandbox mode for pkg rules - use no sandbox so packages can access
-   the shared install directory via PREFIX. Dune's copy sandbox remaps paths
-   which breaks cross-package access. *)
-let pkg_sandbox = Sandbox_mode.Set.singleton Sandbox_mode.none
+(* Sandbox mode for install-related actions - use no sandbox because they
+   write to the shared PREFIX directory. Copy/install actions need direct
+   access to the shared install directory. *)
+let install_action_sandbox = Sandbox_mode.Set.singleton Sandbox_mode.none
 
 let dune_dep =
   lazy (Sys.executable_name |> Path.External.of_string |> Path.external_ |> Dep.file)
@@ -2302,7 +2385,7 @@ let build_rule context_name ~source_deps (pkg : Resolved_pkg.t) =
                   Action.progn
                     [ Action.mkdir (Path.Build.parent_exn dst); Action.copy src dst ])
                 |> Action.concurrent
-                |> Action.Full.make ~sandbox:pkg_sandbox
+                |> Action.Full.make ~sandbox:install_action_sandbox
                 |> Action_builder.return)
           ]
         in
@@ -2327,7 +2410,7 @@ let build_rule context_name ~source_deps (pkg : Resolved_pkg.t) =
               Action.remove_tree dst
             ; Action.copy src dst
             ]
-          |> Action.Full.make ~sandbox:pkg_sandbox
+          |> Action.Full.make ~sandbox:install_action_sandbox
           |> Action_builder.With_targets.return)
       and+ build_action =
         match Action_expander.build_command context_name pkg with
@@ -2344,7 +2427,7 @@ let build_rule context_name ~source_deps (pkg : Resolved_pkg.t) =
             |> List.rev_map ~f:(fun section ->
               Install.Paths.get install_paths section |> Action.mkdir)
             |> Action.progn
-            |> Action.Full.make ~sandbox:pkg_sandbox
+            |> Action.Full.make ~sandbox:install_action_sandbox
             |> Action_builder.With_targets.return
           in
           [ mkdir_install_dirs; install_action ]
@@ -2358,8 +2441,9 @@ let build_rule context_name ~source_deps (pkg : Resolved_pkg.t) =
         (match Action_expander.install_command context_name pkg with
          | None -> `No_install_action
          | Some _ -> `Has_install_action)
+        ~prefix:pkg.paths.prefix
         ~prefix_outside_build_dir
-      |> Action.Full.make ~sandbox:pkg_sandbox
+      |> Action.Full.make ~sandbox:install_action_sandbox
       |> Action_builder.return
       |> Action_builder.with_no_targets
     in
@@ -2368,7 +2452,7 @@ let build_rule context_name ~source_deps (pkg : Resolved_pkg.t) =
     let progress_building =
       let status = if pkg.is_cached_toolchain then `Cached else `Building in
       Pkg_build_progress.progress_action pkg.info.name pkg.info.version status
-      |> Action.Full.make ~sandbox:pkg_sandbox
+      |> Action.Full.make ~sandbox:install_action_sandbox
       |> Action_builder.return
       |> Action_builder.with_no_targets
     in

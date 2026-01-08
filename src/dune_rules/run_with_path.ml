@@ -193,19 +193,29 @@ module Spec = struct
         Io.portable_symlink ~src ~dst;
         Path.to_string bin_folder
       in
+      let prefix_value = Path.to_absolute_filename prefix in
+      let ocamlfind_destdir_value = Path.to_absolute_filename ocamlfind_destdir in
       let env =
-        let prefix_value = Path.to_absolute_filename prefix in
         eenv.env
         (* OPAM_SWITCH_PREFIX is the standard opam env var for the switch prefix *)
         |> Env.add ~var:"OPAM_SWITCH_PREFIX" ~value:prefix_value
         (* PREFIX is also set for compatibility with traditional Makefiles *)
         |> Env.add ~var:"PREFIX" ~value:prefix_value
-        |> Env.add
-             ~var:"OCAMLFIND_DESTDIR"
-             ~value:(Path.to_absolute_filename ocamlfind_destdir)
+        |> Env.add ~var:"OCAMLFIND_DESTDIR" ~value:ocamlfind_destdir_value
         |> Env.update ~var:"PATH" ~f:(function
           | None -> Some dune_folder
           | Some path -> Some (sprintf "%s:%s" dune_folder path))
+      in
+      (* BUILD_PATH_PREFIX_MAP for reproducible/relocatable builds.
+         Maps absolute PREFIX and OCAMLFIND_DESTDIR to canonical paths so
+         tools that support this variable produce relocatable output. *)
+      let env =
+        Dune_util.Build_path_prefix_map.extend_build_path_prefix_map
+          env
+          `New_rules_have_precedence
+          [ Some { source = prefix_value; target = "/OPAMROOT" }
+          ; Some { source = ocamlfind_destdir_value; target = "/OPAMROOT/lib" }
+          ]
       in
       Output.with_error
         ~accepted_exit_codes:eenv.exit_codes
