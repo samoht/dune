@@ -2,14 +2,6 @@ open Import
 module Vendor = Dune_pkg.Vendor
 module Vendor_stanza = Dune_lang.Vendor_stanza
 
-(* Extract all package names from an opam dependency formula.
-   This ignores version constraints and filters - just collects the names. *)
-let extract_dep_names (formula : OpamTypes.filtered_formula) =
-  let names = ref [] in
-  OpamFormula.iter (fun (name, _condition) -> names := name :: !names) formula;
-  !names
-;;
-
 (* Path to a package's build directory: _build/.pkgs/<ctx>/<name>.<version>/ *)
 let pkg_build_root ~context ~pkg_name ~pkg_version =
   let ctx_dir =
@@ -393,6 +385,7 @@ module Paths = struct
     }
   ;;
 
+  (* Legacy cookie path inside target_dir - kept for backward compatibility *)
   let make_install_cookie target_dir ~relative = relative target_dir "cookie"
 
   let install_cookie' target_dir =
@@ -415,10 +408,10 @@ let marker_for_package ~context pkg_name =
       | None -> Package_version.of_string "dev"
       | Some info -> info.version
     in
-    (* _build/.pkgs/<ctx>/<name>.<version>/target/cookie *)
+    (* _build/.pkgs/<ctx>/<name>.<version>/cookie (root level, sibling of target/) *)
     let root = pkg_build_root ~context ~pkg_name ~pkg_version:version in
-    let paths = Paths.of_root pkg_name ~root ~relative:Path.Build.relative in
-    Some (Paths.install_cookie' (Paths.target_dir paths)))
+    (* Cookie is now at root level *)
+    Some (Path.Build.relative root "cookie"))
   else None
 ;;
 
@@ -431,190 +424,4 @@ let marker_for_library ~context lib_name =
   match Vendored_map.package_for_library map lib_name with
   | None -> Memo.return None
   | Some pkg_name -> marker_for_package ~context pkg_name
-;;
-
-(* Build an opam package using the shared Pkg_opam expansion logic *)
-let build_opam_package ~context ~pkg_name ~pkg_version ~source_dir ~opam_file =
-  let open Memo.O in
-  let* vendored_map = get_vendored_map () in
-  let build_cmds = OpamFile.OPAM.build opam_file in
-  let install_cmds = OpamFile.OPAM.install opam_file in
-  (* Extract dependencies from the opam file and filter to vendored packages *)
-  let opam_depends = OpamFile.OPAM.depends opam_file in
-  let dep_names = extract_dep_names opam_depends in
-  let vendored_deps =
-    List.filter_map dep_names ~f:(fun opam_name ->
-      let name = Package.Name.of_string (OpamPackage.Name.to_string opam_name) in
-      match Vendored_map.find vendored_map name with
-      | None -> None
-      | Some info -> Some (name, info))
-  in
-  (* Convert vendored_map to all_packages for Pkg_opam *)
-  let all_packages =
-    List.fold_left
-      (Vendored_map.all_packages vendored_map)
-      ~init:Package.Name.Map.empty
-      ~f:(fun acc pkg ->
-        match Vendored_map.version vendored_map pkg with
-        | Some v -> Package.Name.Map.set acc pkg v
-        | None -> acc)
-  in
-  (* Get install paths - use absolute paths since vendor builds chdir
-     to the package directory *)
-  let install_dir = Pkg_opam.Pkg_install.dir ~context in
-  let prefix = Path.of_string (Path.to_absolute_filename (Path.build install_dir)) in
-  let roots = Pkg_opam.Pkg_install.roots ~context in
-  let ocamlfind_destdir = Path.of_string (Path.to_absolute_filename roots.lib_root) in
-  (* For vendor builds, use the build directory path *)
-  let build_dir = Path.Build.append_source (Context_name.build_dir context) source_dir in
-  let build_path = Path.build build_dir in
-  let system_path = Global.env () |> Env_path.path in
-  let expand_vars s =
-    Pkg_opam.expand_string
-      ~context
-      ~pkg_name
-      ~pkg_version
-      ~all_packages
-      ~prefix
-      ~ocamlfind_destdir
-      s
-  in
-  let expand_ident var =
-    Pkg_opam.expand_ident ~context ~pkg_name ~pkg_version ~prefix ~ocamlfind_destdir var
-  in
-  let cmd_to_action (args, _filter) =
-    let* args =
-      Memo.List.filter_map args ~f:(fun (arg, _filter) ->
-        match (arg : OpamTypes.simple_arg) with
-        | CString s ->
-          let+ expanded = expand_vars s in
-          Some expanded
-        | CIdent i -> Memo.return (expand_ident i))
-    in
-    match args with
-    | [] -> Memo.return None
-    | prog_str :: cmd_args ->
-      let prog_path =
-        match Filename.analyze_program_name prog_str with
-        | Absolute -> Ok (Path.of_string prog_str)
-        | Relative_to_current_dir -> Ok (Path.relative build_path prog_str)
-        | In_path ->
-          (match Bin.which ~path:system_path prog_str with
-           | Some p -> Ok p
-           | None ->
-             Error (Action.Prog.Not_found.create ~program:prog_str ~context ~loc:None ()))
-      in
-      let args_arr =
-        Array.Immutable.of_list_map cmd_args ~f:(fun arg ->
-          Array.Immutable.of_list [ Run_with_path.Spec.String arg ])
-      in
-      Memo.return
-        (Some
-           (Run_with_path.action
-              ~pkg:(pkg_name, Loc.none)
-              ~depexts:[]
-              prog_path
-              args_arr
-              ~prefix
-              ~ocamlfind_destdir))
-  in
-  let* build_actions = Memo.List.filter_map build_cmds ~f:cmd_to_action in
-  let* install_actions = Memo.List.filter_map install_cmds ~f:cmd_to_action in
-  let progress_building =
-    Pkg_build_progress.progress_action pkg_name pkg_version `Building
-  in
-  let progress_installing =
-    Pkg_build_progress.progress_action pkg_name pkg_version `Installing
-  in
-  (* _build/.pkgs/<ctx>/<name>.<version>/target/cookie *)
-  let root = pkg_build_root ~context ~pkg_name ~pkg_version in
-  let paths = Paths.of_root pkg_name ~root ~relative:Path.Build.relative in
-  let target_dir = Paths.target_dir paths in
-  let marker_file = Paths.install_cookie' target_dir in
-  let mkdir_action = Action.mkdir target_dir in
-  let marker_action = Action.write_file marker_file "" in
-  let all_actions =
-    [ progress_building ]
-    @ build_actions
-    @ [ progress_installing ]
-    @ install_actions
-    @ [ mkdir_action; marker_action ]
-  in
-  let action =
-    Action.chdir build_path (Action.progn all_actions)
-    |> Action.Full.make ~env:Env.initial
-  in
-  (* Depend on all files in the build dir to trigger vendored_dirs mirroring. *)
-  let file_selector =
-    File_selector.of_predicate_lang ~dir:build_path Predicate_lang.true_
-  in
-  let source_deps = Action_builder.paths_matching_unit ~loc:Loc.none file_selector in
-  (* Build dependencies on other vendored packages *)
-  let pkg_deps =
-    List.map vendored_deps ~f:(fun (dep_name, dep_info) ->
-      match dep_info.Vendored_map.build_method with
-      | Some Vendor_stanza.Build_method.Opam_sandboxed ->
-        (* Opam-sandboxed packages: depend on their marker file *)
-        let dep_root =
-          pkg_build_root ~context ~pkg_name:dep_name ~pkg_version:dep_info.version
-        in
-        let dep_paths =
-          Paths.of_root dep_name ~root:dep_root ~relative:Path.Build.relative
-        in
-        let dep_target_dir = Paths.target_dir dep_paths in
-        let dep_cookie = Paths.install_cookie' dep_target_dir in
-        Dep.file (Path.build dep_cookie)
-      | Some Dune_native | None ->
-        (* Native dune packages: depend on @install alias to populate install dir *)
-        let dir =
-          Path.Build.append_source (Context_name.build_dir context) dep_info.source_dir
-        in
-        Dep.alias (Alias.make Alias0.install ~dir))
-    |> Dep.Set.of_list
-  in
-  let deps =
-    Action_builder.O.(
-      source_deps >>> Action_builder.deps pkg_deps |> Action_builder.map ~f:(fun _ -> ()))
-  in
-  let with_targets =
-    let open Action_builder.With_targets.O in
-    Action_builder.with_no_targets deps
-    >>> (Action_builder.return action
-         |> Action_builder.with_no_targets
-         |> Action_builder.With_targets.add_directories ~directory_targets:[ target_dir ]
-        )
-  in
-  Memo.return (marker_file, with_targets)
-;;
-
-let setup_vendor_package_rules ~context ~pkg_dir =
-  let open Memo.O in
-  let pkg_name = Package.Name.of_string (parse_pkg_name_from_dir pkg_dir) in
-  let* map = get_vendored_map () in
-  match Vendored_map.find map pkg_name with
-  | None -> Memo.return None
-  | Some info ->
-    (* Only handle opam-sandboxed packages here *)
-    (match info.build_method with
-     | Some Vendor_stanza.Build_method.Opam_sandboxed ->
-       let pkg_name_str = Package.Name.to_string pkg_name in
-       (match find_opam_file ~pkg_name:pkg_name_str ~pkg_dir:info.source_dir with
-        | None -> Memo.return None
-        | Some opam_file_path ->
-          let contents = Io.read_file ~binary:true (Path.source opam_file_path) in
-          (match OpamFile.OPAM.read_from_string contents with
-           | exception _ -> Memo.return None
-           | opam_file ->
-             let+ _marker, action =
-               build_opam_package
-                 ~context
-                 ~pkg_name
-                 ~pkg_version:info.version
-                 ~source_dir:info.source_dir
-                 ~opam_file
-             in
-             Some action))
-     | Some Dune_native | None ->
-       (* Native dune packages don't need special rules here *)
-       Memo.return None)
 ;;

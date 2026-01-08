@@ -125,34 +125,3 @@ module Paths : sig
   val source_dir : 'a t -> 'a
   val install_paths : 'a t -> 'a Install.Paths.t
 end
-
-(** {2 Opam Package Building}
-
-    Build infrastructure for opam-style packages. This handles variable
-    expansion (%{prefix}%, %{lib}%, %{make}%, etc.) and command execution. *)
-
-(** Build an opam package from an opam file.
-    This is the foundation that both lock file packages and vendor packages use.
-
-    @param context Build context name
-    @param pkg_name Package name
-    @param pkg_version Package version
-    @param source_dir Path to package source
-    @param opam_file Parsed opam file
-    @return Marker file and build action *)
-val build_opam_package
-  :  context:Context_name.t
-  -> pkg_name:Package.Name.t
-  -> pkg_version:Package_version.t
-  -> source_dir:Path.Source.t
-  -> opam_file:OpamFile.OPAM.t
-  -> (Path.Build.t * Action.Full.t Action_builder.With_targets.t) Memo.t
-
-(** Set up rules for a vendor package in the pkg context.
-    Called from pkg_rules when handling _build/.pkgs/<ctx>/<name>.<version>/.
-    Returns None if the package directory doesn't correspond to a vendor package.
-    Returns the build action with targets for the cookie file. *)
-val setup_vendor_package_rules
-  :  context:Context_name.t
-  -> pkg_dir:string
-  -> Action.Full.t Action_builder.With_targets.t option Memo.t

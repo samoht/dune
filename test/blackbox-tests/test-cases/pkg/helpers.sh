@@ -37,7 +37,8 @@ build_pkg() {
   prefix=$(get_build_pkg_dir $1)
   status=$?
   if [ "$status" -eq "0" ]; then
-    $dune build "$prefix/target"
+    # Build the cookie file which triggers the full package build+install
+    $dune build "$prefix/cookie"
   else
     return 1
   fi
@@ -53,15 +54,14 @@ strip_sandbox() {
 }
 
 show_pkg_targets() {
-  # Packages now install to the shared _build/install/default/ directory
-  # Filter to only show files related to this package
-  pkg_name=$1
+  # Show files installed to the shared install directory
   prefix="_build/install/default"
-  find "$prefix" 2>/dev/null | grep -E "/$pkg_name[/.]" | sort | dune_cmd subst "$prefix" ""
+  find "$prefix" 2>/dev/null | sort | dune_cmd subst "$prefix" "" | grep -v '^$'
 }
 
 show_pkg_cookie() {
-  $dune internal dump "$(get_build_pkg_dir $1)/target/cookie"
+  # Cookie is now at root level (sibling of target/)
+  $dune internal dump "$(get_build_pkg_dir $1)/cookie"
 }
 
 mock_packages="mock-opam-repository/packages"

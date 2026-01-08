@@ -192,6 +192,19 @@ module Paths = struct
     of_root pkg_digest.name ~root
   ;;
 
+  (* Get the root directory (parent of target_dir) *)
+  let root_of_target_dir target_dir = Path.Build.parent_exn target_dir
+  let root_of_target_dir_path target_dir = Path.parent_exn target_dir
+
+  (* Cookie path at root level (sibling of target/) for split rules *)
+  let install_cookie_root_build target_dir =
+    Path.Build.relative (root_of_target_dir target_dir) "cookie"
+  ;;
+
+  let install_cookie_root target_dir =
+    Path.relative (root_of_target_dir_path target_dir) "cookie"
+  ;;
+
   let install_file t =
     Path.Build.relative
       t.source_dir
@@ -457,7 +470,7 @@ module Resolved_pkg = struct
     | Some root -> loop root Path.Local.Set.empty Path.Local.root
   ;;
 
-  let dep t = Dep.file (Paths.install_cookie t.paths)
+  let dep t = Dep.file (Paths.install_cookie_root t.paths.target_dir)
 
   let package_deps t =
     deps_closure t
@@ -544,7 +557,8 @@ module Pkg_installed = struct
   let of_paths (paths : Path.t Paths.t) =
     let cookie =
       let open Action_builder.O in
-      let path = Paths.install_cookie paths in
+      (* Cookie is now at root level (sibling of target/) *)
+      let path = Paths.install_cookie_root paths.target_dir in
       let+ () = path |> Dep.file |> Action_builder.dep in
       Install_cookie.load_exn path
     in
@@ -1509,6 +1523,7 @@ end = struct
         |> List.fold_left ~init:Package.Name.Map.empty ~f:(fun acc reg_entry ->
           Package.Name.Map.set acc reg_entry.Package_registry.name reg_entry.version)
       in
+      let context = Package_universe.context_name package_universe in
       (* Build the package record *)
       let paths =
         let base_paths = Paths.map_path write_paths ~f:Path.build in
@@ -1542,9 +1557,24 @@ end = struct
               Lazy.map install_roots ~f:(Install.Roots.map ~f:Path.outside_build_dir)
           ; install_paths
           })
-        else base_paths
+        else (
+          (* For regular (non-toolchain) packages, use the shared install directory
+             so %{prefix}%, %{lib}%, etc. expand to the correct paths *)
+          let shared_prefix = Pkg_opam.Pkg_install.dir ~context |> Path.build in
+          let shared_roots = Pkg_opam.Pkg_install.roots ~context in
+          let install_paths =
+            lazy
+              (Install.Paths.make
+                 ~relative:Path.relative
+                 ~package:info.name
+                 ~roots:shared_roots)
+          in
+          { base_paths with
+            prefix = shared_prefix
+          ; install_roots = lazy shared_roots
+          ; install_paths
+          })
       in
-      let context = Package_universe.context_name package_universe in
       let t =
         { Resolved_pkg.id
         ; build_command
@@ -1890,25 +1920,20 @@ module Install_action = struct
       let* () = Fiber.return () in
       let* files =
         let from_install_action =
-          let target_dir =
-            (* If the package used a prefix that was outside the build
-               directory (as is the case with toolchains), parse the
-               installed sections from that location. Otherwise parse the
-               installed sections from the package's location within the
-               build directory. *)
+          (* Install actions write to the prefix directory (which is either the
+             shared install directory or the toolchain cache for cached toolchains).
+             Look there for installed files. *)
+          let prefix_dir =
             match prefix_outside_build_dir with
             | Some prefix_outside_build_dir ->
               Path.outside_build_dir prefix_outside_build_dir
-            | None -> Path.build target_dir
+            | None -> prefix
           in
           match install_action with
           | `No_install_action -> Section.Map.empty
           | `Has_install_action ->
             let install_paths =
-              Paths.of_root
-                package
-                ~root:(Path.parent_exn target_dir)
-                ~relative:Path.relative
+              Paths.of_root package ~root:prefix_dir ~relative:Path.relative
               |> Paths.install_paths
             in
             section_map_of_dir install_paths
@@ -1962,8 +1987,8 @@ module Install_action = struct
         let+ variables = Async.async (fun () -> read_variables config_file) in
         { Install_cookie.Gen.files; variables }
       in
-      (* Produce the cookie file in the standard path *)
-      let cookie_file = Path.build @@ Paths.install_cookie' target_dir in
+      (* Produce the cookie file at root level (sibling of target/) for split rules *)
+      let cookie_file = Path.build @@ Paths.install_cookie_root_build target_dir in
       let* () =
         Async.async (fun () ->
           cookie_file |> Path.parent_exn |> Path.mkdir_p;
@@ -2136,128 +2161,98 @@ let dune_dep =
   lazy (Sys.executable_name |> Path.External.of_string |> Path.external_ |> Dep.file)
 ;;
 
-let build_rule context_name ~source_deps (pkg : Resolved_pkg.t) =
+(* Build sandbox mode - restricts writes to declared targets *)
+let build_sandbox = Sandbox_config.needs_sandboxing
+
+(* Marker file path at root level (sibling of target/) to signal build completion *)
+let build_marker_path (pkg : Resolved_pkg.t) =
+  Path.Build.relative
+    (Paths.root_of_target_dir pkg.write_paths.target_dir)
+    ".dune-pkg-build-done"
+;;
+
+(* Rule 1: Build rule (sandboxed) - copies sources and runs build command.
+   Produces target_dir with build outputs and a marker file. *)
+let build_only_rule context_name ~source_deps (pkg : Resolved_pkg.t) =
   let+ build_action =
-    let+ copy_action, build_action, install_action =
+    let+ copy_action =
       let+ copy_action =
-        let+ copy_action =
-          let+ () = Memo.return () in
-          let open Action_builder.O in
-          [ Action_builder.with_no_targets
-            @@ ((match pkg.files_dir with
-                 | Some files_dir -> Action_builder.path (Path.build files_dir)
-                 | None -> Action_builder.return ())
-                >>> Action_builder.of_memo
-                      (Memo.of_thunk (fun () ->
-                         match pkg.files_dir with
-                         | None -> Memo.return (Path.Set.empty, Dep.Set.empty)
-                         | Some files_dir ->
-                           let deps, source_deps = files files_dir in
-                           Memo.return (source_deps, deps)))
-                |> Action_builder.dyn_deps
-                >>= fun source_deps ->
-                Path.Set.to_list_map source_deps ~f:(fun src ->
-                  let dst =
-                    let prefix = pkg.files_dir |> Option.value_exn |> Path.build in
-                    let local_path = Path.drop_prefix_exn src ~prefix in
-                    Path.Build.append_local pkg.write_paths.source_dir local_path
-                  in
-                  Action.progn
-                    [ Action.mkdir (Path.Build.parent_exn dst); Action.copy src dst ])
-                |> Action.concurrent
-                |> Action.Full.make ~sandbox:install_action_sandbox
-                |> Action_builder.return)
-          ]
-        in
-        copy_action
-        @ List.map pkg.info.extra_sources ~f:(fun (local, _) ->
-          (* If the package has extra sources, they will be
-             initially stored in the extra_sources directory for that
-             package. Prior to building, the contents of
-             extra_sources must be copied into the package's source
-             directory. *)
-          let src = Paths.extra_source pkg.paths local in
-          let dst = Path.Build.append_local pkg.write_paths.source_dir local in
-          Action.progn
-            [ (* If the package has no source directory (some
-                 low-level packages are exclusively made up of extra
-                 sources), the source directory is first created. *)
-              Action.mkdir pkg.write_paths.source_dir
-            ; (* It's possible for some extra sources to already be at
-                 the destination. If these files are write-protected
-                 then the copy action will fail if we don't first remove
-                 them. *)
-              Action.remove_tree dst
-            ; Action.copy src dst
-            ]
-          |> Action.Full.make ~sandbox:install_action_sandbox
-          |> Action_builder.With_targets.return)
-      and+ build_action =
-        match Action_expander.build_command context_name pkg with
-        | None -> Memo.return []
-        | Some build_command -> build_command >>| List.singleton
-      and+ install_action =
-        match Action_expander.install_command context_name pkg with
-        | None -> Memo.return []
-        | Some install_action ->
-          let+ install_action = install_action in
-          let mkdir_install_dirs =
-            let install_paths = Paths.install_paths pkg.write_paths in
-            Install_action.installable_sections
-            |> List.rev_map ~f:(fun section ->
-              Install.Paths.get install_paths section |> Action.mkdir)
-            |> Action.progn
-            |> Action.Full.make ~sandbox:install_action_sandbox
-            |> Action_builder.With_targets.return
-          in
-          [ mkdir_install_dirs; install_action ]
+        let+ () = Memo.return () in
+        let open Action_builder.O in
+        [ Action_builder.with_no_targets
+          @@ ((match pkg.files_dir with
+               | Some files_dir -> Action_builder.path (Path.build files_dir)
+               | None -> Action_builder.return ())
+              >>> Action_builder.of_memo
+                    (Memo.of_thunk (fun () ->
+                       match pkg.files_dir with
+                       | None -> Memo.return (Path.Set.empty, Dep.Set.empty)
+                       | Some files_dir ->
+                         let deps, source_deps = files files_dir in
+                         Memo.return (source_deps, deps)))
+              |> Action_builder.dyn_deps
+              >>= fun source_deps ->
+              Path.Set.to_list_map source_deps ~f:(fun src ->
+                let dst =
+                  let prefix = pkg.files_dir |> Option.value_exn |> Path.build in
+                  let local_path = Path.drop_prefix_exn src ~prefix in
+                  Path.Build.append_local pkg.write_paths.source_dir local_path
+                in
+                Action.progn
+                  [ Action.mkdir (Path.Build.parent_exn dst); Action.copy src dst ])
+              |> Action.concurrent
+              |> Action.Full.make ~sandbox:build_sandbox
+              |> Action_builder.return)
+        ]
       in
-      copy_action, build_action, install_action
+      copy_action
+      @ List.map pkg.info.extra_sources ~f:(fun (local, _) ->
+        let src = Paths.extra_source pkg.paths local in
+        let dst = Path.Build.append_local pkg.write_paths.source_dir local in
+        Action.progn
+          [ Action.mkdir pkg.write_paths.source_dir
+          ; Action.remove_tree dst
+          ; Action.copy src dst
+          ]
+        |> Action.Full.make ~sandbox:build_sandbox
+        |> Action_builder.With_targets.return)
+    and+ build_action =
+      match Action_expander.build_command context_name pkg with
+      | None -> Memo.return []
+      | Some build_command -> build_command >>| List.singleton
     in
-    let install_file_action =
-      let prefix_outside_build_dir = Path.as_outside_build_dir pkg.paths.prefix in
-      Install_action.action
-        pkg.write_paths
-        (match Action_expander.install_command context_name pkg with
-         | None -> `No_install_action
-         | Some _ -> `Has_install_action)
-        ~prefix:pkg.paths.prefix
-        ~prefix_outside_build_dir
-      |> Action.Full.make ~sandbox:install_action_sandbox
-      |> Action_builder.return
-      |> Action_builder.with_no_targets
-    in
-    (* Action to print a progress message for the package.
-       Uses "Cached" for toolchains restored from cache, "Building" otherwise. *)
-    let progress_building =
-      let status = if pkg.is_cached_toolchain then `Cached else `Building in
-      Pkg_build_progress.progress_action pkg.info.name pkg.info.version status
-      |> Action.Full.make ~sandbox:install_action_sandbox
-      |> Action_builder.return
-      |> Action_builder.with_no_targets
-    in
-    [ copy_action
-    ; [ progress_building ]
-    ; build_action
-    ; install_action
-    ; [ install_file_action ]
-    ]
+    copy_action, build_action
+  in
+  let copy_action, build_action = build_action in
+  (* Action to print a progress message for the package *)
+  let progress_building =
+    let status = if pkg.is_cached_toolchain then `Cached else `Building in
+    Pkg_build_progress.progress_action pkg.info.name pkg.info.version status
+    |> Action.Full.make ~sandbox:build_sandbox
+    |> Action_builder.return
+    |> Action_builder.with_no_targets
+  in
+  (* Create marker file to signal build completion *)
+  let marker_action =
+    Action.write_file (build_marker_path pkg) ""
+    |> Action.Full.make ~sandbox:build_sandbox
+    |> Action_builder.return
+    |> Action_builder.with_file_targets ~file_targets:[ build_marker_path pkg ]
+  in
+  let actions =
+    [ copy_action; [ progress_building ]; build_action; [ marker_action ] ]
     |> List.concat
     |> Action_builder.progn
   in
   let open Action_builder.With_targets.O in
   (let deps =
      let deps = Dep.Set.union source_deps (Resolved_pkg.package_deps pkg) in
-     (* Add dependencies on vendored dune packages (their install aliases) *)
      let deps = Dep.Set.union deps (Resolved_pkg.vendored_deps pkg) in
      let deps =
        match pkg.depends_on_dune with
        | false -> deps
        | true -> Dep.Set.add deps (Lazy.force dune_dep)
      in
-     (* For cached toolchains, add a dependency on the global cache's ocaml binary.
-        This invalidates the shared cache when the global cache changes.
-        We use the ocaml binary as it exists in valid installs but not in stale ones. *)
      match pkg.toolchain_cache_dir with
      | None -> deps
      | Some cache_dir ->
@@ -2267,17 +2262,78 @@ let build_rule context_name ~source_deps (pkg : Resolved_pkg.t) =
        else deps
    in
    Action_builder.deps deps |> Action_builder.with_no_targets)
-  (* TODO should we add env deps on these? *)
-  >>> add_env (Resolved_pkg.exported_env pkg) build_action
-  |> Action_builder.With_targets.add_directories
-       ~directory_targets:[ pkg.write_paths.target_dir ]
+  >>> add_env (Resolved_pkg.exported_env pkg) actions
+;;
+
+(* Cookie file path for the install rule *)
+let install_cookie_path (pkg : Resolved_pkg.t) =
+  Paths.install_cookie_root_build pkg.write_paths.target_dir
+;;
+
+(* Rule 2: Install rule (unsandboxed) - runs install command and creates cookie.
+   Depends on build rule completion. Writes to shared install directory. *)
+let install_only_rule context_name (pkg : Resolved_pkg.t) =
+  let+ install_action =
+    let+ install_action =
+      match Action_expander.install_command context_name pkg with
+      | None -> Memo.return []
+      | Some install_action ->
+        let+ install_action = install_action in
+        (* Create directories in the shared install location *)
+        let mkdir_install_dirs =
+          let install_paths = Paths.install_paths pkg.paths in
+          Install_action.installable_sections
+          |> List.rev_map ~f:(fun section ->
+            Install.Paths.get install_paths section
+            |> Path.as_in_build_dir_exn
+            |> Action.mkdir)
+          |> Action.progn
+          |> Action.Full.make ~sandbox:install_action_sandbox
+          |> Action_builder.With_targets.return
+        in
+        [ mkdir_install_dirs; install_action ]
+    in
+    install_action
+  in
+  let install_file_action =
+    let prefix_outside_build_dir = Path.as_outside_build_dir pkg.paths.prefix in
+    Install_action.action
+      pkg.write_paths
+      (match Action_expander.install_command context_name pkg with
+       | None -> `No_install_action
+       | Some _ -> `Has_install_action)
+      ~prefix:pkg.paths.prefix
+      ~prefix_outside_build_dir
+    |> Action.Full.make ~sandbox:install_action_sandbox
+    |> Action_builder.return
+    (* Cookie is file target of this rule *)
+    |> Action_builder.with_file_targets ~file_targets:[ install_cookie_path pkg ]
+  in
+  let progress_installing =
+    Pkg_build_progress.progress_action pkg.info.name pkg.info.version `Installing
+    |> Action.Full.make ~sandbox:install_action_sandbox
+    |> Action_builder.return
+    |> Action_builder.with_no_targets
+  in
+  let actions =
+    [ [ progress_installing ]; install_action; [ install_file_action ] ]
+    |> List.concat
+    |> Action_builder.progn
+  in
+  let open Action_builder.With_targets.O in
+  (* Depend on build completion marker *)
+  Action_builder.path (Path.build (build_marker_path pkg))
+  |> Action_builder.with_no_targets
+  >>> add_env (Resolved_pkg.exported_env pkg) actions
 ;;
 
 let gen_rules context_name (pkg : Resolved_pkg.t) =
   let* source_deps, copy_rules = source_rules pkg in
   let* () = copy_rules
-  and* build_rule = build_rule context_name pkg ~source_deps in
-  rule ~loc:Loc.none (* TODO *) build_rule
+  and* build_rule = build_only_rule context_name pkg ~source_deps
+  and* install_rule = install_only_rule context_name pkg in
+  let* () = rule ~loc:Loc.none build_rule in
+  rule ~loc:Loc.none install_rule
 ;;
 
 module Gen_rules = Build_config.Gen_rules
@@ -2372,9 +2428,11 @@ module Vendor_build = struct
          pkg_digests)
     in
     List.map pkg_digests ~f:(fun pkg_digest ->
-      Paths.make ~relative:Path.Build.relative pkg_digest (Dependencies ctx_name)
-      |> Paths.target_dir
-      |> Path.build)
+      let paths =
+        Paths.make ~relative:Path.Build.relative pkg_digest (Dependencies ctx_name)
+      in
+      (* Depend on the cookie file which is produced by the install rule *)
+      Paths.install_cookie_root_build paths.target_dir |> Path.build)
     |> Action_builder.paths
   ;;
 
@@ -2398,7 +2456,7 @@ module Vendor_build = struct
       | Some v -> Package_version.of_string (OpamPackage.Version.to_string v)
       | None -> Package_version.of_string "dev"
     in
-    (* Marker is at _build/.pkgs/<ctx>/<name>.<version>/target/cookie *)
+    (* Marker is at _build/.pkgs/<ctx>/<name>.<version>/cookie (root level, sibling of target/) *)
     Vendor_rules.marker_for_package ~context:ctx_name pkg_name
     >>| function
     | Some marker -> marker
@@ -2410,13 +2468,9 @@ module Vendor_build = struct
           (Package.Name.to_string pkg_name)
           (Package_version.to_string pkg_version)
       in
-      let pkg_context =
-        Vendor_rules.Paths.of_root
-          pkg_name
-          ~root:(Path.Build.relative (build_dir ctx_name) pkg_dir)
-          ~relative:Path.Build.relative
-      in
-      Vendor_rules.Paths.install_cookie' (Vendor_rules.Paths.target_dir pkg_context)
+      let root = Path.Build.relative (build_dir ctx_name) pkg_dir in
+      (* Cookie is now at root level, sibling of target/ *)
+      Path.Build.relative root "cookie"
   ;;
 
   let classify_vendor_stanzas ctx_name =
@@ -2556,18 +2610,17 @@ let setup_package_rules_from_entry
       Paths.make pkg.pkg_digest package_universe ~relative:Path.Build.relative
     in
     let+ directory_targets =
-      let map =
-        let target_dir = paths.target_dir in
-        Path.Build.Map.singleton target_dir Loc.none
-      in
+      (* With split rules, we no longer produce target_dir as a directory target.
+         We only produce file targets (build marker and cookie) at the root level.
+         source_dir is still a directory target when source is fetched. *)
       match pkg.info.source with
-      | None -> Memo.return map
+      | None -> Memo.return Path.Build.Map.empty
       | Some source ->
         Lock_dir.source_kind source
         >>| (function
-         | `Local (`Directory, _) -> map
+         | `Local (`Directory, _) -> Path.Build.Map.empty
          | `Local (`File, _) | `Fetch ->
-           Path.Build.Map.add_exn map paths.source_dir (fst source.url))
+           Path.Build.Map.singleton paths.source_dir (fst source.url))
     in
     let build_dir_only_sub_dirs =
       Gen_rules.Build_only_sub_dirs.singleton ~dir Subdir_set.empty
