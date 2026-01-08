@@ -824,9 +824,9 @@ let gen_rules ctx ~dir components =
           ~directory_targets
           (Memo.return rules)))
   else if is_under_pkgs_dir dir
-  then pkg_context_rules ~dir components
+  then pkg_context_rules ~dir (Context_name.to_string ctx :: components)
   else if is_under_locks_dir dir
-  then lock_context_rules ~dir components
+  then lock_context_rules ~dir (Context_name.to_string ctx :: components)
   else if Context_name.equal ctx Fetch_rules.context.name
   then Fetch_rules.gen_rules ~dir ~components
   else
