@@ -164,9 +164,9 @@ let%expect_test "Status line clearing with wrapping." =
   escape [%expect.output];
   [%expect
     {|
-This status line is a problem because of the fact that it is especially long
-and therefore will not be cleared properly.\r                                                                                                                        \r
- |}]
+    This status line is a problem because of the fact that it is especially long
+    ...\r                                                                                \r
+    |}]
 ;;
 
 let%expect_test "Multi-line status line clearing." =
