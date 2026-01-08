@@ -243,8 +243,15 @@ let opam_package_to_lock_file_pkg
 ;;
 
 (* Internal implementation that optionally collects opam file contents.
-   When ~with_opam_files is true, returns opam file content for each package. *)
-let file_to_lock_impl ~loc ~solver_env ~with_opam_files (file : Lock.File.t) =
+   When ~with_opam_files is true, returns opam file content for each package.
+   Preserves the dependency_hash from the source file for out-of-sync detection. *)
+let file_to_lock_impl
+      ~loc
+      ~solver_env
+      ~local_packages
+      ~with_opam_files
+      (file : Lock.File.t)
+  =
   let open Fiber.O in
   let portable_lock_dir = Lock.File.is_portable file in
   let* repos, resolved_packages = Lock.File.derive ~loc file in
@@ -309,7 +316,7 @@ let file_to_lock_impl ~loc ~solver_env ~with_opam_files (file : Lock.File.t) =
   let lock =
     Lock.create_latest_version
       packages
-      ~local_packages:[]
+      ~local_packages (* dependency_hash computed from local_packages during derivation *)
       ~ocaml:None
       ~repos:(Some repos)
       ~expanded_solver_variable_bindings
@@ -319,14 +326,16 @@ let file_to_lock_impl ~loc ~solver_env ~with_opam_files (file : Lock.File.t) =
   lock, opam_files
 ;;
 
-let file_to_lock ~loc ~solver_env file =
+let file_to_lock ~loc ~solver_env ~local_packages file =
   let open Fiber.O in
-  let+ lock, _ = file_to_lock_impl ~loc ~solver_env ~with_opam_files:false file in
+  let+ lock, _ =
+    file_to_lock_impl ~loc ~solver_env ~local_packages ~with_opam_files:false file
+  in
   lock
 ;;
 
-let file_to_lock_with_opam_files ~loc ~solver_env file =
-  file_to_lock_impl ~loc ~solver_env ~with_opam_files:true file
+let file_to_lock_with_opam_files ~loc ~solver_env ~local_packages file =
+  file_to_lock_impl ~loc ~solver_env ~local_packages ~with_opam_files:true file
 ;;
 
 (* Cache for derived single-file locks.
@@ -397,7 +406,7 @@ module Single_file_cache = struct
   ;;
 end
 
-let derive_and_cache_lock ~solver_env path =
+let derive_and_cache_lock ~solver_env ~local_packages path =
   let cache_path = Single_file_cache.cache_path_for path in
   let file =
     Io.with_lexbuf_from_file path ~f:(fun lexbuf ->
@@ -406,7 +415,7 @@ let derive_and_cache_lock ~solver_env path =
   let portable_lock_dir = Lock.File.is_portable file in
   let loc = Loc.in_file path in
   let open Fiber.O in
-  let+ lock = file_to_lock ~loc ~solver_env file in
+  let+ lock = file_to_lock ~loc ~solver_env ~local_packages file in
   (* Write to cache for next time (same format as upstream lock dir) *)
   (match Single_file_cache.get_source_mtime path with
    | Some mtime -> Single_file_cache.write_cache ~portable_lock_dir cache_path lock mtime
@@ -414,7 +423,7 @@ let derive_and_cache_lock ~solver_env path =
   lock
 ;;
 
-let read_disk ~solver_env path =
+let read_disk ~solver_env ~local_packages path =
   match Lock.detect_format path with
   | None ->
     User_error.raise
@@ -426,7 +435,8 @@ let read_disk ~solver_env path =
     (* Directory format - use sync reader wrapped in Fiber *)
     Fiber.return (Lock.read_disk_exn path)
   | Some Lock.File ->
-    (* Single-file format - check cache first, then derive if needed *)
+    (* Single-file format - check cache first, then derive if needed.
+       The dependency_hash is computed from local_packages during derivation. *)
     let cache_path = Single_file_cache.cache_path_for path in
     if Single_file_cache.is_cache_valid path cache_path
     then (
@@ -435,14 +445,14 @@ let read_disk ~solver_env path =
       | Some lock -> Fiber.return lock
       | None ->
         (* Cache read failed (stale/corrupt) - re-derive *)
-        derive_and_cache_lock ~solver_env path)
+        derive_and_cache_lock ~solver_env ~local_packages path)
     else (* Cache miss - derive from opam repo and cache result *)
-      derive_and_cache_lock ~solver_env path
+      derive_and_cache_lock ~solver_env ~local_packages path
 ;;
 
 (* Like read_disk but also returns opam files for fetch.
    Only returns opam files for single-file format (where we derive from repo). *)
-let read_disk_with_opam_files ~solver_env path =
+let read_disk_with_opam_files ~solver_env ~local_packages path =
   match Lock.detect_format path with
   | None ->
     User_error.raise
@@ -462,7 +472,9 @@ let read_disk_with_opam_files ~solver_env path =
     in
     let portable_lock_dir = Lock.File.is_portable file in
     let loc = Loc.in_file path in
-    let+ lock, opam_files = file_to_lock_with_opam_files ~loc ~solver_env file in
+    let+ lock, opam_files =
+      file_to_lock_with_opam_files ~loc ~solver_env ~local_packages file
+    in
     let cache_path = Single_file_cache.cache_path_for path in
     (* Also cache the result for subsequent non-fetch reads *)
     (match Single_file_cache.get_source_mtime path with

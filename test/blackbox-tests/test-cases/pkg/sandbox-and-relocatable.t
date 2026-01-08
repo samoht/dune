@@ -28,7 +28,7 @@ Create a package that embeds absolute paths in its output:
 
   $ make_lockpkg bad-pkg <<EOF
   > (version 0.0.1)
-  > (build
+  > (install
   >  (system "mkdir -p %{lib}/%{pkg-self:name}; echo 'prefix=%{prefix}' > %{lib}/%{pkg-self:name}/bad.pc"))
   > EOF
 
@@ -45,7 +45,7 @@ Create a package that uses relative paths:
 
   $ make_lockpkg good-pkg <<EOF
   > (version 0.0.1)
-  > (build
+  > (install
   >  (system "mkdir -p %{lib}/%{pkg-self:name}; echo 'prefix=\${pcfiledir}/../..' > %{lib}/%{pkg-self:name}/good.pc"))
   > EOF
 
@@ -67,7 +67,7 @@ Create a package that tries to read the file:
 
   $ make_lockpkg sandbox-test <<EOF
   > (version 0.0.1)
-  > (build
+  > (install
   >  (system "mkdir -p %{lib}/%{pkg-self:name}; if [ -f /tmp/outside-file-$$ ]; then echo 'LEAK: can see outside file'; else echo 'ISOLATED: cannot see outside file'; fi"))
   > EOF
 
@@ -102,7 +102,7 @@ META files are commonly checked for relocatability:
 
   $ make_lockpkg meta-with-abs-path <<EOF
   > (version 0.0.1)
-  > (build
+  > (install
   >  (system "mkdir -p %{lib}/%{pkg-self:name}; echo 'directory=\"%{lib}/%{pkg-self:name}\"' > %{lib}/%{pkg-self:name}/META"))
   > EOF
 
@@ -117,7 +117,7 @@ Test 7: dune-package file with absolute paths (TODO)
 
   $ make_lockpkg dune-pkg-with-abs-path <<EOF
   > (version 0.0.1)
-  > (build
+  > (install
   >  (system "mkdir -p %{lib}/%{pkg-self:name}; echo '(name mylib) (dir %{lib}/%{pkg-self:name})' > %{lib}/%{pkg-self:name}/dune-package"))
   > EOF
 

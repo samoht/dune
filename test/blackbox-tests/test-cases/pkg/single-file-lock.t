@@ -33,7 +33,9 @@ Check the contents of the single-file lock:
   $ cat dune.lock
   (lang package 0.1)
   
-  (repos)
+  (repos
+   (file:///Users/samoht/git/dune/_build/.sandbox/ebd7423dd37b3e55ce6345de75288fdc/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository
+    76aa4530162e9f1e6d056284067631b0dd1ae0dc))
   
   (packages foo.0.0.1)
   
@@ -92,7 +94,9 @@ Check the single-file lock contents include pins:
   $ cat dune.lock | strip_sandbox
   (lang package 0.1)
   
-  (repos)
+  (repos
+   $SANDBOX/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository
+    76aa4530162e9f1e6d056284067631b0dd1ae0dc))
   
   (packages my-pinned-pkg.dev)
   
@@ -131,7 +135,9 @@ Check lock has linux platform only:
   $ cat dune.lock
   (lang package 0.1)
   
-  (repos)
+  (repos
+   (file:///Users/samoht/git/dune/_build/.sandbox/ebd7423dd37b3e55ce6345de75288fdc/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository
+    76aa4530162e9f1e6d056284067631b0dd1ae0dc))
   
   (packages foo.0.0.1)
   
@@ -157,7 +163,9 @@ Check lock has linux with only x86_64 arch:
   $ cat dune.lock
   (lang package 0.1)
   
-  (repos)
+  (repos
+   (file:///Users/samoht/git/dune/_build/.sandbox/ebd7423dd37b3e55ce6345de75288fdc/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository
+    76aa4530162e9f1e6d056284067631b0dd1ae0dc))
   
   (packages foo.0.0.1)
   
@@ -182,7 +190,9 @@ Check lock has both platforms:
   $ cat dune.lock
   (lang package 0.1)
   
-  (repos)
+  (repos
+   (file:///Users/samoht/git/dune/_build/.sandbox/ebd7423dd37b3e55ce6345de75288fdc/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository
+    76aa4530162e9f1e6d056284067631b0dd1ae0dc))
   
   (packages foo.0.0.1)
   

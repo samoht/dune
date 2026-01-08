@@ -234,10 +234,19 @@ module Derive_spec = struct
     }
 
   let name = "derive-lock"
-  let version = 1
+
+  let version =
+    5 (* Bumped: dependency_hash computed at runtime for out-of-sync detection *)
+  ;;
+
   let bimap t f g = { t with source_file = f t.source_file; target = g t.target }
   let is_useful_to ~memoize = memoize
 
+  (* NOTE: dependency_hash is NOT in the cache key. It's computed at runtime
+     from current local_packages. This means:
+     - Derivation only re-runs when source lock file changes
+     - If dune-project changes without re-locking, derived lock has stale hash
+     - Out-of-sync detection catches this mismatch *)
   let encode
         { target; source_file; solver_env_from_context; unset_solver_vars }
         encode_path
@@ -284,8 +293,34 @@ module Derive_spec = struct
       in
       Solver_env.unset_multi solver_env unset_solver_vars
     in
-    (* Read and derive the single-file lock *)
-    let+ lock_dir = Lock_pkg.read_disk ~solver_env source_file in
+    (* Read and derive the single-file lock.
+       Pass ~local_packages:[] - we compute dependency_hash separately below. *)
+    let+ lock_dir = Lock_pkg.read_disk ~solver_env ~local_packages:[] source_file in
+    (* Compute dependency_hash from current local_packages.
+       This is read at derivation time (not cached), so if dune-project changes
+       without re-locking, the derived lock's hash reflects what was current
+       when derivation ran, enabling out-of-sync detection. *)
+    let dependency_hash =
+      (* Read dune-project to get local package dependencies *)
+      let dune_project_path = Path.of_string "dune-project" in
+      if Path.Untracked.exists dune_project_path
+      then (
+        try
+          let project = Dune_project.load dune_project_path in
+          let packages = Dune_project.packages project in
+          let local_packages =
+            Package.Name.Map.map packages ~f:Local_package.of_package
+          in
+          Package_universe.dependency_digest local_packages
+        with
+        | _ -> None)
+      else None
+    in
+    let lock_dir =
+      Lock.with_dependency_hash
+        lock_dir
+        ~dependency_hash:(Option.map dependency_hash ~f:(fun h -> Loc.none, h))
+    in
     let lock_dir_path = Path.build target in
     Lock.Write_disk.prepare
       ~portable_lock_dir
@@ -552,7 +587,8 @@ let setup_copy_rules ~dir:target ~lock_dir =
 
 (* Set up rules to derive single-file lock format to directory format.
    This uses the derive action which reads the single-file, fetches opam repo
-   info, and writes the full directory format to the build directory. *)
+   info, and writes the full directory format to the build directory.
+   The dependency_hash for out-of-sync detection is preserved from the source file. *)
 let setup_single_file_derive_rules ~dir:target ~lock_file ~lock_dir_local =
   let rules =
     let+ workspace = Workspace.workspace () in
@@ -597,21 +633,83 @@ let setup_single_file_derive_rules ~dir:target ~lock_file ~lock_dir_local =
   Gen_rules.make ~directory_targets rules
 ;;
 
-let setup_lock_rules_with_source (workspace : Workspace.t) ~dir ~lock_dir =
-  let* source =
-    let lock_dir_path = Path.Source.append_local workspace.dir lock_dir in
-    (* Check for directory format first *)
+(* Check if lock file is in sync with dune-project dependencies *)
+let lock_is_in_sync lock_dir_path =
+  let* lock_dir_exists =
     let* is_dir =
       Fs_memo.dir_exists (Path.Outside_build_dir.In_source_dir lock_dir_path)
     in
     if is_dir
-    then Memo.return (`Source_tree lock_dir_path)
-    else
-      (* Check for single-file format *)
-      let+ is_file =
-        Fs_memo.file_exists (Path.Outside_build_dir.In_source_dir lock_dir_path)
+    then Memo.return true
+    else Fs_memo.file_exists (Path.Outside_build_dir.In_source_dir lock_dir_path)
+  in
+  if not lock_dir_exists
+  then Memo.return false
+  else
+    (* Load local packages and check dependency hash *)
+    let* local_packages =
+      Dune_load.packages () >>| Dune_lang.Package.Name.Map.map ~f:Local_package.of_package
+    in
+    (* Try to load the lock dir to check its dependency hash *)
+    let path = Path.source lock_dir_path in
+    match Lock.read_disk path with
+    | Error _ -> Memo.return false (* Can't load = out of sync *)
+    | Ok lock_dir ->
+      let saved_hash = Option.map ~f:snd lock_dir.dependency_hash in
+      Memo.return
+        (match Package_universe.up_to_date local_packages ~dependency_hash:saved_hash with
+         | `Valid -> true
+         | `Invalid -> false)
+;;
+
+let setup_lock_rules_with_source (workspace : Workspace.t) ~dir ~lock_dir =
+  let* source =
+    let lock_dir_path = Path.Source.append_local workspace.dir lock_dir in
+    (* Determine effective auto-lock mode:
+       - CLI flags (Enabled/Always) take precedence
+       - (pkg enabled) in config implies auto-lock behavior
+       - Otherwise use default Auto behavior *)
+    let* effective_auto_lock =
+      match !Clflags.auto_lock with
+      | (Enabled | Always) as mode -> Memo.return mode
+      | Disabled -> Memo.return Dune_config_file.Dune_config.Auto_lock.Disabled
+      | Auto ->
+        (* Check if (pkg enabled) is set in workspace config *)
+        (match workspace.config.pkg_enabled with
+         | Set (_, `Enabled) ->
+           (* (pkg enabled) implies auto-lock when in Auto mode *)
+           Memo.return Dune_config_file.Dune_config.Auto_lock.Enabled
+         | Set (_, `Disabled) | Unset ->
+           Memo.return Dune_config_file.Dune_config.Auto_lock.Auto)
+    in
+    match effective_auto_lock with
+    | Always -> Memo.return `Generated
+    | Enabled ->
+      (* Regenerate if lock file doesn't exist or is out of sync *)
+      let* in_sync = lock_is_in_sync lock_dir_path in
+      if not in_sync
+      then Memo.return `Generated
+      else
+        (* Lock is in sync, use existing source (check format) *)
+        let* is_dir =
+          Fs_memo.dir_exists (Path.Outside_build_dir.In_source_dir lock_dir_path)
+        in
+        if is_dir
+        then Memo.return (`Source_tree lock_dir_path)
+        else Memo.return (`Single_file lock_dir_path)
+    | Disabled | Auto ->
+      (* Check for directory format first *)
+      let* is_dir =
+        Fs_memo.dir_exists (Path.Outside_build_dir.In_source_dir lock_dir_path)
       in
-      if is_file then `Single_file lock_dir_path else `Generated
+      if is_dir
+      then Memo.return (`Source_tree lock_dir_path)
+      else
+        (* Check for single-file format *)
+        let+ is_file =
+          Fs_memo.file_exists (Path.Outside_build_dir.In_source_dir lock_dir_path)
+        in
+        if is_file then `Single_file lock_dir_path else `Generated
   in
   match source with
   | `Source_tree lock_dir_src ->

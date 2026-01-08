@@ -332,10 +332,12 @@ let fetch_source_group ~rev_store ~platform ~patches_dir ~pkgs_by_name group =
     Fiber.return (true, final_dirname)
 ;;
 
-let fetch_duniverse ~lock_dir_path ~solver_env () =
+let fetch_duniverse ~lock_dir_path ~solver_env ~local_packages () =
   let open Fiber.O in
   let lock_path = Path.source lock_dir_path in
-  let* lock_dir, opam_files = Lock_pkg.read_disk_with_opam_files ~solver_env lock_path in
+  let* lock_dir, opam_files =
+    Lock_pkg.read_disk_with_opam_files ~solver_env ~local_packages lock_path
+  in
   let all_pkgs = Lock_dir.Packages.to_pkg_list lock_dir.packages in
   let fetchable_pkgs =
     List.filter all_pkgs ~f:(fun (pkg : Pkg.t) -> Option.is_some pkg.info.source)
@@ -473,10 +475,10 @@ let fetch_duniverse ~lock_dir_path ~solver_env () =
     Fiber.return ())
 ;;
 
-let auto_fetch_missing ~lock_dir_path ~solver_env () =
+let auto_fetch_missing ~lock_dir_path ~solver_env ~local_packages () =
   let open Fiber.O in
   let lock_path = Path.source lock_dir_path in
-  let* lock_dir = Lock_pkg.read_disk ~solver_env lock_path in
+  let* lock_dir = Lock_pkg.read_disk ~solver_env ~local_packages lock_path in
   let all_pkgs = Lock_dir.Packages.to_pkg_list lock_dir.packages in
   (* Filter to packages with sources (both dune and opam packages) *)
   let fetchable_pkgs =
@@ -606,14 +608,19 @@ let term =
     Pkg_common.check_pkg_management_enabled ()
     >>>
     let* solver_env = Pkg_common.poll_solver_env_from_current_system ()
-    and* workspace = Memo.run (Workspace.workspace ()) in
+    and* workspace = Memo.run (Workspace.workspace ())
+    and* local_packages = Memo.run Pkg_common.find_local_packages in
+    let local_packages =
+      Package_name.Map.values local_packages
+      |> List.map ~f:Dune_pkg.Local_package.for_solver
+    in
     let lock_dirs =
       Pkg_common.Lock_dirs_arg.lock_dirs_of_workspace lock_dirs_arg workspace
     in
     match lock_dirs with
     | [] ->
       User_error.raise [ Pp.text "No lock directories found. Run 'dune pkg lock' first." ]
-    | lock_dir_path :: _ -> fetch_duniverse ~lock_dir_path ~solver_env ())
+    | lock_dir_path :: _ -> fetch_duniverse ~lock_dir_path ~solver_env ~local_packages ())
 ;;
 
 let info =

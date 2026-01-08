@@ -121,8 +121,8 @@ let resolve_builtin_var
       ~all_versions
       ~present
       ~scope
-      ~self_source_dir
-      ~dep_source_dir
+      ~self_build_id
+      ~build_ids
       variable_name
   =
   match Package_variable_name.to_string variable_name with
@@ -140,22 +140,22 @@ let resolve_builtin_var
        Some (Memo.return @@ Ok [ Value.String (Package_version.to_string version) ])
      | None -> Some (Memo.return @@ Ok [ Value.String "" ]))
   | "build-id" ->
-    let source_dir =
-      match scope with
-      | Package_variable.Scope.Self -> Some self_source_dir
-      | Package_variable.Scope.Package _ -> dep_source_dir
-    in
     let build_id =
-      match source_dir with
-      | Some dir -> Path.to_string dir |> Dune_digest.string |> Dune_digest.to_string
+      match scope with
+      | Package_variable.Scope.Self -> Some self_build_id
+      | Package_variable.Scope.Package pkg -> Package.Name.Map.find build_ids pkg
+    in
+    let build_id_str =
+      match build_id with
+      | Some digest -> Dune_digest.to_string digest
       | None -> ""
     in
-    Some (Memo.return @@ Ok [ Value.String build_id ])
+    Some (Memo.return @@ Ok [ Value.String build_id_str ])
   | _ ->
     (* Try section directory *)
-    (match dep_source_dir with
-     | None -> None
-     | Some _ ->
+    (match Package.Name.Map.mem build_ids package_name with
+     | false -> None
+     | true ->
        (match
           Pform.Var.Pkg.Section.of_string (Package_variable_name.to_string variable_name)
         with

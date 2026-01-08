@@ -60,8 +60,8 @@ val resolve_builtin_var
   -> all_versions:Package_version.t Package.Name.Map.t
   -> present:bool
   -> scope:Dune_pkg.Package_variable.Scope.t
-  -> self_source_dir:Path.t
-  -> dep_source_dir:Path.t option
+  -> self_build_id:Dune_digest.t
+  -> build_ids:Dune_digest.t Package.Name.Map.t
   -> Package_variable_name.t
   -> (Value.t list, [> `Undefined_pkg_var of Package_variable_name.t ]) result Memo.t
        option

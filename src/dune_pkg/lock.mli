@@ -36,6 +36,13 @@ val remove_locs : t -> t
 val equal : t -> t -> bool
 val to_dyn : t -> Dyn.t
 
+(** Update the dependency_hash field. Used when reading from cache
+    to update the hash to match current local packages. *)
+val with_dependency_hash
+  :  t
+  -> dependency_hash:(Loc.t * Local_package.Dependency_hash.t) option
+  -> t
+
 (** [create_latest_version packages ~ocaml ~repos
     ~expanded_solver_variable_bindings] raises a [Code_error] if [packages] is
     not closed under the "depends on" relationship between packages. Every

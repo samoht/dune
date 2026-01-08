@@ -24,11 +24,17 @@ val opam_package_to_lock_file_pkg
   -> allow_missing_deps:bool
   -> (Pkg.t, User_message.t) result
 
-(** [file_to_lock ~loc ~solver_env file] loads the repos at their pinned hashes,
-    looks up each package from the single-file lock format, and converts them
-    to a full [Lock.t] using the provided solver environment for evaluating
-    platform-specific formulas. *)
-val file_to_lock : loc:Loc.t -> solver_env:Solver_env.t -> Lock.File.t -> Lock.t Fiber.t
+(** [file_to_lock ~loc ~solver_env ~local_packages file] loads the repos at
+    their pinned hashes, looks up each package from the single-file lock format,
+    and converts them to a full [Lock.t] using the provided solver environment
+    for evaluating platform-specific formulas. The dependency_hash is computed
+    from local_packages during derivation. *)
+val file_to_lock
+  :  loc:Loc.t
+  -> solver_env:Solver_env.t
+  -> local_packages:Local_package.For_solver.t list
+  -> Lock.File.t
+  -> Lock.t Fiber.t
 
 (** Like [file_to_lock] but also returns the opam file content for each package.
     Used by fetch to write opam files to duniverse. Returns the lock and a list
@@ -36,17 +42,24 @@ val file_to_lock : loc:Loc.t -> solver_env:Solver_env.t -> Lock.File.t -> Lock.t
 val file_to_lock_with_opam_files
   :  loc:Loc.t
   -> solver_env:Solver_env.t
+  -> local_packages:Local_package.For_solver.t list
   -> Lock.File.t
   -> (Lock.t * (Package_name.t * string) list) Fiber.t
 
-(** [read_disk ~solver_env path] reads a lock from either directory or
-    single-file format. For directory format, it uses the synchronous reader.
-    For single-file format, it parses the file and derives full package metadata
-    from the opam repos specified in the file.
+(** [read_disk ~solver_env ~local_packages path] reads a lock from either
+    directory or single-file format. For directory format, it uses the
+    synchronous reader. For single-file format, it parses the file and derives
+    full package metadata from the opam repos specified in the file. The
+    dependency_hash is computed from local_packages during derivation.
 
     @param solver_env Used for platform-specific dependency evaluation
+    @param local_packages Current local packages for dependency hash computation
     @param path Path to either dune.lock directory or dune.lock file *)
-val read_disk : solver_env:Solver_env.t -> Path.t -> Lock.t Fiber.t
+val read_disk
+  :  solver_env:Solver_env.t
+  -> local_packages:Local_package.For_solver.t list
+  -> Path.t
+  -> Lock.t Fiber.t
 
 (** Like [read_disk] but also returns opam file contents for each package.
     Used by fetch to write opam files to duniverse. For single-file format,
@@ -54,9 +67,11 @@ val read_disk : solver_env:Solver_env.t -> Path.t -> Lock.t Fiber.t
     returns an empty list (opam files not available).
 
     @param solver_env Used for platform-specific dependency evaluation
+    @param local_packages Current local packages for dependency hash computation
     @param path Path to either dune.lock directory or dune.lock file *)
 val read_disk_with_opam_files
   :  solver_env:Solver_env.t
+  -> local_packages:Local_package.For_solver.t list
   -> Path.t
   -> (Lock.t * (Package_name.t * string) list) Fiber.t
 

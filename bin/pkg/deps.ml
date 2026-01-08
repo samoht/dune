@@ -155,8 +155,18 @@ let run_deps ~lock_dirs_arg ~tree ~why () =
   let+ () =
     Fiber.sequential_iter lock_dirs ~f:(fun lock_dir_path ->
       let lock_dir_path = Path.source lock_dir_path in
-      let* platform = solver_env_from_system_and_context ~lock_dir_path in
-      let+ lock_dir = Dune_pkg.Lock_pkg.read_disk ~solver_env:platform lock_dir_path in
+      let* platform = solver_env_from_system_and_context ~lock_dir_path
+      and* local_packages = Memo.run find_local_packages in
+      let local_packages_for_solver =
+        Package_name.Map.values local_packages
+        |> List.map ~f:Dune_pkg.Local_package.for_solver
+      in
+      let+ lock_dir =
+        Dune_pkg.Lock_pkg.read_disk
+          ~solver_env:platform
+          ~local_packages:local_packages_for_solver
+          lock_dir_path
+      in
       let graph = Dep_graph.of_lock_dir lock_dir ~platform in
       match why with
       | Some target ->

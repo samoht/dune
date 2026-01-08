@@ -50,8 +50,13 @@ let run_build_system ~common ~auto_fetch ~request =
            let lock_dir_path = Dune_rules.Lock_dir.default_source_path in
            if Path.exists (Path.source lock_dir_path)
            then
-             let* solver_env = Pkg.Pkg_common.poll_solver_env_from_current_system () in
-             Pkg.Fetch.auto_fetch_missing ~lock_dir_path ~solver_env ()
+             let* solver_env = Pkg.Pkg_common.poll_solver_env_from_current_system ()
+             and* local_packages = Memo.run Pkg.Pkg_common.find_local_packages in
+             let local_packages =
+               Package_name.Map.values local_packages
+               |> List.map ~f:Dune_pkg.Local_package.for_solver
+             in
+             Pkg.Fetch.auto_fetch_missing ~lock_dir_path ~solver_env ~local_packages ()
            else Fiber.return ())
        in
        let* setup = Import.Main.setup () in

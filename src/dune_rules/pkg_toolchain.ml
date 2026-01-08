@@ -64,44 +64,46 @@ let platform_suffix (pkg : Pkg.t) =
     "-" ^ String.sub hash ~pos:0 ~len:(min 8 (String.length hash))
 ;;
 
-let pkg_dir (pkg : Pkg.t) =
+let pkg_dir (pkg : Pkg.t) ~build_id =
   (* The name of this package's directory within the toolchains directory.
 
      For relocatable-compiler packages, we use the base OCaml version plus
-     a platform hash. This enables cache sharing across projects while
-     ensuring different platforms (for cross-compilation) get separate entries.
+     platform hash and build_id. The build_id is a recursive hash of the
+     package's opam content and all its dependencies' build_ids, ensuring
+     any change in the dependency graph produces a different cache entry.
 
-     For other packages (including non-relocatable compilers), we include a
-     hash of the package's fields so that modified lockfiles produce different
-     cache entries. *)
+     For other packages (including non-relocatable compilers), we use the
+     build_id directly since it already includes platform-specific info
+     from the opam file hash. *)
   let dir_name =
     let name = pkg.info.name in
     if is_relocatable_compiler name
     then (
-      (* Relocatable compiler: use base OCaml version + platform for cache sharing *)
+      (* Relocatable compiler: use base OCaml version + platform + build_id *)
       let base_version =
         relocatable_base_version pkg.info.version
         |> Option.value ~default:(Package_version.to_string pkg.info.version)
       in
       let platform = platform_suffix pkg in
-      sprintf "%s.%s%s" (Package.Name.to_string name) base_version platform)
-    else (
-      (* Non-relocatable: include hash to ensure correctness *)
-      (* TODO should include resolved deps *)
-      let pkg_digest =
-        Dune_digest.Feed.compute_digest Pkg.digest_feed (Pkg.remove_locs pkg)
-      in
+      sprintf
+        "%s.%s%s-%s"
+        (Package.Name.to_string name)
+        base_version
+        platform
+        (Dune_digest.to_string build_id))
+    else
+      (* Non-relocatable: use build_id which includes opam content + deps *)
       sprintf
         "%s.%s-%s"
         (Package.Name.to_string name)
         (Package_version.to_string pkg.info.version)
-        (Dune_digest.to_string pkg_digest))
+        (Dune_digest.to_string build_id)
   in
   Path.Outside_build_dir.relative (base_dir ()) dir_name
 ;;
 
-let installation_prefix pkg =
-  let pkg_dir = pkg_dir pkg in
+let installation_prefix pkg ~build_id =
+  let pkg_dir = pkg_dir pkg ~build_id in
   Path.Outside_build_dir.relative pkg_dir "target"
 ;;
 
@@ -118,8 +120,8 @@ let install_roots ~prefix =
 (* Check if a toolchain is already installed in the cache.
    We check for the presence of the install cookie file which indicates
    a successful installation. *)
-let is_installed pkg =
-  let prefix = installation_prefix pkg in
+let is_installed pkg ~build_id =
+  let prefix = installation_prefix pkg ~build_id in
   let cookie_path =
     Path.outside_build_dir (Path.Outside_build_dir.relative prefix "cookie")
   in
@@ -127,13 +129,13 @@ let is_installed pkg =
 ;;
 
 (* Get the cache directory path for a toolchain package *)
-let cache_dir pkg = Path.outside_build_dir (pkg_dir pkg)
+let cache_dir pkg ~build_id = Path.outside_build_dir (pkg_dir pkg ~build_id)
 
 (* Populate the shared install directory from global cache.
    Copies the cached target/ contents to install_dir.
    Also creates target_dir and copies the cookie there for dependency tracking. *)
-let populate_from_cache_action pkg ~install_dir ~target_dir =
-  let cache_target = Path.outside_build_dir (installation_prefix pkg) in
+let populate_from_cache_action pkg ~build_id ~install_dir ~target_dir =
+  let cache_target = Path.outside_build_dir (installation_prefix pkg ~build_id) in
   let cache_target_str = Path.to_string cache_target in
   let workspace_root = Path.to_absolute_filename Path.root in
   let install_dir_abs =

@@ -383,6 +383,8 @@ module Resolved_pkg = struct
     ; mutable exported_env : string Env_update.t list
     ; all_package_versions : Package_version.t Package.Name.Map.t
       (* All packages in the lock, for looking up versions of non-dependencies *)
+    ; build_id : Dune_digest.t
+      (* Recursive build-id: hash(opam_content, deps' build_ids) for toolchain cache *)
     ; is_cached_toolchain : bool
       (* Whether this toolchain is being populated from the global cache *)
     ; toolchain_cache_dir : Path.t option
@@ -566,6 +568,9 @@ module Expander0 = struct
     ; env : Value.t list Env.Map.t
     ; all_package_versions : Package_version.t Package.Name.Map.t Memo.t
       (* All packages in the lock, for looking up versions of non-dependencies *)
+    ; self_build_id : Dune_digest.t (* Build ID of this package *)
+    ; build_ids : Dune_digest.t Package.Name.Map.t Memo.t
+      (* Build IDs of all dependencies for resolving %{pkg:build-id} *)
     }
 
   let expand_pform_fdecl
@@ -676,12 +681,15 @@ module Action_expander = struct
           ~context
           ~loc
           ~all_package_versions
+          ~self_build_id
+          ~build_ids
           (self_paths : _ Paths.t)
           deps
           macro_invocation
       =
       let* deps = deps
-      and* all_versions = all_package_versions in
+      and* all_versions = all_package_versions
+      and* build_ids = build_ids in
       let { Package_variable.name = variable_name; scope; default_if_true } =
         match Package_variable.of_macro_invocation ~loc macro_invocation with
         | Ok package_variable -> package_variable
@@ -706,7 +714,6 @@ module Action_expander = struct
         | Some v -> Memo.return @@ Ok (Variable.dune_value v)
         | None ->
           let present = Option.is_some dep_paths in
-          let dep_source_dir = Option.map dep_paths ~f:(fun p -> p.Paths.source_dir) in
           (match
              Pkg_opam.resolve_builtin_var
                ~context
@@ -714,8 +721,8 @@ module Action_expander = struct
                ~all_versions
                ~present
                ~scope
-               ~self_source_dir:self_paths.Paths.source_dir
-               ~dep_source_dir
+               ~self_build_id
+               ~build_ids
                variable_name
            with
            | Some result -> result
@@ -1080,6 +1087,17 @@ module Action_expander = struct
       let+ { Artifacts_and_deps.binaries; _ } = Memo.Lazy.force closure in
       binaries
     in
+    (* Compute build_ids map for all dependencies *)
+    let build_ids =
+      let deps_closure = Resolved_pkg.deps_closure pkg in
+      let dep_build_ids =
+        List.map deps_closure ~f:(fun (dep : Resolved_pkg.t) ->
+          dep.info.name, dep.build_id)
+      in
+      (* Include self in the map *)
+      Memo.return
+        (Package.Name.Map.of_list_exn ((pkg.info.name, pkg.build_id) :: dep_build_ids))
+    in
     { Expander.paths = pkg.paths
     ; name = pkg.info.name
     ; artifacts
@@ -1089,6 +1107,8 @@ module Action_expander = struct
     ; version = pkg.info.version
     ; env
     ; all_package_versions = Memo.return pkg.all_package_versions
+    ; self_build_id = pkg.build_id
+    ; build_ids
     }
   ;;
 
@@ -1255,6 +1275,7 @@ end = struct
   let apply_toolchain_caching
         ~info
         ~pkg
+        ~build_id
         ~build_command
         ~install_command
         ~write_paths
@@ -1263,9 +1284,9 @@ end = struct
     let is_toolchain =
       Pkg_toolchain.is_compiler_and_toolchains_enabled info.Pkg_info.name
     in
-    let is_cached = is_toolchain && Pkg_toolchain.is_installed pkg in
+    let is_cached = is_toolchain && Pkg_toolchain.is_installed pkg ~build_id in
     let toolchain_cache_dir =
-      if is_cached then Some (Pkg_toolchain.cache_dir pkg) else None
+      if is_cached then Some (Pkg_toolchain.cache_dir pkg ~build_id) else None
     in
     let build_command, install_command =
       if is_cached
@@ -1278,12 +1299,14 @@ end = struct
           [ "name", Dyn.string (Package.Name.to_string info.name)
           ; "version", Dyn.string (Package_version.to_string info.version)
           ; "cache_dir", Dyn.string (Path.to_string cache_dir)
+          ; "build_id", Dyn.string (Dune_digest.to_string build_id)
           ; "local_target", Dyn.string (Path.Build.to_string write_paths.Paths.target_dir)
           ; "install_dir", Dyn.string (Path.Build.to_string install_dir)
           ];
         let populate_action =
           Pkg_toolchain.populate_from_cache_action
             pkg
+            ~build_id
             ~install_dir
             ~target_dir:write_paths.target_dir
         in
@@ -1294,6 +1317,7 @@ end = struct
           "Toolchain cache miss"
           [ "name", Dyn.string (Package.Name.to_string info.name)
           ; "version", Dyn.string (Package_version.to_string info.version)
+          ; "build_id", Dyn.string (Dune_digest.to_string build_id)
           ];
         build_command, install_command)
       else build_command, install_command
@@ -1441,11 +1465,30 @@ end = struct
       let install_command = Option.map install_command ~f:relocate in
       let build_command = choose_for_current_platform pkg.build_command in
       let build_command = Option.map build_command ~f:relocate_build in
+      (* Compute build_id: hash(opam_content, platform, deps' build_ids)
+         This creates a Merkle tree where any change in the dep graph propagates up.
+         Platform is included to support cross-compilation scenarios. *)
+      let build_id =
+        (* Hash the opam file content (package definition without location info) *)
+        let opam_content_hash =
+          Dune_digest.Feed.compute_digest Pkg.digest_feed (Pkg.remove_locs pkg)
+          |> Dune_digest.to_string
+        in
+        (* Use the platform from Lock_dir.Sys_vars.solver_env bound earlier *)
+        let platform_hash = Dune_digest.generic platform |> Dune_digest.to_string in
+        let deps_hashes =
+          List.map depends ~f:(fun (dep : Resolved_pkg.t) ->
+            Dune_digest.to_string dep.build_id)
+          |> List.sort ~compare:String.compare
+        in
+        Dune_digest.generic (opam_content_hash :: platform_hash :: deps_hashes)
+      in
       (* Apply toolchain caching if applicable *)
       let build_command, install_command, is_cached, toolchain_cache_dir =
         apply_toolchain_caching
           ~info
           ~pkg
+          ~build_id
           ~build_command
           ~install_command
           ~write_paths
@@ -1475,6 +1518,7 @@ end = struct
         ; pkg_digest
         ; exported_env = []
         ; all_package_versions
+        ; build_id
         ; is_cached_toolchain = is_cached
         ; toolchain_cache_dir
         ; context

@@ -140,6 +140,8 @@ let remove_locs t =
   }
 ;;
 
+let with_dependency_hash t ~dependency_hash = { t with dependency_hash }
+
 let equal
       { version
       ; dependency_hash
