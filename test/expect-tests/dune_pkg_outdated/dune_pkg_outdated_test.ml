@@ -297,18 +297,18 @@ let%expect_test "testing entire output" =
   test_entire_output ~transitive:false 2 3 2 3;
   [%expect
     {|
-4/6 packages in dune.lock are outdated.
-Showing immediate dependencies, use --transitive to see the rest.
-- foo0 1.0.0 < 2.0.0
-- foo1 1.0.0 < 2.0.0
-  |}];
+    4/6 packages in dune.lock are outdated.
+    Showing immediate dependencies, use --transitive to see the rest.
+    - foo0 1.0.0 -> 2.0.0
+    - foo1 1.0.0 -> 2.0.0
+    |}];
   test_entire_output ~transitive:true 2 3 2 3;
   [%expect
     {|
-4/6 packages in dune.lock are outdated.
-- foo0 1.0.0 < 2.0.0
-- foo1 1.0.0 < 2.0.0
-- bar0 1.0.0 < 2.0.0
-- bar1 1.0.0 < 2.0.0
-  |}]
+    4/6 packages in dune.lock are outdated.
+    - foo0 1.0.0 -> 2.0.0
+    - foo1 1.0.0 -> 2.0.0
+    - bar0 1.0.0 -> 2.0.0
+    - bar1 1.0.0 -> 2.0.0
+    |}]
 ;;

@@ -145,10 +145,13 @@ let get_dir_triage ~dir =
     let+ contexts = Memo.Lazy.force (Build_config.get ()).contexts in
     (match Context_name.Map.find contexts context_name with
      | None -> Dir_triage.no_rules
-     | Some ((_ : Build_context.t), context_type) ->
+     | Some ((_ : Build_context.t), _context_type) ->
        let dir = Path.as_in_build_dir_exn dir in
+       (* Use Empty: Pkg_rules handles source copying with correct paths.
+          Generic mechanism would look at wrong path (<project>/<sub_dir>/
+          instead of <project>/vendor/pkg/ or fetched sources). *)
        Dir_triage.Build_directory
-         { dir; context_name; context_type; sub_dir; kind = Pkgs })
+         { dir; context_name; context_type = Empty; sub_dir; kind = Pkgs })
   | Build (Locks Root) ->
     (* _build/.locks/ - list all contexts *)
     let+ contexts = Memo.Lazy.force (Build_config.get ()).contexts in
@@ -163,10 +166,12 @@ let get_dir_triage ~dir =
     let+ contexts = Memo.Lazy.force (Build_config.get ()).contexts in
     (match Context_name.Map.find contexts context_name with
      | None -> Dir_triage.no_rules
-     | Some ((_ : Build_context.t), context_type) ->
+     | Some ((_ : Build_context.t), _context_type) ->
        let dir = Path.as_in_build_dir_exn dir in
+       (* Use Empty: Lock_rules has specialized copy handling via setup_copy_rules
+          that creates directory targets. Generic file-level copy rules would conflict. *)
        Dir_triage.Build_directory
-         { dir; context_name; context_type; sub_dir; kind = Locks })
+         { dir; context_name; context_type = Empty; sub_dir; kind = Locks })
   | Build (Invalid _) ->
     Memo.return @@ Dir_triage.Known (Loaded.no_rules ~allowed_subdirs:Dir_set.empty)
   | Build (Regular (With_context (context_name, sub_dir))) ->
@@ -852,8 +857,8 @@ end = struct
   ;;
 
   let load_build_directory_exn
-        ({ Dir_triage.Build_directory.dir; context_name; context_type; sub_dir; kind = _ }
-         as build_dir)
+        ({ Dir_triage.Build_directory.dir; context_name; context_type; sub_dir; kind } as
+         build_dir)
     =
     (* Load all the rules *)
     Gen_rules.gen_rules build_dir
@@ -890,7 +895,16 @@ end = struct
           source_files_and_dirs source_paths_to_ignore sub_dir
       in
       let copy_rules =
-        let ctx_dir = Context_name.build_dir context_name in
+        let ctx_dir =
+          match kind with
+          | Dir_triage.Build_directory.Kind.Regular -> Context_name.build_dir context_name
+          | Dir_triage.Build_directory.Kind.Pkgs ->
+            Path.Build.relative Dpath.Build.pkgs_dir (Context_name.to_string context_name)
+          | Dir_triage.Build_directory.Kind.Locks ->
+            Path.Build.relative
+              Dpath.Build.locks_dir
+              (Context_name.to_string context_name)
+        in
         create_copy_rules
           ~dir:sub_dir
           ~ctx_dir

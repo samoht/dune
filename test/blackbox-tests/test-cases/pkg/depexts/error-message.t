@@ -1,5 +1,6 @@
  When a package fails to build, dune will print opam depexts warning.
 
+  $ export DUNE_PKG_PLATFORM=brew
   $ mkrepo
   $ add_mock_repo_if_needed
 

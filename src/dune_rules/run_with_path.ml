@@ -11,20 +11,37 @@ module Platform = struct
     | Apk
     | Unknown
 
+  let of_string = function
+    | "apt" -> Some Apt
+    | "brew" -> Some Brew
+    | "dnf" -> Some Dnf
+    | "pacman" -> Some Pacman
+    | "apk" -> Some Apk
+    | "unknown" -> Some Unknown
+    | _ -> None
+  ;;
+
   let detect () =
-    let path = Env_path.path Env.initial in
-    let has_cmd cmd = Option.is_some (Bin.which ~path cmd) in
-    if has_cmd "brew"
-    then Brew
-    else if has_cmd "apt"
-    then Apt
-    else if has_cmd "dnf"
-    then Dnf
-    else if has_cmd "pacman"
-    then Pacman
-    else if has_cmd "apk"
-    then Apk
-    else Unknown
+    (* Allow overriding platform detection via environment variable for testing *)
+    match Sys.getenv_opt "DUNE_PKG_PLATFORM" with
+    | Some s ->
+      (match of_string s with
+       | Some pm -> pm
+       | None -> Unknown)
+    | None ->
+      let path = Env_path.path Env.initial in
+      let has_cmd cmd = Option.is_some (Bin.which ~path cmd) in
+      if has_cmd "brew"
+      then Brew
+      else if has_cmd "apt"
+      then Apt
+      else if has_cmd "dnf"
+      then Dnf
+      else if has_cmd "pacman"
+      then Pacman
+      else if has_cmd "apk"
+      then Apk
+      else Unknown
   ;;
 
   let install_command pm packages =

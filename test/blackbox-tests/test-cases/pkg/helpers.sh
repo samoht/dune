@@ -11,7 +11,7 @@ export DUNE_CONFIG__SYS_OCAML_VERSION=5.4.0+fake
 
 dune="dune"
 
-pkg_root="_build/pkg/default"
+pkg_root="_build/.pkgs/default"
 
 default_lock_dir="dune.lock"
 source_lock_dir="${default_lock_dir}"
