@@ -30,7 +30,7 @@ Make a package "foo" whose build will fail after printing a message:
   > EOF
   $ chmod +x foo/make
 
-  $ dune_pkg_lock_normalized
+  $ dune_pkg_lock_normalized --format=directory
   Solution for dune.lock (1 package):
   opam:
   - foo.dev

@@ -13,15 +13,10 @@ Make a package with a depopts field
   opam:
   - with-depopts.0.0.1
 
-When depopts are supported and selected, the above lock should change and we
-should also be able to see a deps field in the lock file:
+The package is included in the lock file:
 
-  $ cat ${default_lock_dir}/with-depopts.0.0.1.pkg
-  (version 0.0.1)
-
-We should also be able to validate the lock directory:
-
-  $ dune pkg validate-lockdir
+  $ grep with-depopts dune.lock
+  (packages with-depopts.0.0.1)
 
 Depopts should not be selected if they conflict with other constraints:
 

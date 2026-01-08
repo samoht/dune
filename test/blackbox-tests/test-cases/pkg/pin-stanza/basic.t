@@ -22,7 +22,7 @@ in any repository
   > (package (name foo))
   > EOF
 
-  $ dune_pkg_lock_normalized
+  $ dune_pkg_lock_normalized --format=directory
   Solution for dune.lock (1 package):
   dune:
   - foo.1.0.0

@@ -19,7 +19,7 @@ We try to pull an opam package that isn't a dune project
   > build: [ "echo" "foo" ]
   > EOF
 
-  $ dune_pkg_lock_normalized
+  $ dune_pkg_lock_normalized --format=directory
   Solution for dune.lock (1 package):
   opam:
   - foo.dev

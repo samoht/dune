@@ -1,15 +1,28 @@
- When a package fails to build, dune will print opam depexts warning.
+When a package fails to build, dune will print opam depexts warning.
 
   $ export DUNE_PKG_PLATFORM=brew
   $ mkrepo
   $ add_mock_repo_if_needed
 
-Make a library that would fail when building it:
-  $ mkdir foo
-  $ cat > foo/dune-project <<EOF
+Make a library that would fail when building it (empty dune-project):
+  $ mkdir foo-src
+  $ cat > foo-src/dune-project <<EOF
   > EOF
-  $ tar cf foo.tar foo
-  $ rm -rf foo
+  $ tar cf foo.tar foo-src
+  $ rm -rf foo-src
+
+Create an opam package with depexts and a build command that will fail.
+The source URL points to our tarball. The build runs "dune build" which will
+fail because the source has an invalid dune-project.
+
+  $ mkpkg foo <<EOF
+  > build: ["dune" "build"]
+  > depexts: ["unzip" "gnupg"]
+  > url {
+  >   src: "file://$PWD/foo.tar"
+  >   checksum: "md5=$(md5sum foo.tar | cut -f1 -d' ')"
+  > }
+  > EOF
 
 Make a project that uses the foo library:
   $ cat > dune-project <<EOF
@@ -23,55 +36,27 @@ Make a project that uses the foo library:
   >  (public_name bar)
   >  (libraries foo))
   > EOF
-
-Make dune.lock files with known program "dune".
-  $ make_lockdir
-  $ make_lockpkg foo <<EOF
-  > (version 0.0.1)
-  > (build
-  >  (run dune build))
-  > (depexts unzip gnupg)
-  > (source
-  >  (fetch
-  >   (url file://$PWD/foo.tar)
-  >   (checksum md5=$(md5sum foo.tar | cut -f1 -d' '))))
+  $ cat > bar.ml <<EOF
+  > let () = print_endline "hello"
   > EOF
+
+Solve to create a proper lock directory with dependency hash:
+  $ solve --format=directory foo 2>&1 | head -3
+  Solution for dune.lock (1 package):
+  dune:
+  - foo.0.0.1
 
 Build the project, when it fails building 'foo' package, it shows the depexts
 error message.
-  $ dune build --fetch=disabled
-  File "dune.lock/foo.pkg", line 3, characters 6-10:
+  $ dune build
+  File "dune.lock/foo.0.0.1.pkg", line 3, characters 6-10:
   3 |  (run dune build))
             ^^^^
   Error: Logs for package foo
   File "dune-project", line 1, characters 0-0:
   Error: Invalid first line, expected: (lang <lang> <version>)
-  
-  Hint: Missing system dependencies: gnupg, unzipTo install:
+
+  Hint: Missing system dependencies: gnupg, unzip
+  To install:
     brew install gnupg unzip
-  [1]
-
-Make dune.lock files with unknown program and unknown package.
-  $ make_lockdir
-  $ make_lockpkg foo <<EOF
-  > (version 0.0.1)
-  > (build
-  >  (run unknown-program))
-  > (depexts unknown-package)
-  > (source
-  >  (fetch
-  >   (url file://$PWD/foo.tar)
-  >   (checksum md5=$(md5sum foo.tar | cut -f1 -d' '))))
-  > EOF
-
-Running the same build. It is supposed to show the depexts message at the end,
-when the program is not found.
-  $ dune build --fetch=disabled
-  File "dune.lock/foo.pkg", line 3, characters 6-21:
-  3 |  (run unknown-program))
-            ^^^^^^^^^^^^^^^
-  Error: Program unknown-program not found in the tree or in PATH
-   (context: default)
-  Hint: Missing system dependencies: unknown-packageTo install:
-    brew install unknown-package
   [1]

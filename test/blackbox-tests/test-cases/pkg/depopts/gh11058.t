@@ -2,6 +2,7 @@ Reproduce github issue #11058
 
 Handling of more than one depopt:
 
+  $ mkrepo
   $ mkpkg a
   $ mkpkg b
   $ mkpkg c

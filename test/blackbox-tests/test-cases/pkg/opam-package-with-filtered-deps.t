@@ -4,8 +4,6 @@ Demonstrate the translation of filtered dependencies
 
   $ mkpkg pkg-post <<EOF
   > EOF
-  $ mkpkg pkg-dev <<EOF
-  > EOF
   $ mkpkg pkg-build <<EOF
   > EOF
   $ mkpkg pkg-dev <<EOF
@@ -23,7 +21,7 @@ Demonstrate the translation of filtered dependencies
   > ]
   > EOF
 
-  $ solve bar 2>/dev/null
+  $ solve --format=directory bar 2>/dev/null
   Solution for dune.lock (3 packages):
   opam:
   - bar.0.0.1
@@ -38,3 +36,5 @@ Demonstrate the translation of filtered dependencies
   
   (post_depends
    (all_platforms (pkg-post)))
+
+

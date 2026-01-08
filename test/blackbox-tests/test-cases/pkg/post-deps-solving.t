@@ -17,15 +17,23 @@ Solving for post dependencies:
 
 We don't need bar, so we skip it
 
-  $ solve foo
+  $ solve --format=directory foo
   Solution for dune.lock (2 packages):
   opam:
   - bar.0.0.1
   - foo.0.0.1
 
-Verify foo has post_depends on bar:
-  $ grep -A1 "foo.0.0.1" dune.lock | grep post_depends
-   (post_depends (all_platforms (bar))))
+  $ cat ${default_lock_dir}/foo.0.0.1.pkg
+  (version 0.0.1)
+  
+  (post_depends
+   (all_platforms (bar)))
+
+
+We should also skip any artifacts that bar references:
+
+  $ [ -d ${default_lock_dir}/bar.files ] && ls -1 -x ${default_lock_dir}/bar.files
+  [1]
 
 Self dependency
 
@@ -33,14 +41,17 @@ Self dependency
   > depends: [ "foo" {post} ]
   > EOF
 
-  $ solve foo
+  $ solve --format=directory foo
   Solution for dune.lock (1 package):
   opam:
   - foo.0.0.1
 
-Verify foo has post_depends on itself:
-  $ grep -A1 "foo.0.0.1" dune.lock | grep post_depends
-   (post_depends (all_platforms (foo))))
+  $ cat ${default_lock_dir}/foo.0.0.1.pkg
+  (version 0.0.1)
+  
+  (post_depends
+   (all_platforms (foo)))
+
 
 Using post to break cycle:
 
@@ -52,16 +63,23 @@ Using post to break cycle:
   > depends: [ "foo" ]
   > EOF
 
-  $ solve bar
+  $ solve --format=directory bar
   Solution for dune.lock (2 packages):
   opam:
   - bar.0.0.1
   - foo.0.0.1
 
-Verify foo has post_depends on bar, and bar depends on foo:
-  $ grep -E "post_depends|depends" dune.lock
-   (depends (all_platforms (foo))))
-   (post_depends (all_platforms (bar))))
+  $ cat ${default_lock_dir}/foo.0.0.1.pkg ${default_lock_dir}/bar.0.0.1.pkg
+  (version 0.0.1)
+  
+  (post_depends
+   (all_platforms (bar)))
+  (version 0.0.1)
+  
+  (depends
+   (all_platforms (foo)))
+
+
 
 post "cycle":
 
@@ -73,16 +91,18 @@ post "cycle":
   > depends: [ "foo" {post} ]
   > EOF
 
-  $ solve foo
+  $ solve --format=directory foo
   Solution for dune.lock (2 packages):
   opam:
   - bar.0.0.1
   - foo.0.0.1
 
-Verify both have post_depends:
-  $ grep post_depends dune.lock
-   (post_depends (all_platforms (foo))))
-   (post_depends (all_platforms (bar))))
+  $ cat ${default_lock_dir}/foo.0.0.1.pkg
+  (version 0.0.1)
+  
+  (post_depends
+   (all_platforms (bar)))
+
 
 In depopts:
 

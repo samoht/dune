@@ -52,7 +52,7 @@ Demonstrate the build command we construct for different types of projects:
   >  (depends dune-only mixed template opam-only))
   > EOF
 
-  $ dune_pkg_lock_normalized
+  $ dune_pkg_lock_normalized --format=directory
   Solution for dune.lock (4 packages):
   dune:
   - dune-only.dev

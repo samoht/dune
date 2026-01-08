@@ -27,7 +27,7 @@ command is currently not respected when the package is pinned.
   > build: [ "echo" "run" "this" ]
   > EOF
 
-  $ dune_pkg_lock_normalized
+  $ dune_pkg_lock_normalized --format=directory
   Solution for dune.lock (1 package):
   dune:
   - opam-template.dev
