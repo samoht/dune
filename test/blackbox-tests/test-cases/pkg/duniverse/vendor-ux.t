@@ -298,7 +298,7 @@ Set up two versions of "json" package, both with library "json":
   $ mkdir -p duniverse/json.1.0.0
   $ cat >duniverse/json.1.0.0/dune-project <<EOF
   > (lang dune 3.0)
-  > (package (name json))
+  > (package (name json) (version 1.0.0))
   > EOF
   $ cat >duniverse/json.1.0.0/dune <<EOF
   > (library (name json) (public_name json))
@@ -311,7 +311,7 @@ Set up two versions of "json" package, both with library "json":
   $ mkdir -p duniverse/json.2.0.0
   $ cat >duniverse/json.2.0.0/dune-project <<EOF
   > (lang dune 3.0)
-  > (package (name json))
+  > (package (name json) (version 2.0.0))
   > EOF
   $ cat >duniverse/json.2.0.0/dune <<EOF
   > (library (name json) (public_name json))

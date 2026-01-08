@@ -449,6 +449,35 @@ let vendor_stanzas dir =
      | Some dune_file -> Filename.Map.to_list (Dune_file.vendor dune_file))
 ;;
 
+module Vendor_stanza_list = Monoid.Appendable_list (struct
+    type t = Path.Source.t * Vendor_stanza.t
+  end)
+
+module All_vendor_stanzas_map_reduce =
+  Make_map_reduce_with_progress (Memo) (Vendor_stanza_list)
+
+let all_vendor_stanzas =
+  Memo.lazy_ ~name:"all-vendor-stanzas" (fun () ->
+    All_vendor_stanzas_map_reduce.map_reduce
+      ~traverse:Source_dir_status.Set.all
+      ~trace_event_name:"find all vendor stanzas"
+      ~f:(fun dir ->
+        let path = Dir.path dir in
+        match Dir.dune_file dir with
+        | None -> Memo.return Vendor_stanza_list.empty
+        | Some dune_file ->
+          let vendor_map = Dune_file.vendor dune_file in
+          let stanzas =
+            Filename.Map.to_list vendor_map
+            |> List.map ~f:(fun (subdir, stanza) ->
+              Path.Source.relative path subdir, stanza)
+          in
+          Memo.return (Appendable_list.of_list stanzas))
+    >>| Appendable_list.to_list)
+;;
+
+let all_vendor_stanzas () = Memo.Lazy.force all_vendor_stanzas
+
 let ancestor_vcs =
   Memo.lazy_ ~name:"ancestor_vcs" (fun () ->
     if Execution_env.inside_dune

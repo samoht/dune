@@ -2558,10 +2558,9 @@ module Vendor_build = struct
 
   let classify_vendor_stanzas ctx_name =
     let open Memo.O in
-    let vendor_dir = Vendor.default_dir in
-    Source_tree.vendor_stanzas vendor_dir
-    >>= Memo.parallel_map ~f:(fun (subdir, stanza) ->
-      let subdir_path = Path.Source.relative vendor_dir subdir in
+    Source_tree.all_vendor_stanzas ()
+    >>= Memo.parallel_map ~f:(fun (subdir_path, stanza) ->
+      let subdir = Path.Source.basename subdir_path in
       let build_dir =
         Path.Build.append_source (Context_name.build_dir ctx_name) subdir_path
       in
@@ -2621,9 +2620,8 @@ module Vendor_build = struct
 
   let has_vendor_sandbox_packages () =
     let open Memo.O in
-    let vendor_dir = Vendor.default_dir in
-    Source_tree.vendor_stanzas vendor_dir
-    >>| List.exists ~f:(fun (_subdir, stanza) ->
+    Source_tree.all_vendor_stanzas ()
+    >>| List.exists ~f:(fun (_subdir_path, stanza) ->
       match stanza.Vendor_stanza.build_method with
       | Some Vendor_stanza.Build_method.Opam_sandboxed -> true
       | _ -> false)

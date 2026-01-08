@@ -1,6 +1,23 @@
 open Import
 open Memo.O
 
+(* Key for packages: (name, version option) to support multi-version vendoring *)
+module Package_key = struct
+  type t = Package.Name.t * Package_version.t option
+
+  let compare (n1, v1) (n2, v2) =
+    match Package.Name.compare n1 n2 with
+    | Eq -> Option.compare Package_version.compare v1 v2
+    | ord -> ord
+  ;;
+
+  let to_dyn (name, version) =
+    Dyn.pair Package.Name.to_dyn (Dyn.option Package_version.to_dyn) (name, version)
+  ;;
+end
+
+module Package_key_map = Map.Make (Package_key)
+
 module Dune_file_db = struct
   type t = Dune_file.t Path.Source.Map.t
 
@@ -18,6 +35,7 @@ end
 type t =
   { dune_files : Dune_file.t list Per_context.t
   ; packages : Package.t Package.Name.Map.t
+  ; all_packages : Package.t Package_key_map.t
   ; projects : Dune_project.t list
   ; projects_by_root : Dune_project.t Path.Source.Map.t
   ; dune_file_by_dir : Dune_file_db.t Per_context.t
@@ -70,11 +88,11 @@ let load () =
       ~f
   in
   let projects = Appendable_list.to_list_rev projects in
-  let* all_packages, vendored_packages =
-    Memo.List.fold_left
+  let packages_by_name, all_packages_by_key, vendored_packages =
+    List.fold_left
       projects
-      ~init:(Package.Name.Map.empty, Package.Name.Set.empty)
-      ~f:(fun (acc_packages, vendored) (status, (project : Dune_project.t)) ->
+      ~init:(Package.Name.Map.empty, Package_key_map.empty, Package.Name.Set.empty)
+      ~f:(fun (acc_by_name, acc_by_key, vendored) (status, (project : Dune_project.t)) ->
         let packages = Dune_project.including_hidden_packages project in
         let vendored =
           match status with
@@ -82,22 +100,32 @@ let load () =
           | `Vendored ->
             Package.Name.Set.of_keys packages |> Package.Name.Set.union vendored
         in
-        (* For vendored directories with explicit (vendor ...) stanzas,
-           don't add packages to global map - they're managed through
-           the vendor stanza's library exposure instead. This allows
-           multi-version coexistence (e.g., yojson.1.7.0 and yojson.2.0.0
-           both defining a "yojson" package). *)
-        let+ has_vendor_stanza =
-          match status with
-          | `Regular -> Memo.return false
-          | `Vendored ->
-            Source_tree.vendor_stanza (Dune_project.root project) >>| Option.is_some
+        (* Add to key map (name, version) - always succeeds for unique name+version *)
+        let acc_by_key =
+          Package.Name.Map.fold packages ~init:acc_by_key ~f:(fun pkg acc ->
+            let key = Package.name pkg, Package.version pkg in
+            match Package_key_map.find acc key with
+            | None -> Package_key_map.add_exn acc key pkg
+            | Some existing ->
+              User_error.raise
+                [ Pp.textf
+                    "The package %S (version %s) is defined more than once:"
+                    (Package.Name.to_string (Package.name pkg))
+                    (match Package.version pkg with
+                     | None -> "<none>"
+                     | Some v -> Package_version.to_string v)
+                ; Pp.textf "- %s" (Loc.to_file_colon_line (Package.loc existing))
+                ; Pp.textf "- %s" (Loc.to_file_colon_line (Package.loc pkg))
+                ])
         in
-        let acc_packages =
-          if has_vendor_stanza
-          then acc_packages (* Skip - managed by vendor stanza *)
-          else
-            Package.Name.Map.union acc_packages packages ~f:(fun name a b ->
+        (* Add to name map - for backwards compatibility, keep first on conflict *)
+        let acc_by_name =
+          Package.Name.Map.union acc_by_name packages ~f:(fun name a b ->
+            match status with
+            | `Vendored ->
+              (* Vendored packages with same name but different versions: keep first *)
+              Some a
+            | `Regular ->
               User_error.raise
                 [ Pp.textf
                     "The package %S is defined more than once:"
@@ -106,17 +134,18 @@ let load () =
                 ; Pp.textf "- %s" (Loc.to_file_colon_line (Package.loc b))
                 ])
         in
-        acc_packages, vendored)
+        acc_by_name, acc_by_key, vendored)
   in
-  let mask = Only_packages.mask all_packages ~vendored:vendored_packages in
-  let packages = Only_packages.filter_packages mask all_packages in
+  let all_packages = all_packages_by_key in
+  let mask = Only_packages.mask packages_by_name ~vendored:vendored_packages in
+  let packages = Only_packages.filter_packages mask packages_by_name in
   let projects = List.rev_map projects ~f:snd in
   let dune_files =
     let without_ctx =
       Memo.lazy_ ~name:"dune-files-eval" (fun () ->
         let (_ : Package.Name.t Path.Source.Map.t) =
           match
-            Package.Name.Map.values all_packages
+            Package.Name.Map.values packages_by_name
             |> List.filter_map ~f:(fun pkg ->
               match Package.exclusive_dir pkg with
               | None -> None
@@ -151,6 +180,7 @@ let load () =
     ; mask
     ; dune_file_by_dir
     ; packages
+    ; all_packages
     ; projects
     ; projects_by_root =
         Path.Source.Map.of_list_map_exn projects ~f:(fun project ->
@@ -210,4 +240,9 @@ let projects () =
 let vendored_packages () =
   let+ t = load () in
   t.vendored_packages
+;;
+
+let all_packages () =
+  let+ t = load () in
+  t.all_packages
 ;;

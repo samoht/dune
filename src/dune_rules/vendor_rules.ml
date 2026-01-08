@@ -320,10 +320,9 @@ let read_pkg_name_from_opam pkg_dir =
 let get_vendored_map =
   let impl () =
     let open Memo.O in
-    let vendor_dir = Vendor.default_dir in
-    let+ stanzas = Source_tree.vendor_stanzas vendor_dir in
-    List.fold_left stanzas ~init:Vendored_map.empty ~f:(fun map (subdir, stanza) ->
-      let pkg_dir = Path.Source.relative vendor_dir subdir in
+    let+ stanzas = Source_tree.all_vendor_stanzas () in
+    List.fold_left stanzas ~init:Vendored_map.empty ~f:(fun map (pkg_dir, stanza) ->
+      let subdir = Path.Source.basename pkg_dir in
       (* Try to get package name from opam file, fallback to directory parsing *)
       let pkg_name =
         match read_pkg_name_from_opam pkg_dir with
@@ -560,7 +559,7 @@ let build_opam_package ~context ~pkg_name ~pkg_version ~source_dir ~opam_file =
         let dep_cookie = Paths.install_cookie' dep_target_dir in
         Dep.file (Path.build dep_cookie)
       | Some Dune_native | None ->
-        (* Native dune packages: depend on @install alias in their source dir *)
+        (* Native dune packages: depend on @install alias to populate install dir *)
         let dir =
           Path.Build.append_source (Context_name.build_dir context) dep_info.source_dir
         in

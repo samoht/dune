@@ -66,6 +66,11 @@ val vendor_stanza : Path.Source.t -> Vendor_stanza.t option Memo.t
     at [dir], as a list of (subdirectory_name, stanza) pairs. *)
 val vendor_stanzas : Path.Source.t -> (Filename.t * Vendor_stanza.t) list Memo.t
 
+(** [all_vendor_stanzas ()] returns all vendor stanzas in the entire workspace,
+    as a list of (full_path, stanza) pairs where full_path is the absolute
+    source path to the vendored directory. *)
+val all_vendor_stanzas : unit -> (Path.Source.t * Vendor_stanza.t) list Memo.t
+
 (** [nearest_vcs t fn] returns the version control system with the longest root
     path that is an ancestor of [fn]. *)
 val nearest_vcs : Path.Source.t -> Vcs.t option Memo.t

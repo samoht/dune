@@ -1418,11 +1418,12 @@ let scheme_per_ctx_memo =
     ~input:(module Super_context.As_memo_key)
     "install-rule-scheme"
     (fun sctx ->
-       let* packages = Dune_load.packages () in
+       let* packages = Dune_load.all_packages () in
        (* All packages generate install artifacts, including vendored ones.
           This is needed so opam-sandboxed packages can find vendored/duniverse
-          libraries via findlib. *)
-       Package.Name.Map.values packages
+          libraries via findlib. Use all_packages to include multi-version
+          vendored packages (same name, different versions). *)
+       Dune_load.Package_key_map.values packages
        |> Memo.parallel_map ~f:(fun pkg -> scheme sctx (Package.name pkg))
        >>| Scheme.all
        >>= Scheme.evaluate ~union:Rules.Dir_rules.union)
