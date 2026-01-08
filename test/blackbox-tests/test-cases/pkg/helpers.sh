@@ -64,8 +64,11 @@ mock_packages="mock-opam-repository/packages"
 
 mkrepo() {
   mkdir -p $mock_packages
+  # Get the repo directory (parent of packages dir)
+  local repo_dir
+  repo_dir=$(dirname "$mock_packages")
   # Initialize as git repo for single-file lock format (needs commit hashes)
-  (cd mock-opam-repository && git init -q && git config user.email "test@test" && git config user.name "test")
+  (cd "$repo_dir" && git init -q && git config user.email "test@test" && git config user.name "test")
 }
 
 mkpkg() {
@@ -80,7 +83,10 @@ mkpkg() {
   echo 'opam-version: "2.0"' > $mock_packages/$name/$name.$version/opam
   cat >>$mock_packages/$name/$name.$version/opam
   # Commit the package so single-file format can derive from repo hash
-  (cd mock-opam-repository && git add -A && git commit -q -m "Add $name.$version")
+  # Get the repo directory (parent of packages dir)
+  local repo_dir
+  repo_dir=$(dirname "$mock_packages")
+  (cd "$repo_dir" && git add -A && git commit -q -m "Add $name.$version" 2>/dev/null || true)
 }
 
 mk_ocaml() {
