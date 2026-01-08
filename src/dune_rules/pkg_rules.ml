@@ -755,7 +755,8 @@ module Action_expander = struct
       | Var (Pkg Version) ->
         Memo.return (Ok [ Value.String (Package_version.to_string version) ])
       | Var (Pkg var) ->
-        Pkg_opam.expand_pkg ~context ~source_dir:paths.source_dir var >>| Result.ok
+        Pkg_opam.expand_pkg ~context ~source_dir:paths.source_dir ~prefix:paths.prefix var
+        >>| Result.ok
       | Var Context_name ->
         Memo.return (Ok [ Value.String (Context_name.to_string context) ])
       | Var Make ->
@@ -1505,7 +1506,40 @@ end = struct
           Package.Name.Map.set acc reg_entry.Package_registry.name reg_entry.version)
       in
       (* Build the package record *)
-      let paths = Paths.map_path write_paths ~f:Path.build in
+      let paths =
+        let base_paths = Paths.map_path write_paths ~f:Path.build in
+        (* For toolchain packages (not cached), set prefix to the toolchain cache directory
+           so files get installed there. This enables cache sharing across projects. *)
+        let is_toolchain =
+          Pkg_toolchain.is_compiler_and_toolchains_enabled info.Pkg_info.name
+        in
+        if is_toolchain && not is_cached
+        then (
+          let toolchain_prefix =
+            Pkg_toolchain.installation_prefix pkg ~build_id |> Path.outside_build_dir
+          in
+          let install_roots =
+            lazy
+              (Pkg_toolchain.install_roots
+                 ~prefix:(Path.as_outside_build_dir_exn toolchain_prefix))
+          in
+          let install_paths =
+            lazy
+              (Install.Paths.make
+                 ~relative:Path.relative
+                 ~package:info.name
+                 ~roots:
+                   (Lazy.force install_roots
+                    |> Install.Roots.map ~f:Path.outside_build_dir))
+          in
+          { base_paths with
+            prefix = toolchain_prefix
+          ; install_roots =
+              Lazy.map install_roots ~f:(Install.Roots.map ~f:Path.outside_build_dir)
+          ; install_paths
+          })
+        else base_paths
+      in
       let context = Package_universe.context_name package_universe in
       let t =
         { Resolved_pkg.id

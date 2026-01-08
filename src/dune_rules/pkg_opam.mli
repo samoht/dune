@@ -50,6 +50,7 @@ val sys_poll_var
 val expand_pkg
   :  context:Context_name.t
   -> source_dir:Path.t
+  -> prefix:Path.t
   -> Pform.Var.Pkg.t
   -> Value.t list Memo.t
 

@@ -88,7 +88,7 @@ let sys_poll_var accessor =
 ;;
 
 (** Expand package-level pform variables like %{prefix}%, %{lib}%, %{jobs}%, etc. *)
-let expand_pkg ~context ~source_dir (pform : Pform.Var.Pkg.t) =
+let expand_pkg ~context ~source_dir ~prefix (pform : Pform.Var.Pkg.t) =
   match pform with
   | Switch -> Memo.return [ Value.String (Context_name.to_string context) ]
   | Os Os -> sys_poll_var (fun { os; _ } -> os)
@@ -98,8 +98,8 @@ let expand_pkg ~context ~source_dir (pform : Pform.Var.Pkg.t) =
   | Sys_ocaml_version -> sys_poll_var (fun { sys_ocaml_version; _ } -> sys_ocaml_version)
   | Build -> Memo.return [ Value.Dir source_dir ]
   | Prefix ->
-    (* All packages install to the shared _build/install/<ctx>/ directory *)
-    Memo.return [ Value.Dir (Pkg_install.dir ~context |> Path.build) ]
+    (* Use the package's prefix (may be toolchain cache dir or shared install dir) *)
+    Memo.return [ Value.Dir prefix ]
   | User -> Memo.return [ Value.String (Unix.getlogin ()) ]
   | Jobs -> Memo.return [ Value.String (Int.to_string !Clflags.concurrency) ]
   | Arch -> sys_poll_var (fun { arch; _ } -> arch)
