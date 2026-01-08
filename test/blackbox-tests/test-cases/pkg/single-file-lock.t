@@ -30,12 +30,12 @@ Check that dune.lock is a file (not a directory):
   dune.lock is a file
 
 Check the contents of the single-file lock:
-  $ cat dune.lock
+  $ cat dune.lock | strip_sandbox | sed 's/[a-f0-9]\{40\}/HASH/'
   (lang package 0.1)
   
   (repos
-   (file:///Users/samoht/git/dune/_build/.sandbox/ebd7423dd37b3e55ce6345de75288fdc/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository
-    76aa4530162e9f1e6d056284067631b0dd1ae0dc))
+   $SANDBOX/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository
+    HASH))
   
   (packages foo.0.0.1)
   
@@ -44,6 +44,9 @@ Check the contents of the single-file lock:
     (arch arm64 x86_64))
    (macos
     (arch arm64 x86_64)))
+
+
+
 
 
 
@@ -91,12 +94,12 @@ Lock with single-file format (expect pins section):
 
 
 Check the single-file lock contents include pins:
-  $ cat dune.lock | strip_sandbox
+  $ cat dune.lock | strip_sandbox | sed 's/[a-f0-9]\{40\}/HASH/'
   (lang package 0.1)
   
   (repos
    $SANDBOX/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository
-    76aa4530162e9f1e6d056284067631b0dd1ae0dc))
+    HASH))
   
   (packages my-pinned-pkg.dev)
   
@@ -110,6 +113,7 @@ Check the single-file lock contents include pins:
     (arch arm64 x86_64))
    (macos
     (arch arm64 x86_64)))
+
 
 
 Test --platform CLI option:
@@ -132,18 +136,21 @@ Lock with specific platform:
 
 
 Check lock has linux platform only:
-  $ cat dune.lock
+  $ cat dune.lock | strip_sandbox | sed 's/[a-f0-9]\{40\}/HASH/'
   (lang package 0.1)
   
   (repos
-   (file:///Users/samoht/git/dune/_build/.sandbox/ebd7423dd37b3e55ce6345de75288fdc/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository
-    76aa4530162e9f1e6d056284067631b0dd1ae0dc))
+   $SANDBOX/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository
+    HASH))
   
   (packages foo.0.0.1)
   
   (platforms
    (linux
     (arch arm64 x86_64)))
+
+
+
 
 
 
@@ -160,18 +167,21 @@ Lock with platform including archs:
 
 
 Check lock has linux with only x86_64 arch:
-  $ cat dune.lock
+  $ cat dune.lock | strip_sandbox | sed 's/[a-f0-9]\{40\}/HASH/'
   (lang package 0.1)
   
   (repos
-   (file:///Users/samoht/git/dune/_build/.sandbox/ebd7423dd37b3e55ce6345de75288fdc/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository
-    76aa4530162e9f1e6d056284067631b0dd1ae0dc))
+   $SANDBOX/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository
+    HASH))
   
   (packages foo.0.0.1)
   
   (platforms
    (linux
     (arch x86_64)))
+
+
+
 
 
 
@@ -187,12 +197,12 @@ Lock with multiple platforms:
 
 
 Check lock has both platforms:
-  $ cat dune.lock
+  $ cat dune.lock | strip_sandbox | sed 's/[a-f0-9]\{40\}/HASH/'
   (lang package 0.1)
   
   (repos
-   (file:///Users/samoht/git/dune/_build/.sandbox/ebd7423dd37b3e55ce6345de75288fdc/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository
-    76aa4530162e9f1e6d056284067631b0dd1ae0dc))
+   $SANDBOX/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository
+    HASH))
   
   (packages foo.0.0.1)
   
@@ -201,6 +211,9 @@ Check lock has both platforms:
     (arch arm64 x86_64))
    (macos
     (arch arm64)))
+
+
+
 
 Test switching between formats (single-file to directory):
 First create a single-file lock:
