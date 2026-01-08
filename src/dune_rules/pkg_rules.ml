@@ -848,13 +848,13 @@ module Action_expander = struct
     ;;
 
     let expand_pform
-          { name = _
+          { name
           ; env = _
           ; paths
           ; artifacts = _
           ; context
           ; depends
-          ; version = _
+          ; version
           ; depexts = _
           ; all_package_versions
           }
@@ -864,6 +864,10 @@ module Action_expander = struct
       =
       let loc = Dune_sexp.Template.Pform.loc source in
       match pform with
+      | Var (Pkg Name) ->
+        Memo.return (Ok [ Value.String (Dune_pkg.Package_name.to_string name) ])
+      | Var (Pkg Version) ->
+        Memo.return (Ok [ Value.String (Package_version.to_string version) ])
       | Var (Pkg var) -> expand_pkg ~context paths var >>| Result.ok
       | Var Context_name ->
         Memo.return (Ok [ Value.String (Context_name.to_string context) ])
@@ -1191,16 +1195,17 @@ module Action_expander = struct
     }
   ;;
 
-  (* Install commands use no sandbox because they write to the shared PREFIX
-     directory. Build commands can be sandboxed since they only read from PREFIX. *)
+  (* Install commands require no sandbox because they write to the shared PREFIX
+     directory, which is an absolute path outside the sandbox. *)
   let install_sandbox = Sandbox_mode.Set.singleton Sandbox_mode.none
 
-  (* Build commands can use any sandbox mode - they only read from PREFIX,
-     not write to it. PREFIX is an absolute path outside the sandbox. *)
+  (* Build commands can use any sandbox mode (including none) - they only read from PREFIX,
+     not write to it. PREFIX is an absolute path outside the sandbox. We allow None
+     so that when build and install actions are combined, the intersection includes None. *)
   let build_sandbox =
     Sandbox_mode.Set.of_func (function
-      | Some Sandbox_mode.Symlink | Some Copy | Some Hardlink -> true
-      | None | Some Patch_back_source_tree -> false)
+      | Some Sandbox_mode.Symlink | Some Copy | Some Hardlink | None -> true
+      | Some Patch_back_source_tree -> false)
   ;;
 
   let expand
