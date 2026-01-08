@@ -1479,7 +1479,13 @@ end = struct
       | Package_registry.Source.From_lock { pkg } -> Memo.return (Ok pkg)
       | Package_registry.Source.From_vendor { source_dir; stanza = _ } ->
         let opam = load_vendor_opam_file ~source_dir ~pkg_name in
-        Dune_pkg.Pkg.of_opam_file ~name ~version ~opam () |> Memo.return
+        (* Set source to point to the vendor directory so source_rules can copy it *)
+        let abs_path =
+          Path.source source_dir |> Path.to_absolute_filename |> Path.External.of_string
+        in
+        let vendor_source = Source.external_copy (Loc.none, abs_path) in
+        Dune_pkg.Pkg.of_opam_file ~name ~version ~source:vendor_source ~opam ()
+        |> Memo.return
     in
     match pkg_result with
     | Error msg -> User_error.raise (User_message.pp msg |> List.singleton)
