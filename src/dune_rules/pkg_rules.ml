@@ -672,129 +672,6 @@ module Action_expander = struct
       x
     ;;
 
-    let section_dir_of_root
-          (roots : _ Install.Roots.t)
-          (section : Pform.Var.Pkg.Section.t)
-      =
-      match section with
-      | Lib -> roots.lib_root
-      | Libexec -> roots.libexec_root
-      | Bin -> roots.bin
-      | Sbin -> roots.sbin
-      | Share -> roots.share_root
-      | Etc -> roots.etc_root
-      | Doc -> roots.doc_root
-      | Man -> roots.man
-      | Toplevel -> Path.relative roots.lib_root "toplevel"
-      | Stublibs -> Path.relative roots.lib_root "stublibs"
-    ;;
-
-    let sys_poll_var accessor =
-      accessor Lock_dir.Sys_vars.poll
-      |> Memo.Lazy.force
-      >>| function
-      | Some v -> [ Value.String v ]
-      | None ->
-        (* TODO: in OPAM an unset variable evaluates to false, but we
-           can't represent that in a string so it evaluates to an empty
-           string instead *)
-        [ Value.String "" ]
-    ;;
-
-    let expand_pkg ~context (paths : Path.t Paths.t) (pform : Pform.Var.Pkg.t) =
-      match pform with
-      | Switch -> Memo.return [ Value.String "dune" ]
-      | Os Os -> sys_poll_var (fun { os; _ } -> os)
-      | Os Os_version -> sys_poll_var (fun { os_version; _ } -> os_version)
-      | Os Os_distribution -> sys_poll_var (fun { os_distribution; _ } -> os_distribution)
-      | Os Os_family -> sys_poll_var (fun { os_family; _ } -> os_family)
-      | Sys_ocaml_version ->
-        sys_poll_var (fun { sys_ocaml_version; _ } -> sys_ocaml_version)
-      | Build -> Memo.return [ Value.Dir paths.source_dir ]
-      | Prefix ->
-        (* All packages install to the shared _build/install/<ctx>/ directory.
-           The per-package target_dir/cookie is used only for dependency tracking. *)
-        Memo.return [ Value.Dir (Pkg_opam.Pkg_install.dir ~context |> Path.build) ]
-      | User -> Memo.return [ Value.String (Unix.getlogin ()) ]
-      | Jobs -> Memo.return [ Value.String (Int.to_string !Clflags.concurrency) ]
-      | Arch -> sys_poll_var (fun { arch; _ } -> arch)
-      | Group ->
-        let group = Unix.getgid () |> Unix.getgrgid in
-        Memo.return [ Value.String group.gr_name ]
-      | Section_dir section ->
-        let dir = section_dir_of_root (Pkg_opam.Pkg_install.roots ~context) section in
-        Memo.return [ Value.Dir dir ]
-    ;;
-
-    (* Resolve builtin package variables that don't come from the package itself *)
-    let resolve_builtin_var
-          ~context
-          ~package_name
-          ~all_versions
-          ~present
-          ~scope
-          ~self_source_dir
-          ~dep_source_dir
-          variable_name
-      =
-      match Package_variable_name.to_string variable_name with
-      | "pinned" -> Some (Memo.return @@ Ok [ Value.false_ ])
-      | "preinstalled" -> Some (Memo.return @@ Ok [ Value.false_ ])
-      | "native" -> Some (Memo.return @@ Ok [ Value.true_ ])
-      | "enable" ->
-        Some (Memo.return @@ Ok [ Value.String (if present then "enable" else "disable") ])
-      | "installed" ->
-        let in_lock = Package.Name.Map.mem all_versions package_name in
-        Some (Memo.return @@ Ok [ Value.String (Bool.to_string in_lock) ])
-      | "version" ->
-        (match Package.Name.Map.find all_versions package_name with
-         | Some version ->
-           Some (Memo.return @@ Ok [ Value.String (Package_version.to_string version) ])
-         | None -> Some (Memo.return @@ Ok [ Value.String "" ]))
-      | "build-id" ->
-        let source_dir =
-          match scope with
-          | Package_variable.Scope.Self -> Some self_source_dir
-          | Package_variable.Scope.Package _ -> dep_source_dir
-        in
-        let build_id =
-          match source_dir with
-          | Some dir -> Path.to_string dir |> Dune_digest.string |> Dune_digest.to_string
-          | None -> ""
-        in
-        Some (Memo.return @@ Ok [ Value.String build_id ])
-      | _ ->
-        (* Try section directory *)
-        (match dep_source_dir with
-         | None -> None
-         | Some _ ->
-           (match
-              Pform.Var.Pkg.Section.of_string
-                (Package_variable_name.to_string variable_name)
-            with
-            | None -> None
-            | Some section ->
-              let roots =
-                Pkg_opam.Pkg_install.roots_for_package ~pkg_name:package_name ~context
-              in
-              Some (Memo.return @@ Ok [ Value.Dir (section_dir_of_root roots section) ])))
-    ;;
-
-    (* Apply opam's var?default semantics: if var is truthy, return default, else "" *)
-    let apply_default_if_true default_if_true result =
-      match default_if_true with
-      | None -> result
-      | Some default ->
-        Result.map result ~f:(fun values ->
-          let is_truthy =
-            match values with
-            | [ Value.String "true" ] -> true
-            | [ Value.String "false" ] | [ Value.String "" ] | [] -> false
-            | _ -> true
-          in
-          if is_truthy then [ Value.String default ] else [ Value.String "" ])
-    ;;
-
     let expand_pkg_macro
           ~context
           ~loc
@@ -831,7 +708,7 @@ module Action_expander = struct
           let present = Option.is_some dep_paths in
           let dep_source_dir = Option.map dep_paths ~f:(fun p -> p.Paths.source_dir) in
           (match
-             resolve_builtin_var
+             Pkg_opam.resolve_builtin_var
                ~context
                ~package_name
                ~all_versions
@@ -844,7 +721,7 @@ module Action_expander = struct
            | Some result -> result
            | None -> Memo.return (Error (`Undefined_pkg_var variable_name)))
       in
-      apply_default_if_true default_if_true result
+      Pkg_opam.apply_default_if_true default_if_true result
     ;;
 
     let expand_pform
@@ -868,7 +745,8 @@ module Action_expander = struct
         Memo.return (Ok [ Value.String (Dune_pkg.Package_name.to_string name) ])
       | Var (Pkg Version) ->
         Memo.return (Ok [ Value.String (Package_version.to_string version) ])
-      | Var (Pkg var) -> expand_pkg ~context paths var >>| Result.ok
+      | Var (Pkg var) ->
+        Pkg_opam.expand_pkg ~context ~source_dir:paths.source_dir var >>| Result.ok
       | Var Context_name ->
         Memo.return (Ok [ Value.String (Context_name.to_string context) ])
       | Var Make ->
@@ -1045,9 +923,28 @@ module Action_expander = struct
       let+ args = Memo.parallel_map t ~f:(expand ~expander) in
       Action.Progn args
     | System arg ->
-      Expander.expand_pform_gen ~mode:Single expander arg
-      >>| Value.to_string ~dir
-      >>| System.action
+      let+ cmd =
+        Expander.expand_pform_gen ~mode:Single expander arg >>| Value.to_string ~dir
+      in
+      (* Wrap System actions with BUILD_PATH_PREFIX_MAP for relocatable builds.
+         Match Run_with_path.ml's mappings for consistency. *)
+      let prefix = Pkg_opam.Pkg_install.dir ~context:expander.context in
+      let roots = Pkg_opam.Pkg_install.roots_build ~context:expander.context in
+      let prefix_value = Path.Build.to_string prefix in
+      let ocamlfind_destdir_value = Path.Build.to_string roots.lib_root in
+      let build_path_prefix_map =
+        Build_path_prefix_map.encode_map
+          [ Some
+              { Build_path_prefix_map.source = ocamlfind_destdir_value
+              ; target = "/OPAMROOT/lib"
+              }
+          ; Some { source = prefix_value; target = "/OPAMROOT" }
+          ]
+      in
+      Action.Setenv
+        ( Dune_util.Build_path_prefix_map._BUILD_PATH_PREFIX_MAP
+        , build_path_prefix_map
+        , System.action cmd )
     | Patch p ->
       let+ patch =
         Expander.expand_pform_gen ~mode:Single expander p >>| Value.to_path ~dir
@@ -1195,17 +1092,20 @@ module Action_expander = struct
     }
   ;;
 
-  (* Install commands require no sandbox because they write to the shared PREFIX
-     directory, which is an absolute path outside the sandbox. *)
-  let install_sandbox = Sandbox_mode.Set.singleton Sandbox_mode.none
+  (* Install commands write to the shared PREFIX directory, which is an absolute
+     path outside the sandbox, so they work regardless of sandbox mode. Use
+     no_special_requirements to avoid conflicting with build_sandbox when actions
+     are combined via Action_builder.progn (which intersects sandbox configs). *)
+  let install_sandbox = Sandbox_config.no_special_requirements
 
-  (* Build commands can use any sandbox mode (including none) - they only read from PREFIX,
-     not write to it. PREFIX is an absolute path outside the sandbox. We allow None
-     so that when build and install actions are combined, the intersection includes None. *)
+  (* Build commands require Copy sandbox mode to get a writable copy of the
+     source directory. Symlink/Hardlink modes won't work because source files
+     from tarballs are often read-only, and symlinks/hardlinks preserve that.
+     Copy mode explicitly adds write permissions (see sandbox.ml chmod_file). *)
   let build_sandbox =
     Sandbox_mode.Set.of_func (function
-      | Some Sandbox_mode.Symlink | Some Copy | Some Hardlink | None -> true
-      | Some Patch_back_source_tree -> false)
+      | Some Sandbox_mode.Copy -> true
+      | Some Symlink | Some Hardlink | None | Some Patch_back_source_tree -> false)
   ;;
 
   let expand

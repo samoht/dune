@@ -49,8 +49,11 @@ strip_sandbox() {
 }
 
 show_pkg_targets() {
-  prefix="$(get_build_pkg_dir $1)/target"
-  find "$prefix" | sort | dune_cmd subst "$prefix" ""
+  # Packages now install to the shared _build/install/default/ directory
+  # Filter to only show files related to this package
+  pkg_name=$1
+  prefix="_build/install/default"
+  find "$prefix" 2>/dev/null | grep -E "/$pkg_name[/.]" | sort | dune_cmd subst "$prefix" ""
 }
 
 show_pkg_cookie() {

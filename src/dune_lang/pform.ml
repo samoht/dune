@@ -70,6 +70,8 @@ module Var = struct
       | Arch
       | Sys_ocaml_version
       | Section_dir of Section.t
+      | Name
+      | Version
 
     let compare = Poly.compare
 
@@ -84,6 +86,8 @@ module Var = struct
       | Arch -> "arch"
       | Sys_ocaml_version -> "sys_ocaml_version"
       | Section_dir section -> Section.to_string section
+      | Name -> "name"
+      | Version -> "version"
     ;;
 
     let to_dyn t = Dyn.variant (encode_to_latest_dune_lang_version t) []
@@ -629,6 +633,8 @@ module Env = struct
         ; "arch", Arch
         ; "jobs", Jobs
         ; "sys_ocaml_version", Sys_ocaml_version
+        ; "name", Name
+        ; "version", Version
         ]
         |> List.rev_append
              (List.rev_map Var.Pkg.Section.all ~f:(fun (section, name) ->

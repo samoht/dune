@@ -90,7 +90,7 @@ let sys_poll_var accessor =
 (** Expand package-level pform variables like %{prefix}%, %{lib}%, %{jobs}%, etc. *)
 let expand_pkg ~context ~source_dir (pform : Pform.Var.Pkg.t) =
   match pform with
-  | Switch -> Memo.return [ Value.String "dune" ]
+  | Switch -> Memo.return [ Value.String (Context_name.to_string context) ]
   | Os Os -> sys_poll_var (fun { os; _ } -> os)
   | Os Os_version -> sys_poll_var (fun { os_version; _ } -> os_version)
   | Os Os_distribution -> sys_poll_var (fun { os_distribution; _ } -> os_distribution)
@@ -109,6 +109,9 @@ let expand_pkg ~context ~source_dir (pform : Pform.Var.Pkg.t) =
   | Section_dir section ->
     let dir = section_dir_of_root (Pkg_install.roots ~context) section in
     Memo.return [ Value.Dir dir ]
+  | Name | Version ->
+    (* Name and Version need to be handled by the caller with access to package info *)
+    Code_error.raise "Name and Version should be handled by caller" []
 ;;
 
 (** Resolve builtin package variables that don't come from the package itself *)

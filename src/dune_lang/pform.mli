@@ -38,6 +38,8 @@ module Var : sig
       | Arch
       | Sys_ocaml_version
       | Section_dir of Section.t
+      | Name
+      | Version
 
     val compare : t -> t -> Ordering.t
     val to_dyn : t -> Dyn.t
