@@ -487,3 +487,73 @@ let read_disk_with_opam_files ~solver_env ~local_packages path =
 let pkg_of_local_opam_file ~loc:_ ~name ~version ~opam_file ~source =
   Pkg.of_opam_file ~name ~version ~source ~opam:opam_file ()
 ;;
+
+(* Create a minimal Pkg.t with just name/version for quick reading.
+   Used by commands like 'outdated' that only need package identification. *)
+let minimal_pkg ~name ~version =
+  { Pkg.build_command = Pkg.Conditional_choice.empty
+  ; install_command = Pkg.Conditional_choice.empty
+  ; depends = Pkg.Conditional_choice.empty
+  ; post_depends = Pkg.Conditional_choice.empty
+  ; depexts = []
+  ; info =
+      { Pkg.Info.name
+      ; version
+      ; dev = false
+      ; avoid = false
+      ; source = None
+      ; extra_sources = []
+      }
+  ; exported_env = []
+  ; enabled_on_platforms = [] (* empty = enabled on all platforms *)
+  }
+;;
+
+(* Convert single-file lock to Lock.t without deriving from opam repos.
+   Creates minimal Pkg.t entries with just name/version information.
+   Used by commands that only need to identify packages, not build them. *)
+let file_to_lock_minimal (file : Lock.File.t) ~local_packages =
+  let packages =
+    List.fold_left
+      file.packages
+      ~init:Package_name.Map.empty
+      ~f:(fun acc { Lock.File.Package_entry.name; version; platforms = _ } ->
+        let pkg = minimal_pkg ~name ~version in
+        Package_name.Map.set acc name pkg)
+  in
+  let local_packages_for_solver =
+    Package_name.Map.values local_packages |> List.map ~f:Local_package.for_solver
+  in
+  Lock.create_latest_version
+    packages
+    ~local_packages:local_packages_for_solver
+    ~ocaml:None
+    ~repos:None
+    ~expanded_solver_variable_bindings:Solver_stats.Expanded_variable_bindings.empty
+    ~solved_for_platform:None
+    ~portable_lock_dir:(Lock.File.is_portable file)
+;;
+
+(* Read a lock file in minimal mode - only package names/versions, no opam derivation.
+   For directory format, uses full read (already has all info).
+   For single-file format, parses and creates minimal Pkg.t without fetching from repos.
+   Used by commands like 'outdated' that only need to identify packages. *)
+let read_disk_minimal ~(local_packages : Local_package.t Package_name.Map.t) path =
+  match Lock.detect_format path with
+  | None ->
+    User_error.raise
+      [ Pp.textf
+          "%s is not a valid lock directory or lock file"
+          (Path.to_string_maybe_quoted path)
+      ]
+  | Some Lock.Directory ->
+    (* Directory format - use sync reader (has all info already) *)
+    Lock.read_disk_exn path
+  | Some Lock.File ->
+    (* Single-file format - parse and create minimal Lock.t without derivation *)
+    let file =
+      Io.with_lexbuf_from_file path ~f:(fun lexbuf ->
+        Lock.Metadata.parse_contents lexbuf ~f:(fun _lang -> Lock.File.decode))
+    in
+    file_to_lock_minimal file ~local_packages
+;;

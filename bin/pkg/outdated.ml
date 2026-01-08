@@ -16,16 +16,9 @@ let find_outdated_packages ~transitive ~lock_dirs_arg () =
           ()
       and* local_packages = Memo.run find_local_packages
       and* platform = solver_env_from_system_and_context ~lock_dir_path in
-      let local_packages_for_solver =
-        Package_name.Map.values local_packages
-        |> List.map ~f:Dune_pkg.Local_package.for_solver
-      in
-      let* lock_dir =
-        Dune_pkg.Lock_pkg.read_disk
-          ~solver_env:platform
-          ~local_packages:local_packages_for_solver
-          lock_dir_path
-      in
+      (* Use minimal read that doesn't derive from opam repos.
+         Outdated only needs package names/versions, not build commands. *)
+      let lock_dir = Dune_pkg.Lock_pkg.read_disk_minimal ~local_packages lock_dir_path in
       let packages =
         Dune_pkg.Lock.Packages.pkgs_on_platform_by_name lock_dir.packages ~platform
       in

@@ -85,3 +85,14 @@ val pkg_of_local_opam_file
   -> opam_file:OpamFile.OPAM.t
   -> source:Source.t
   -> (Pkg.t, User_message.t) result
+
+(** [read_disk_minimal ~local_packages path] reads a lock file in minimal mode.
+    Only extracts package names/versions without deriving full opam metadata.
+    For directory format, uses full read (info already present).
+    For single-file format, parses the file without fetching from opam repos.
+    Used by commands like 'outdated' that only need package identification,
+    not full build information. Synchronous; does not require Fiber. *)
+val read_disk_minimal
+  :  local_packages:Local_package.t Package_name.Map.t
+  -> Path.t
+  -> Lock.t
