@@ -65,10 +65,7 @@ let of_ctx =
             let subdir = Path.Source.basename source_dir in
             match Vendor_rules.read_project_name source_dir with
             | Some name -> name
-            | None ->
-              (match OpamPackage.of_string_opt subdir with
-               | Some pkg -> OpamPackage.Name.to_string (OpamPackage.name pkg)
-               | None -> subdir)
+            | None -> Vendor_rules.parse_pkg_name_from_dir subdir
           in
           let name = Package.Name.of_string pkg_name in
           let version, libraries =

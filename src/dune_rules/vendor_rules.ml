@@ -281,11 +281,23 @@ let scan_vendor_dir vendor_dir =
         | _ -> map))
 ;;
 
-(* Parse package name from directory format "<name>.<version>" using OpamPackage *)
-let parse_pkg_name_from_dir dir_name =
+(* Parse "name.version" strings into components. These are the canonical helpers
+   for parsing opam-style package directory names. Used by package_registry.ml
+   and pkg_rules.ml (via Pkg_id). *)
+
+let parse_name_version dir_name =
   match OpamPackage.of_string_opt dir_name with
-  | Some pkg -> OpamPackage.Name.to_string (OpamPackage.name pkg)
-  | None -> dir_name (* fallback to full name if parsing fails *)
+  | Some pkg ->
+    let name = OpamPackage.Name.to_string (OpamPackage.name pkg) in
+    let version = OpamPackage.Version.to_string (OpamPackage.version pkg) in
+    Some (name, version)
+  | None -> None
+;;
+
+let parse_pkg_name_from_dir dir_name =
+  match parse_name_version dir_name with
+  | Some (name, _) -> name
+  | None -> dir_name
 ;;
 
 (* Try to read package name from opam file in directory *)
@@ -577,13 +589,7 @@ let build_opam_package ~context ~pkg_name ~pkg_version ~source_dir ~opam_file =
 
 let setup_vendor_package_rules ~context ~pkg_dir =
   let open Memo.O in
-  (* Parse pkg_dir which is like "foo.1.0.0" into name using OpamPackage *)
-  let pkg_name =
-    match OpamPackage.of_string_opt pkg_dir with
-    | Some pkg ->
-      Package.Name.of_string (OpamPackage.Name.to_string (OpamPackage.name pkg))
-    | None -> Package.Name.of_string pkg_dir
-  in
+  let pkg_name = Package.Name.of_string (parse_pkg_name_from_dir pkg_dir) in
   let* map = get_vendored_map () in
   match Vendored_map.find map pkg_name with
   | None -> Memo.return None

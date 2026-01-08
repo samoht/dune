@@ -207,39 +207,8 @@ let build =
                  "Build $(docv) in its parent directory only. Equivalent to the build \
                   target $(b,@@)$(docv). Example: $(b,--alias dir/foo) builds the \
                   $(b,foo) alias in $(b,dir/) only. Repeatable."))
-    and+ auto_fetch_opt =
-      let toggle = [ "enabled", true; "disabled", false ] in
-      let doc =
-        Printf.sprintf
-          "Enable or disable automatic fetching of missing dune packages to duniverse \
-           (%s)."
-          (Arg.doc_alts_enum toggle)
-      in
-      Arg.(
-        value
-        & opt (some (enum toggle)) None
-        & info
-            [ "auto-fetch" ]
-            ~env:(Cmd.Env.info ~doc Common.auto_fetch_env)
-            ~doc:(Some doc))
-    and+ auto_lock_opt =
-      let modes = Dune_config.Auto_lock.all in
-      let doc =
-        Printf.sprintf
-          "Control automatic locking behavior (%s). $(b,auto): use workspace config, \
-           then check for lock file (default). $(b,disabled): ignore lock file, use \
-           system packages only. $(b,enabled): enable package management, auto-lock if \
-           missing. $(b,always): always re-solve before building."
-          (Arg.doc_alts_enum modes)
-      in
-      Arg.(
-        value
-        & opt (some (enum modes)) None
-        & info
-            [ "auto-lock" ]
-            ~env:(Cmd.Env.info ~doc Common.auto_lock_env)
-            ~doc:(Some doc))
-    in
+    and+ auto_fetch_opt = Common.fetch_term
+    and+ auto_lock_opt = Common.lock_term in
     let targets = List.concat [ targets; aliases; aliases_rec ] in
     let targets =
       match targets with
@@ -283,13 +252,8 @@ let build =
         >>| Rpc.Rpc_common.wrap_build_outcome_exn ~print_on_success:true)
     | Ok () ->
       let request setup = Target.interpret_targets (Common.root common) setup targets in
-      let auto_fetch = Option.value auto_fetch_opt ~default:config.auto_fetch in
-      let auto_lock = Option.value auto_lock_opt ~default:config.auto_lock in
-      (* Override Clflags.auto_lock if CLI option was provided *)
-      Option.iter auto_lock_opt ~f:(fun v -> Dune_rules.Clflags.auto_lock := v);
-      Log.info
-        "Build auto_lock"
-        [ "auto_lock", Dune_config.Auto_lock.to_dyn !Dune_rules.Clflags.auto_lock ];
+      let auto_fetch = Common.resolve_fetch_flag ~cli_opt:auto_fetch_opt ~config in
+      let auto_lock = Common.resolve_lock_flag ~cli_opt:auto_lock_opt ~config in
       run_build_command ~common ~config ~auto_fetch ~auto_lock ~request
   in
   Cmd.v (Cmd.info "build" ~doc ~man ~envs:Common.envs) term

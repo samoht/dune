@@ -60,7 +60,7 @@ val read_disk_with_opam_files
   -> Path.t
   -> (Lock.t * (Package_name.t * string) list) Fiber.t
 
-(** [pkg_of_local_opam_file ~loc ~name ~version ~opam_file] creates a Pkg.t
+(** [pkg_of_local_opam_file ~loc ~name ~version ~opam_file ~source] creates a Pkg.t
     from a local opam file. Used for vendored opam packages that don't go through
     the solver. Build and install commands are extracted directly from the opam file. *)
 val pkg_of_local_opam_file
@@ -68,4 +68,5 @@ val pkg_of_local_opam_file
   -> name:Package_name.t
   -> version:Package_version.t
   -> opam_file:OpamFile.OPAM.t
+  -> source:Source.t
   -> (Pkg.t, User_message.t) result

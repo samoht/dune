@@ -72,6 +72,15 @@ val help_secs : Cmdliner.Manpage.block list
 val footer : Cmdliner.Manpage.block
 val auto_fetch_env : string
 val auto_lock_env : string
+val fetch_term : bool option Cmdliner.Term.t
+val lock_term : Dune_config.Auto_lock.t option Cmdliner.Term.t
+val resolve_fetch_flag : cli_opt:bool option -> config:Dune_config.t -> bool
+
+val resolve_lock_flag
+  :  cli_opt:Dune_config.Auto_lock.t option
+  -> config:Dune_config.t
+  -> Dune_config.Auto_lock.t
+
 val envs : Cmdliner.Cmd.Env.info list
 val debug_backtraces : bool Cmdliner.Term.t
 val config_from_config_file : Dune_config.Partial.t Cmdliner.Term.t

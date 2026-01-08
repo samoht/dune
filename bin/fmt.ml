@@ -70,27 +70,12 @@ let command =
                  "Just print the changes that would be made without actually applying \
                   them. This takes precedence over auto-promote as that flag is assumed \
                   for this command."))
-    and+ auto_fetch_opt =
-      let toggle = [ "enabled", true; "disabled", false ] in
-      let doc =
-        Printf.sprintf
-          "Enable or disable automatic fetching of missing dune packages to duniverse \
-           (%s)."
-          (Arg.doc_alts_enum toggle)
-      in
-      Arg.(
-        value
-        & opt (some (enum toggle)) None
-        & info
-            [ "auto-fetch" ]
-            ~env:(Cmd.Env.info ~doc Common.auto_fetch_env)
-            ~doc:(Some doc))
-    in
+    and+ auto_fetch_opt = Common.fetch_term in
     let builder =
       Common.Builder.set_promote builder (if preview then Never else Automatically)
     in
     let common, config = Common.init builder in
-    let auto_fetch = Option.value auto_fetch_opt ~default:config.auto_fetch in
+    let auto_fetch = Common.resolve_fetch_flag ~cli_opt:auto_fetch_opt ~config in
     run_fmt_command ~common ~config ~preview ~auto_fetch builder
   in
   Cmd.v (Cmd.info "fmt" ~doc ~man ~envs:Common.envs) term

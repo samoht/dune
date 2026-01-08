@@ -32,13 +32,25 @@ val setup_pkg_install_alias
   -> Context_name.t
   -> Build_config.Gen_rules.t
 
-module Pkg_digest : sig
-  type t
+(** Package identifier: a (name, version) pair used to uniquely identify packages
+    and construct directory paths like "_build/.pkgs/<ctx>/pkg-name.1.0.0/" *)
+module Pkg_id : sig
+  type t =
+    { name : Package.Name.t
+    ; version : Package_version.t
+    }
 
   val to_string : t -> string
+  val of_string : string -> t
+  val of_string_opt : string -> t option
+
+  (** Extract just the package name from a "name.version" string *)
+  val name_of_string : string -> Package.Name.t
+
+  val create : name:Package.Name.t -> version:Package_version.t -> t
 end
 
-val pkg_digest_of_project_dependency
+val pkg_id_of_project_dependency
   :  Context_name.t
   -> Package.Name.t
-  -> Pkg_digest.t option Memo.t
+  -> Pkg_id.t option Memo.t

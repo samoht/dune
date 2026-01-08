@@ -14,6 +14,19 @@ open Import
     v}
 *)
 
+(** {2 Name/Version Parsing}
+
+    Parse "name.version" strings (e.g. "foo.1.0.0") into components.
+    These are the canonical helpers for parsing opam-style package directory names. *)
+
+(** Parse "name.version" into (name, version) components. Returns None if
+    the string doesn't match the expected format. *)
+val parse_name_version : string -> (string * string) option
+
+(** Extract the package name from a "name.version" string.
+    Falls back to returning the input unchanged if parsing fails. *)
+val parse_pkg_name_from_dir : string -> string
+
 (** {2 Library Scanning} *)
 
 val scan_public_libraries : Path.Source.t -> string list

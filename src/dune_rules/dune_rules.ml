@@ -79,9 +79,9 @@ module Pkg_rules = struct
   let build_dir = Pkg_rules.build_dir
   let all_filtered_depexts = Pkg_rules.all_filtered_depexts
   let all_filtered_depexts_with_origins = Pkg_rules.all_filtered_depexts_with_origins
-  let pkg_digest_of_project_dependency = Pkg_rules.pkg_digest_of_project_dependency
+  let pkg_id_of_project_dependency = Pkg_rules.pkg_id_of_project_dependency
 
-  module Pkg_digest = Pkg_rules.Pkg_digest
+  module Pkg_id = Pkg_rules.Pkg_id
 end
 
 module Fetch_rules = Fetch_rules

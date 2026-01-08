@@ -126,7 +126,9 @@ module Package_universe = struct
   ;;
 end
 
-module Pkg_digest = struct
+(* Package identifier: a (name, version) pair used to uniquely identify packages
+   and construct directory paths like "_build/.pkgs/<ctx>/pkg-name.1.0.0/" *)
+module Pkg_id = struct
   module T = struct
     type t =
       { name : Package.Name.t
@@ -152,21 +154,20 @@ module Pkg_digest = struct
     sprintf "%s.%s" (Package.Name.to_string name) (Package_version.to_string version)
   ;;
 
+  let of_string_opt s =
+    Vendor_rules.parse_name_version s
+    |> Option.map ~f:(fun (name, version) ->
+      { name = Package.Name.of_string name; version = Package_version.of_string version })
+  ;;
+
   let of_string s =
-    match OpamPackage.of_string_opt s with
-    | Some pkg ->
-      let name =
-        Package.Name.of_string (OpamPackage.Name.to_string (OpamPackage.name pkg))
-      in
-      let version =
-        Package_version.of_string
-          (OpamPackage.Version.to_string (OpamPackage.version pkg))
-      in
-      { name; version }
+    match of_string_opt s with
+    | Some t -> t
     | None ->
       { name = Package.Name.of_string s; version = Package_version.of_string "dev" }
   ;;
 
+  let name_of_string s = Package.Name.of_string (Vendor_rules.parse_pkg_name_from_dir s)
   let create ~name ~version = { name; version }
 end
 
@@ -186,7 +187,7 @@ module Paths = struct
         | Dependencies ctx -> ctx
         | Dev_tool dev_tool -> Dev_tool.context_name dev_tool
       in
-      Path.Build.relative (build_dir ctx) (Pkg_digest.to_string pkg_digest)
+      Path.Build.relative (build_dir ctx) (Pkg_id.to_string pkg_digest)
     in
     of_root pkg_digest.name ~root
   ;;
@@ -378,7 +379,7 @@ module Resolved_pkg = struct
     ; paths : Path.t Paths.t
     ; write_paths : Path.Build.t Paths.t
     ; files_dir : Path.Build.t option
-    ; pkg_digest : Pkg_digest.t
+    ; pkg_digest : Pkg_id.t
     ; mutable exported_env : string Env_update.t list
     ; all_package_versions : Package_version.t Package.Name.Map.t
       (* All packages in the lock, for looking up versions of non-dependencies *)
@@ -1472,7 +1473,7 @@ end = struct
   let resolve_entry_impl registry { Entry_input.entry; universe = package_universe } =
     let { Package_registry.name; version; source } = entry in
     let pkg_name = Package.Name.to_string name in
-    let pkg_digest = Pkg_digest.create ~name ~version in
+    let pkg_digest = Pkg_id.create ~name ~version in
     (* Get the Pkg.t from the source *)
     let* pkg_result =
       match source with
@@ -2134,10 +2135,11 @@ let files path =
   Dep.Set.of_source_files ~files ~empty_directories, files
 ;;
 
-(* Sandbox mode for install-related actions - use no sandbox because they
-   write to the shared PREFIX directory. Copy/install actions need direct
-   access to the shared install directory. *)
-let install_action_sandbox = Sandbox_mode.Set.singleton Sandbox_mode.none
+(* Sandbox mode for install-related actions. These actions write to the shared
+   PREFIX directory, which is an absolute path outside the sandbox, so they
+   work regardless of sandbox mode. Use no_special_requirements to avoid
+   conflicting with build_sandbox when actions are combined. *)
+let install_action_sandbox = Sandbox_config.no_special_requirements
 
 let dune_dep =
   lazy (Sys.executable_name |> Path.External.of_string |> Path.external_ |> Dep.file)
@@ -2337,7 +2339,15 @@ module Vendor_build = struct
           (match OpamFile.OPAM.read_from_string contents with
            | exception _ -> Memo.return Vendor_status.Opam_sandboxed
            | opam ->
-             (match Pkg.of_opam_file ~name:entry.name ~version:entry.version ~opam () with
+             let abs_path =
+               Path.source source_dir
+               |> Path.to_absolute_filename
+               |> Path.External.of_string
+             in
+             let source = Source.external_copy (Loc.none, abs_path) in
+             (match
+                Pkg.of_opam_file ~name:entry.name ~version:entry.version ~source ~opam ()
+              with
               | Error _ -> Memo.return Vendor_status.Opam_sandboxed
               | Ok pkg ->
                 let method_ = Vendor.classify_build_method pkg in
@@ -2360,9 +2370,7 @@ module Vendor_build = struct
              | Vendor_status.Dune_native -> None
              | Vendor_status.Not_vendored | Vendor_status.Opam_sandboxed ->
                let pkg_digest =
-                 Pkg_digest.create
-                   ~name:entry.Package_registry.name
-                   ~version:entry.version
+                 Pkg_id.create ~name:entry.Package_registry.name ~version:entry.version
                in
                Some pkg_digest)
          in
@@ -2388,16 +2396,11 @@ module Vendor_build = struct
         ~contents:opam_contents
         (Path.source opam_path)
     in
-    (* Get package name from opam file, fallback to parsing directory name with OpamPackage *)
+    (* Get package name from opam file, fallback to parsing directory name *)
     let pkg_name =
       match OpamFile.OPAM.name_opt opam_file with
       | Some n -> Package.Name.of_string (OpamPackage.Name.to_string n)
-      | None ->
-        (* Use OpamPackage to parse "name.version" format *)
-        (match OpamPackage.of_string_opt subdir with
-         | Some pkg ->
-           Package.Name.of_string (OpamPackage.Name.to_string (OpamPackage.name pkg))
-         | None -> Package.Name.of_string subdir)
+      | None -> Pkg_id.name_of_string subdir
     in
     let pkg_version =
       match OpamFile.OPAM.version_opt opam_file with
@@ -2442,14 +2445,9 @@ module Vendor_build = struct
         if has_dune_project
         then Memo.return (`Dune_package build_dir)
         else (
-          (* Look for opam files. Priority: opam, then <name>.opam
-             where <name> is extracted using OpamPackage parsing *)
+          (* Look for opam files. Priority: opam, then <name>.opam *)
           let dir_name = Path.Source.basename subdir_path in
-          let pkg_name =
-            match OpamPackage.of_string_opt dir_name with
-            | Some pkg -> OpamPackage.Name.to_string (OpamPackage.name pkg)
-            | None -> dir_name
-          in
+          let pkg_name = Vendor_rules.parse_pkg_name_from_dir dir_name in
           let candidates =
             [ Path.Source.relative subdir_path "opam"
             ; Path.Source.relative subdir_path (pkg_name ^ ".opam")
@@ -2600,7 +2598,7 @@ let setup_pkg_context_rules ctx ~dir ~components =
   | [ pkg_dir_string ] ->
     (* _build/.pkgs/<ctx>/<pkg_dir>/ - set up package build rules.
        Use unified Package_registry to find the package. *)
-    let pkg_digest = Pkg_digest.of_string pkg_dir_string in
+    let pkg_digest = Pkg_id.of_string pkg_dir_string in
     let* registry = Package_registry.of_ctx ctx in
     (match
        Package_registry.find_by_name_version
@@ -2785,10 +2783,10 @@ let all_filtered_depexts_with_origins context =
   >>| List.sort ~compare:(fun (d1, _, _) (d2, _, _) -> String.compare d1 d2)
 ;;
 
-let pkg_digest_of_project_dependency ctx package_name =
+let pkg_id_of_project_dependency ctx package_name =
   let+ registry = Package_registry.of_ctx ctx in
   match Package_registry.find registry package_name with
   | None -> None
   | Some entry ->
-    Some (Pkg_digest.create ~name:entry.Package_registry.name ~version:entry.version)
+    Some (Pkg_id.create ~name:entry.Package_registry.name ~version:entry.version)
 ;;

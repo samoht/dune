@@ -472,6 +472,6 @@ let read_disk_with_opam_files ~solver_env path =
     lock, opam_files
 ;;
 
-let pkg_of_local_opam_file ~loc:_ ~name ~version ~opam_file =
-  Pkg.of_opam_file ~name ~version ~opam:opam_file ()
+let pkg_of_local_opam_file ~loc:_ ~name ~version ~opam_file ~source =
+  Pkg.of_opam_file ~name ~version ~source ~opam:opam_file ()
 ;;

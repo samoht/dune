@@ -524,7 +524,7 @@ Hint: run dune pkg lock
 
 **Option 1: CLI flag (one-time)**
 ```bash
-dune build --auto-lock        # One-time auto-lock
+dune build --lock        # One-time auto-lock
 ```
 
 **Option 2: Global config (user preference)**
@@ -548,7 +548,7 @@ All contributors shouldn't be forced into automatic behavior.
 ```
 Error: Lock dir out of sync with dune-project
 Hint: Run `dune pkg lock` to regenerate
-      Or use `dune build --auto-lock` for one-time auto-lock
+      Or use `dune build --lock` for one-time auto-lock
       Or add (auto_lock enabled) to ~/.config/dune/config
 ```
 
@@ -562,7 +562,7 @@ Hint: Run `dune pkg lock` to regenerate
 **Implementation:**
 - `src/dune_config_file/dune_config.ml` — add `auto_lock` field
 - `src/dune_rules/workspace.ml` — add `auto_lock` field (optional override)
-- `bin/common.ml` — add `--auto-lock` flag
+- `bin/common.ml` — add `--lock` flag
 - `src/dune_pkg/package_universe.ml` — check flag in `validate_dependency_hash`
 - If enabled, call lock regeneration instead of erroring
 

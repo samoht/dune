@@ -80,14 +80,14 @@ For CI pipelines that want to test compatibility with the latest opam packages:
 dune pkg update && dune build
 ```
 
-### The `--auto-lock` Flag
+### The `--lock` Flag
 
 A single flag controls locking behavior:
 
 ```bash
-dune build --auto-lock=disabled   # No pkg management, use system/opam (default)
-dune build --auto-lock=enabled    # Auto-lock if missing, use existing if present
-dune build --auto-lock=always     # Always re-solve with latest opam repo
+dune build --lock=disabled   # No pkg management, use system/opam (default)
+dune build --lock=enabled    # Auto-lock if missing, use existing if present
+dune build --lock=always     # Always re-solve with latest opam repo
 ```
 
 | Mode | Lock file | Dependencies from | Use case |
@@ -110,7 +110,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: dune build --auto-lock=always
+      - run: dune build --lock=always
 ```
 
 ### Global Configuration

@@ -312,11 +312,17 @@ let term : unit Term.t =
   and+ args =
     (* CR-someday Alizter: document this option *)
     Arg.(value & pos_right 0 Cmd_arg.conv [] (Arg.info [] ~docv:"ARGS" ~doc:None))
-  in
+  and+ auto_fetch_opt = Common.fetch_term
+  and+ auto_lock_opt = Common.lock_term in
   (* TODO we should make sure to finalize the current backend before exiting dune.
      For watch mode, we should finalize the backend and then restart it in between
      runs. *)
   let common, config = Common.init builder in
+  (* Apply CLI overrides for lock and fetch flags *)
+  let (_ : bool) = Common.resolve_fetch_flag ~cli_opt:auto_fetch_opt ~config in
+  let (_ : Dune_config.Auto_lock.t) =
+    Common.resolve_lock_flag ~cli_opt:auto_lock_opt ~config
+  in
   match Dune_util.Global_lock.lock ~timeout:None with
   | Error lock_held_by ->
     (match Common.watch common with

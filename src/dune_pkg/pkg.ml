@@ -40,8 +40,13 @@ module Solver_env_disjunction = struct
   ;;
 
   (* [matches_platform t ~platform] is true iff there exists a solver env in
-     [t] whose bindings are a subset of those in [platform] *)
-  let matches_platform t ~platform = List.exists t ~f:(Solver_env.is_subset ~of_:platform)
+     [t] whose bindings are a subset of those in [platform].
+     An empty list means "all platforms" and always matches. *)
+  let matches_platform t ~platform =
+    match t with
+    | [] -> true (* Empty condition means "all platforms" *)
+    | _ -> List.exists t ~f:(Solver_env.is_subset ~of_:platform)
+  ;;
 end
 
 module Conditional = struct
@@ -1384,7 +1389,7 @@ module Opam_conversion = struct
   ;;
 end
 
-let of_opam_file ~name ~version ?source ~opam () =
+let of_opam_file ~name ~version ~source ~opam () =
   let open Result.O in
   let loc = Loc.none in
   let package =
@@ -1438,7 +1443,7 @@ let of_opam_file ~name ~version ?source ~opam () =
     ; version
     ; dev = true (* Packages from opam files are treated as dev packages *)
     ; avoid = List.mem (OpamFile.OPAM.flags opam) Pkgflag_AvoidVersion ~equal:Poly.equal
-    ; source
+    ; source = Some source
     ; extra_sources = []
     }
   in

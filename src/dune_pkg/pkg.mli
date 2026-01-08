@@ -301,19 +301,19 @@ module Opam_conversion : sig
   val source_of_opam_file : OpamFile.OPAM.t -> Source.t option
 end
 
-(** [of_opam_file ~name ~version ?source ~opam ()] constructs a [t] from opam file
+(** [of_opam_file ~name ~version ~source ~opam ()] constructs a [t] from opam file
     metadata. This extracts:
     - build_command from [OpamFile.OPAM.build]
     - install_command from [OpamFile.OPAM.install]
     - depends from [OpamFile.OPAM.depends]
     - depexts from [OpamFile.OPAM.depexts]
 
-    @param source Optional source location for the package. Defaults to [None]
-    for local/vendored packages. *)
+    @param source Source location for the package (local path or fetch URL).
+    Required for source_rules to copy/fetch the source to the build directory. *)
 val of_opam_file
   :  name:Package_name.t
   -> version:Package_version.t
-  -> ?source:Source.t
+  -> source:Source.t
   -> opam:OpamFile.OPAM.t
   -> unit
   -> (t, User_message.t) result
