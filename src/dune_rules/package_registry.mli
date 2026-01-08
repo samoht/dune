@@ -33,6 +33,14 @@ val of_ctx : Context_name.t -> t Memo.t
 (** Find a package by name. Returns [None] if not found. *)
 val find : t -> Package.Name.t -> entry option
 
+(** Find a package by name and version. Returns [None] if not found or
+    if the version doesn't match. *)
+val find_by_name_version
+  :  t
+  -> name:Package.Name.t
+  -> version:Package_version.t
+  -> entry option
+
 (** List all packages in the registry. *)
 val to_list : t -> entry list
 

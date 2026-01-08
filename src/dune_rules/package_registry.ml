@@ -21,6 +21,13 @@ type t =
   }
 
 let find t name = Package.Name.Map.find t.entries name
+
+let find_by_name_version t ~name ~version =
+  match Package.Name.Map.find t.entries name with
+  | Some entry when Package_version.equal entry.version version -> Some entry
+  | _ -> None
+;;
+
 let mem t name = Package.Name.Map.mem t.entries name
 let to_list t = Package.Name.Map.values t.entries
 
@@ -67,9 +74,7 @@ let of_ctx =
           let version, libraries =
             (* Scan version from opam file *)
             let version =
-              match
-                Vendor_rules.find_opam_file ~pkg_name ~pkg_dir:source_dir
-              with
+              match Vendor_rules.find_opam_file ~pkg_name ~pkg_dir:source_dir with
               | None -> Package_version.of_string "dev"
               | Some opam_file ->
                 let contents = Io.read_file ~binary:true (Path.source opam_file) in
@@ -117,12 +122,11 @@ let of_ctx =
         |> Memo.return
     in
     let entries =
-      Package.Name.Map.union vendor_entries lock_entries ~f:(fun _ vendor _lock -> Some vendor)
+      Package.Name.Map.union vendor_entries lock_entries ~f:(fun _ vendor _lock ->
+        Some vendor)
     in
     { entries; lib_to_package }
   in
-  let memo =
-    Memo.create "package-registry" ~input:(module Context_name) impl
-  in
+  let memo = Memo.create "package-registry" ~input:(module Context_name) impl in
   Memo.exec memo
 ;;

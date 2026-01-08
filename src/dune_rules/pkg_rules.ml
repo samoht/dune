@@ -133,10 +133,6 @@ module Pkg_digest = struct
       ; version : Package_version.t
       }
 
-    let equal { name; version } t =
-      Package.Name.equal name t.name && Package_version.equal version t.version
-    ;;
-
     let compare { name; version } t =
       let open Ordering.O in
       let= () = Package.Name.compare name t.name in
@@ -146,10 +142,6 @@ module Pkg_digest = struct
     let to_dyn { name; version } =
       Dyn.record
         [ "name", Package.Name.to_dyn name; "version", Package_version.to_dyn version ]
-    ;;
-
-    let hash { name; version } =
-      Tuple.T2.hash Package.Name.hash Package_version.hash (name, version)
     ;;
   end
 
@@ -1267,239 +1259,8 @@ module Action_expander = struct
   ;;
 end
 
-module DB = struct
-  let default_system_provided = Package.Name.Set.singleton Dune_pkg.Dune_dep.name
-
-  (* Helper to get platform from system vars *)
-  let platform () = Lock_dir.Sys_vars.solver_env
-
-  module Pkg_table = struct
-    type dep =
-      { dep_pkg : Pkg.t
-      ; dep_loc : Loc.t
-      ; dep_pkg_digest : Pkg_digest.t
-      }
-
-    type entry =
-      { pkg : Pkg.t
-      ; deps : dep list
-      ; has_dune_dep : bool
-      ; pkg_digest : Pkg_digest.t
-      }
-
-    let entries_by_name_of_lock_dir
-          (lock_dir : Dune_pkg.Lock.t)
-          ~platform
-          ~system_provided
-      =
-      let pkgs_by_name = Dune_pkg.Lock.packages_on_platform lock_dir ~platform in
-      let cache =
-        (* Cache so that the digest of each package is only computed once *)
-        Package.Name.Table.create 10
-      in
-      let rec compute_entry (pkg : Pkg.t) ~seen_set ~seen_list =
-        if Package.Name.Set.mem seen_set pkg.info.name
-        then
-          User_error.raise
-            [ Pp.textf "Dependency cycle between packages:"
-            ; Pp.chain
-                (List.rev (pkg :: seen_list))
-                ~f:(fun (pkg : Pkg.t) ->
-                  Pp.textf
-                    "%s.%s"
-                    (Package.Name.to_string pkg.info.name)
-                    (Package_version.to_string pkg.info.version))
-            ];
-        Package.Name.Table.find_or_add cache pkg.info.name ~f:(fun name ->
-          let seen_set = Package.Name.Set.add seen_set name in
-          let seen_list = pkg :: seen_list in
-          let has_dune_dep, deps =
-            Pkg.Conditional_choice.choose_for_platform pkg.depends ~platform
-            |> Option.value ~default:[]
-            |> List.fold_right
-                 ~init:(false, [])
-                 ~f:(fun { Dependency.name; loc = dep_loc } (has_dune_dep, acc) ->
-                   match
-                     ( Dune_lang.Package_name.equal name Dune_dep.name
-                     , Package.Name.Set.mem system_provided name )
-                   with
-                   | true, _ -> true, acc
-                   | false, true -> has_dune_dep, acc
-                   | _, false ->
-                     let dep_pkg = Package.Name.Map.find_exn pkgs_by_name name in
-                     let dep_entry = compute_entry dep_pkg ~seen_set ~seen_list in
-                     ( has_dune_dep
-                     , { dep_pkg; dep_loc; dep_pkg_digest = dep_entry.pkg_digest } :: acc
-                     ))
-          in
-          let pkg_digest =
-            Pkg_digest.create ~name:pkg.info.name ~version:pkg.info.version
-          in
-          { pkg; deps; has_dune_dep; pkg_digest })
-      in
-      Package.Name.Map.map
-        pkgs_by_name
-        ~f:(compute_entry ~seen_set:Package.Name.Set.empty ~seen_list:[])
-    ;;
-
-    (* Associate each package's digest with the package and its dependencies. *)
-    type t = entry Pkg_digest.Map.t
-
-    let of_lock_dir lock_dir ~platform ~system_provided =
-      entries_by_name_of_lock_dir lock_dir ~platform ~system_provided
-      |> Package.Name.Map.values
-      |> Pkg_digest.Map.of_list_map_exn ~f:(fun entry -> entry.pkg_digest, entry)
-    ;;
-
-    (* Helper which is called when both tables have an entry with the same
-       digest. This happens when two lock directories have a package in common
-       and the transitive dependency closure of the package is identical in both
-       lock directories. Here we assert that the packages and their immediate
-       dependencies are identical as a sanity check. *)
-    let union_check
-          pkg_digest
-          ({ pkg = pkg_a; deps = deps_a; has_dune_dep = _; pkg_digest = _ } as entry)
-          { pkg = pkg_b; deps = deps_b; has_dune_dep = _; pkg_digest = _ }
-      =
-      if not (Pkg.equal (Pkg.remove_locs pkg_a) (Pkg.remove_locs pkg_b))
-      then
-        Code_error.raise
-          "Two packages with the same pkg digest differ in their fields"
-          [ "pkg_digest", Pkg_digest.to_dyn pkg_digest
-          ; "pkg_a", Pkg.to_dyn pkg_a
-          ; "pkg_b", Pkg.to_dyn pkg_b
-          ];
-      List.combine deps_a deps_b
-      |> List.iter ~f:(fun (dep_a, dep_b) ->
-        if not (Pkg.equal (Pkg.remove_locs dep_a.dep_pkg) (Pkg.remove_locs dep_b.dep_pkg))
-        then
-          Code_error.raise
-            "Two packages with the same pkg digest differ in their dependencies"
-            [ "pkg_digest", Pkg_digest.to_dyn pkg_digest
-            ; "pkg_a", Pkg.to_dyn pkg_a
-            ; "pkg_b", Pkg.to_dyn pkg_b
-            ; "dep_of_a", Pkg.to_dyn dep_a.dep_pkg
-            ; "dep_of_b", Pkg.to_dyn dep_b.dep_pkg
-            ]);
-      Some entry
-    ;;
-
-    let union_all = Pkg_digest.Map.union_all ~f:union_check
-
-    let of_dev_tool_deps_if_lock_dir_exists dev_tool ~platform ~system_provided =
-      let+ lock_dir_opt = Dev_tool.load_lock_dir_if_exists dev_tool in
-      Option.map lock_dir_opt ~f:(of_lock_dir ~platform ~system_provided)
-    ;;
-
-    let all_existing_dev_tools =
-      Memo.lazy_ (fun () ->
-        let* platform = Lock_dir.Sys_vars.solver_env in
-        let+ xs =
-          Memo.List.map
-            Dev_tool.all
-            ~f:
-              (of_dev_tool_deps_if_lock_dir_exists
-                 ~platform
-                 ~system_provided:default_system_provided)
-        in
-        List.filter_opt xs |> union_all)
-    ;;
-  end
-
-  module Id = Id.Make ()
-
-  type t =
-    { id : Id.t
-    ; pkg_digest_table : Pkg_table.t
-    ; all_package_versions : Package_version.t Package.Name.Map.t
-    }
-
-  let equal x y = Id.equal x.id y.id
-
-  let create ~pkg_digest_table =
-    let all_package_versions =
-      Pkg_digest.Map.fold
-        pkg_digest_table
-        ~init:Package.Name.Map.empty
-        ~f:(fun (entry : Pkg_table.entry) acc ->
-          let name = entry.pkg.info.name in
-          let version = entry.pkg.info.version in
-          Package.Name.Map.set acc name version)
-    in
-    { id = Id.gen (); pkg_digest_table; all_package_versions }
-  ;;
-
-  let pkg_digest_of_name lock_dir ~platform pkg_name =
-    let entries_by_name =
-      Pkg_table.entries_by_name_of_lock_dir
-        lock_dir
-        ~platform
-        ~system_provided:default_system_provided
-    in
-    let entry = Package.Name.Map.find_exn entries_by_name pkg_name in
-    entry.pkg_digest
-  ;;
-
-  (* Helper to compute pkg_digest with platform lookup *)
-  let pkg_digest_of_lock_dir lock_dir pkg_name =
-    let+ platform = platform () in
-    pkg_digest_of_name lock_dir ~platform pkg_name
-  ;;
-
-  let of_ctx =
-    let of_ctx_memo =
-      Memo.create
-        "pkg-db"
-        ~input:(module Context_name)
-        (fun ctx ->
-           Per_context.valid ctx
-           >>= function
-           | false ->
-             Code_error.raise "invalid context" [ "context", Context_name.to_dyn ctx ]
-           | true ->
-             let+ pkg_digest_table =
-               let* lock_dir = Lock_dir.get_exn ctx
-               and* platform = platform () in
-               Pkg_table.of_lock_dir
-                 lock_dir
-                 ~platform
-                 ~system_provided:default_system_provided
-               |> Memo.return
-             in
-             create ~pkg_digest_table)
-    in
-    Memo.exec of_ctx_memo
-  ;;
-
-  let of_project_pkg ctx pkg_name =
-    let* lock_dir = Lock_dir.get_exn ctx in
-    let* t = of_ctx ctx
-    and* pkg_digest = pkg_digest_of_lock_dir lock_dir pkg_name in
-    Memo.return (t, pkg_digest)
-  ;;
-
-  let of_dev_tool =
-    let inactive_lockdir =
-      Memo.lazy_ (fun () ->
-        let+ pkg_digest_table = Memo.Lazy.force Pkg_table.all_existing_dev_tools in
-        create ~pkg_digest_table)
-    in
-    let of_dev_tool_memo =
-      Memo.create "pkg-db-dev-tool" ~input:(module Dune_pkg.Dev_tool)
-      @@ fun dev_tool ->
-      let* lock_dir = Dev_tool.load_lock_dir dev_tool in
-      pkg_digest_of_lock_dir lock_dir (Dev_tool.package_name dev_tool)
-    in
-    fun dev_tool ->
-      let+ db =
-        Lock_dir.lock_dir_active Context_name.default
-        >>= function
-        | false -> Memo.Lazy.force inactive_lockdir
-        | true -> of_ctx Context_name.default
-      and+ pkg_digest = Memo.exec of_dev_tool_memo dev_tool in
-      db, pkg_digest
-  ;;
-end
+(* System-provided packages that don't need to be built *)
+let default_system_provided = Package.Name.Set.singleton Dune_pkg.Dune_dep.name
 
 (** Status of a package with respect to vendoring. *)
 module Vendor_status = struct
@@ -1510,40 +1271,15 @@ module Vendor_status = struct
 end
 
 module rec Resolve : sig
-  val resolve
-    :  DB.t
-    -> Loc.t
-    -> Pkg_digest.t
-    -> Package_universe.t
+  (** Resolve a package from the unified registry. Works for both lock file
+      packages and vendor packages. *)
+  val resolve_entry
+    :  Package_registry.t
+    -> Package_registry.entry
+    -> package_universe:Package_universe.t
     -> Resolved_pkg.t Memo.t
-
-  val resolve_opt
-    :  DB.t
-    -> Pkg_digest.t
-    -> Package_universe.t
-    -> Resolved_pkg.t option Memo.t
 end = struct
   open Resolve
-
-  module Input = struct
-    type t =
-      { db : DB.t
-      ; pkg_digest : Pkg_digest.t
-      ; universe : Package_universe.t
-      }
-
-    let equal { db; pkg_digest; universe } t =
-      Pkg_digest.equal pkg_digest t.pkg_digest
-      && Package_universe.equal universe t.universe
-      && DB.equal db t.db
-    ;;
-
-    let hash { db = _; pkg_digest; universe } =
-      Tuple.T2.hash Pkg_digest.hash Package_universe.hash (pkg_digest, universe)
-    ;;
-
-    let to_dyn = Dyn.opaque
-  end
 
   let relocate action =
     let string_with_vars = String_with_vars.map_loc ~f:Dune_pkg.Lock.loc_in_source_tree in
@@ -1556,55 +1292,6 @@ end = struct
     match (b : Build_command.t) with
     | Dune -> Build_command.Dune
     | Action a -> Build_command.Action (relocate a)
-  ;;
-
-  (* Check if package is vendored and determine build method.
-     Returns the vendor status and potentially modified info. *)
-  let check_vendor_status pkg info =
-    let vendor_path = Vendor.package_dir info.Pkg_info.name info.version in
-    let+ is_vendored =
-      Fs_memo.dir_exists (Path.Outside_build_dir.In_source_dir vendor_path)
-    in
-    match is_vendored, Vendor.classify_build_method pkg with
-    | true, Vendor.Dune_native -> Vendor_status.Dune_native, info
-    | true, Vendor.Opam_sandboxed ->
-      (* Override source to use local path *)
-      let abs_path =
-        Path.source vendor_path |> Path.to_absolute_filename |> Path.External.of_string
-      in
-      let vendor_source = Source.external_copy (Loc.none, abs_path) in
-      Vendor_status.Opam_sandboxed, { info with Pkg_info.source = Some vendor_source }
-    | false, _ -> Vendor_status.Not_vendored, info
-  ;;
-
-  (* Resolve a single dependency, handling vendored packages.
-     Returns Either.Left for vendored dune deps, Either.Right for normal deps. *)
-  let resolve_dep db package_universe dep =
-    let { DB.Pkg_table.dep_pkg; dep_loc = _; dep_pkg_digest } = dep in
-    let vendor_path = Vendor.package_dir dep_pkg_digest.name dep_pkg.info.version in
-    let* is_vendored =
-      Fs_memo.dir_exists (Path.Outside_build_dir.In_source_dir vendor_path)
-    in
-    match is_vendored, Vendor.classify_build_method dep_pkg with
-    | true, Vendor.Dune_native ->
-      (* Vendored dune package - track as vendored dependency with path *)
-      Memo.return (Either.Left (dep_pkg_digest.name, vendor_path))
-    | _ ->
-      let package_universe =
-        match package_universe with
-        | Package_universe.Dev_tool dev_tool ->
-          (* Each dev tool has its own isolated context. Dependencies are built
-             in that context, not shared with the project. *)
-          Package_universe.Dependencies (Dev_tool.context_name dev_tool)
-        | _ -> package_universe
-      in
-      (* Use resolve_opt to gracefully handle vendored packages *)
-      let+ pkg_opt = resolve_opt db dep_pkg_digest package_universe in
-      (match pkg_opt with
-       | None ->
-         (* Package resolved to None - track as vendored dep *)
-         Either.Left (dep_pkg_digest.name, vendor_path)
-       | Some pkg -> Either.Right pkg)
   ;;
 
   (* Resolve files_dir, handling both versioned and unversioned paths.
@@ -1708,110 +1395,204 @@ end = struct
     build_command, install_command, is_cached, toolchain_cache_dir
   ;;
 
-  let resolve_impl { Input.db; pkg_digest; universe = package_universe } =
-    match Pkg_digest.Map.find db.pkg_digest_table pkg_digest with
-    | None -> Memo.return None
-    | Some
-        { pkg =
-            { Pkg.build_command
-            ; install_command
-            ; depends = _
-            ; post_depends = _
-            ; info
-            ; exported_env
-            ; depexts
-            ; enabled_on_platforms = _
-            } as pkg
-        ; deps
-        ; has_dune_dep
-        ; pkg_digest = _
-        } ->
-      assert (Package.Name.equal pkg_digest.name info.name);
-      let* vendor_status, info = check_vendor_status pkg info in
-      (match vendor_status with
-       | Vendor_status.Dune_native -> Memo.return None
-       | Vendor_status.Not_vendored | Vendor_status.Opam_sandboxed ->
-         (* Resolve dependencies and files directory in parallel *)
-         let* platform = Lock_dir.Sys_vars.solver_env in
-         let choose_for_current_platform field =
-           Pkg.Conditional_choice.choose_for_platform field ~platform
-         in
-         let* all_depends = Memo.parallel_map deps ~f:(resolve_dep db package_universe)
-         and+ files_dir = resolve_files_dir package_universe info in
-         let vendored_depends, depends = List.partition_map all_depends ~f:Fun.id in
-         (* Prepare paths and commands *)
-         let id = Resolved_pkg.Id.gen () in
-         let write_paths =
-           Paths.make pkg_digest package_universe ~relative:Path.Build.relative
-         in
-         let install_command = choose_for_current_platform install_command in
-         let install_command = Option.map install_command ~f:relocate in
-         let build_command = choose_for_current_platform build_command in
-         let build_command = Option.map build_command ~f:relocate_build in
-         (* Apply toolchain caching if applicable *)
-         let build_command, install_command, is_cached, toolchain_cache_dir =
-           apply_toolchain_caching
-             ~info
-             ~pkg
-             ~build_command
-             ~install_command
-             ~write_paths
-             ~package_universe
-         in
-         (* Build the package record *)
-         let paths = Paths.map_path write_paths ~f:Path.build in
-         let context = Package_universe.context_name package_universe in
-         let t =
-           { Resolved_pkg.id
-           ; build_command
-           ; install_command
-           ; depends
-           ; vendored_depends
-           ; depends_on_dune = has_dune_dep
-           ; depexts
-           ; paths
-           ; write_paths
-           ; info
-           ; files_dir
-           ; pkg_digest
-           ; exported_env = []
-           ; all_package_versions = db.all_package_versions
-           ; is_cached_toolchain = is_cached
-           ; toolchain_cache_dir
-           ; context
-           }
-         in
-         let+ exported_env =
-           let expander =
-             Action_expander.expander (Package_universe.context_name package_universe) t
-           in
-           Memo.parallel_map exported_env ~f:(Action_expander.exported_env expander)
-         in
-         t.exported_env <- exported_env;
-         Some t)
-  ;;
+  (* Input for resolve_entry memoization *)
+  module Entry_input = struct
+    type t =
+      { entry : Package_registry.entry
+      ; universe : Package_universe.t
+      }
 
-  let resolve_memo =
-    Memo.create
-      "pkg-resolve"
-      ~input:(module Input)
-      ~human_readable_description:(fun t ->
-        Pp.textf "- package %s" (Package.Name.to_string t.pkg_digest.name))
-      resolve_impl
-  ;;
+    let equal { entry; universe } t =
+      Package.Name.equal entry.name t.entry.name
+      && Package_version.equal entry.version t.entry.version
+      && Package_universe.equal universe t.universe
+    ;;
 
-  let resolve_opt (db : DB.t) pkg_digest package_universe =
-    Memo.exec resolve_memo { db; pkg_digest; universe = package_universe }
-  ;;
+    let hash { entry; universe } =
+      Tuple.T3.hash
+        Package.Name.hash
+        Package_version.hash
+        Package_universe.hash
+        (entry.name, entry.version, universe)
+    ;;
 
-  let resolve (db : DB.t) loc pkg_digest package_universe =
-    resolve_opt db pkg_digest package_universe
-    >>| function
-    | Some s -> s
+    let to_dyn = Dyn.opaque
+  end
+
+  (* Load opam file from a vendor source directory *)
+  let load_vendor_opam_file ~source_dir ~pkg_name =
+    match Vendor_rules.find_opam_file ~pkg_name ~pkg_dir:source_dir with
     | None ->
       User_error.raise
-        ~loc
-        [ Pp.textf "Unknown package %S" (Package.Name.to_string pkg_digest.name) ]
+        [ Pp.textf
+            "No opam file found for vendored package %s in %s"
+            pkg_name
+            (Path.Source.to_string source_dir)
+        ]
+    | Some opam_path ->
+      let contents = Io.read_file ~binary:true (Path.source opam_path) in
+      (match OpamFile.OPAM.read_from_string contents with
+       | exception exn ->
+         User_error.raise
+           [ Pp.textf
+               "Failed to parse opam file for vendored package %s: %s"
+               pkg_name
+               (Printexc.to_string exn)
+           ]
+       | opam -> opam)
+  ;;
+
+  (* Resolve dependencies from registry entries *)
+  let resolve_entry_deps registry (pkg : Pkg.t) =
+    let* platform = Lock_dir.Sys_vars.solver_env in
+    let deps =
+      Pkg.Conditional_choice.choose_for_platform pkg.depends ~platform
+      |> Option.value ~default:[]
+    in
+    let system_provided = default_system_provided in
+    let has_dune_dep, dep_entries =
+      List.fold_right
+        deps
+        ~init:(false, [])
+        ~f:(fun { Dependency.name; loc = _ } (has_dune_dep, acc) ->
+          if Dune_lang.Package_name.equal name Dune_pkg.Dune_dep.name
+          then true, acc
+          else if Package.Name.Set.mem system_provided name
+          then has_dune_dep, acc
+          else (
+            match Package_registry.find registry name with
+            | None ->
+              (* Dependency not in registry - skip (might be optional) *)
+              has_dune_dep, acc
+            | Some dep_entry -> has_dune_dep, dep_entry :: acc))
+    in
+    Memo.return (has_dune_dep, dep_entries)
+  ;;
+
+  let resolve_entry_impl registry { Entry_input.entry; universe = package_universe } =
+    let { Package_registry.name; version; source } = entry in
+    let pkg_name = Package.Name.to_string name in
+    let pkg_digest = Pkg_digest.create ~name ~version in
+    (* Get the Pkg.t from the source *)
+    let* pkg_result =
+      match source with
+      | Package_registry.Source.From_lock { pkg } -> Memo.return (Ok pkg)
+      | Package_registry.Source.From_vendor { source_dir; stanza = _ } ->
+        let opam = load_vendor_opam_file ~source_dir ~pkg_name in
+        Dune_pkg.Pkg.of_opam_file ~name ~version ~opam () |> Memo.return
+    in
+    match pkg_result with
+    | Error msg -> User_error.raise (User_message.pp msg |> List.singleton)
+    | Ok pkg ->
+      let info = pkg.Pkg.info in
+      (* Vendor status is determined by the entry source:
+         - From_vendor with Dune_native build_method should not reach here
+         - From_vendor with Opam_sandboxed or From_lock are both valid *)
+      let* platform = Lock_dir.Sys_vars.solver_env in
+      let choose_for_current_platform field =
+        Pkg.Conditional_choice.choose_for_platform field ~platform
+      in
+      (* Resolve dependencies *)
+      let* has_dune_dep, dep_entries = resolve_entry_deps registry pkg in
+      (* Recursively resolve dep entries *)
+      let* all_depends =
+        Memo.parallel_map dep_entries ~f:(fun dep_entry ->
+          let vendor_path = Vendor.package_dir dep_entry.name dep_entry.version in
+          let* is_vendored =
+            Fs_memo.dir_exists (Path.Outside_build_dir.In_source_dir vendor_path)
+          in
+          match is_vendored with
+          | true ->
+            (* Check if it's dune-native vendored *)
+            (match dep_entry.source with
+             | Package_registry.Source.From_vendor { stanza; _ } ->
+               (match stanza.build_method with
+                | Some Vendor_stanza.Build_method.Dune_native | None ->
+                  Memo.return (Either.Left (dep_entry.name, vendor_path))
+                | Some Opam_sandboxed ->
+                  let+ resolved = resolve_entry registry dep_entry ~package_universe in
+                  Either.Right resolved)
+             | From_lock _ ->
+               let+ resolved = resolve_entry registry dep_entry ~package_universe in
+               Either.Right resolved)
+          | false ->
+            let+ resolved = resolve_entry registry dep_entry ~package_universe in
+            Either.Right resolved)
+      and+ files_dir = resolve_files_dir package_universe info in
+      let vendored_depends, depends = List.partition_map all_depends ~f:Fun.id in
+      (* Prepare paths and commands *)
+      let id = Resolved_pkg.Id.gen () in
+      let write_paths =
+        Paths.make pkg_digest package_universe ~relative:Path.Build.relative
+      in
+      let install_command = choose_for_current_platform pkg.install_command in
+      let install_command = Option.map install_command ~f:relocate in
+      let build_command = choose_for_current_platform pkg.build_command in
+      let build_command = Option.map build_command ~f:relocate_build in
+      (* Apply toolchain caching if applicable *)
+      let build_command, install_command, is_cached, toolchain_cache_dir =
+        apply_toolchain_caching
+          ~info
+          ~pkg
+          ~build_command
+          ~install_command
+          ~write_paths
+          ~package_universe
+      in
+      (* Build all_package_versions from registry *)
+      let all_package_versions =
+        Package_registry.to_list registry
+        |> List.fold_left ~init:Package.Name.Map.empty ~f:(fun acc reg_entry ->
+          Package.Name.Map.set acc reg_entry.Package_registry.name reg_entry.version)
+      in
+      (* Build the package record *)
+      let paths = Paths.map_path write_paths ~f:Path.build in
+      let context = Package_universe.context_name package_universe in
+      let t =
+        { Resolved_pkg.id
+        ; build_command
+        ; install_command
+        ; depends
+        ; vendored_depends
+        ; depends_on_dune = has_dune_dep
+        ; depexts = pkg.depexts
+        ; paths
+        ; write_paths
+        ; info
+        ; files_dir
+        ; pkg_digest
+        ; exported_env = []
+        ; all_package_versions
+        ; is_cached_toolchain = is_cached
+        ; toolchain_cache_dir
+        ; context
+        }
+      in
+      let+ exported_env =
+        let expander =
+          Action_expander.expander (Package_universe.context_name package_universe) t
+        in
+        Memo.parallel_map pkg.exported_env ~f:(Action_expander.exported_env expander)
+      in
+      t.exported_env <- exported_env;
+      t
+  ;;
+
+  let resolve_entry_memo =
+    Memo.create
+      "pkg-resolve-entry"
+      ~input:(module Entry_input)
+      ~human_readable_description:(fun t ->
+        Pp.textf "- package %s" (Package.Name.to_string t.entry.name))
+      (fun input ->
+         let* registry =
+           Package_registry.of_ctx (Package_universe.context_name input.universe)
+         in
+         resolve_entry_impl registry input)
+  ;;
+
+  let resolve_entry _registry entry ~package_universe =
+    Memo.exec resolve_entry_memo { entry; universe = package_universe }
   ;;
 end
 
@@ -2523,37 +2304,40 @@ let pkg_alias_disabled =
 
 (* Vendor build helpers - extracted from setup_pkg_install_alias for clarity *)
 module Vendor_build = struct
-  (* Classify a package's vendor status by checking the vendor directory
-     and determining the appropriate build method. *)
-  let classify (lock_pkg : Pkg.t) =
-    let vendor_path = Vendor.package_dir lock_pkg.info.name lock_pkg.info.version in
-    let* is_vendored =
-      Fs_memo.dir_exists (Path.Outside_build_dir.In_source_dir vendor_path)
-    in
-    let vendor_marker = Path.Source.relative Vendor.default_dir Vendor.marker_filename in
-    let* marker_exists =
-      Fs_memo.file_exists (Path.Outside_build_dir.In_source_dir vendor_marker)
-    in
-    (* Only consider it vendored if both the marker file exists AND the package dir exists *)
-    let is_vendored = is_vendored && marker_exists in
-    if not is_vendored
-    then Memo.return Vendor_status.Not_vendored
-    else
-      (* Check if vendor stanza has (build opam) *)
-      let+ vendor_stanza = Source_tree.vendor_stanza vendor_path in
+  (* Classify a registry entry's vendor status.
+     - From_vendor entries have vendor stanzas - check build method
+     - From_lock entries need pkg rules (will be vendored by build rules) *)
+  let classify_entry (entry : Package_registry.entry) =
+    match entry.source with
+    | Package_registry.Source.From_lock { pkg = _ } ->
+      (* Lock packages need pkg rules to fetch/build - they'll be vendored by the rules *)
+      Memo.return Vendor_status.Not_vendored
+    | Package_registry.Source.From_vendor { source_dir; stanza } ->
+      (* Vendor packages - determine build method *)
       let stanza_forces_opam =
-        match vendor_stanza with
-        | Some
-            { Vendor_stanza.build_method = Some Vendor_stanza.Build_method.Opam_sandboxed
-            ; _
-            } -> true
+        match stanza.Vendor_stanza.build_method with
+        | Some Vendor_stanza.Build_method.Opam_sandboxed -> true
         | _ -> false
       in
-      let inferred_method = Vendor.classify_build_method lock_pkg in
-      (* Use opam sandbox if inferred method says so OR if vendor stanza forces it *)
-      match inferred_method, stanza_forces_opam with
-      | Vendor.Dune_native, false -> Vendor_status.Dune_native
-      | _ -> Vendor_status.Opam_sandboxed
+      if stanza_forces_opam
+      then Memo.return Vendor_status.Opam_sandboxed
+      else (
+        (* Load opam file to check if it uses dune build *)
+        let pkg_name = Package.Name.to_string entry.name in
+        match Vendor_rules.find_opam_file ~pkg_name ~pkg_dir:source_dir with
+        | None -> Memo.return Vendor_status.Opam_sandboxed
+        | Some opam_path ->
+          let contents = Io.read_file ~binary:true (Path.source opam_path) in
+          (match OpamFile.OPAM.read_from_string contents with
+           | exception _ -> Memo.return Vendor_status.Opam_sandboxed
+           | opam ->
+             (match Pkg.of_opam_file ~name:entry.name ~version:entry.version ~opam () with
+              | Error _ -> Memo.return Vendor_status.Opam_sandboxed
+              | Ok pkg ->
+                let method_ = Vendor.classify_build_method pkg in
+                (match method_ with
+                 | Vendor.Dune_native -> Memo.return Vendor_status.Dune_native
+                 | Vendor.Opam_sandboxed -> Memo.return Vendor_status.Opam_sandboxed))))
   ;;
 
   let build_packages_of_context ctx_name =
@@ -2561,14 +2345,19 @@ module Vendor_build = struct
     let* pkg_digests =
       Action_builder.of_memo
         (let open Memo.O in
-         let* db = DB.of_ctx ctx_name in
-         let digests = Pkg_digest.Map.values db.pkg_digest_table in
+         let* registry = Package_registry.of_ctx ctx_name in
+         let entries = Package_registry.to_list registry in
          let+ filtered =
-           Memo.parallel_map digests ~f:(fun { DB.Pkg_table.pkg; pkg_digest; _ } ->
-             let+ status = classify pkg in
+           Memo.parallel_map entries ~f:(fun entry ->
+             let+ status = classify_entry entry in
              match status with
              | Vendor_status.Dune_native -> None
              | Vendor_status.Not_vendored | Vendor_status.Opam_sandboxed ->
+               let pkg_digest =
+                 Pkg_digest.create
+                   ~name:entry.Package_registry.name
+                   ~version:entry.version
+               in
                Some pkg_digest)
          in
          let pkg_digests = List.filter_map filtered ~f:Fun.id in
@@ -2741,14 +2530,25 @@ let setup_pkg_install_alias ~dir ctx_name =
   |> Gen_rules.rules_here
 ;;
 
-let setup_package_rules (db : DB.t) ~package_universe ~dir ~pkg_digest
+(* Setup package rules from a registry entry using the unified resolve path *)
+let setup_package_rules_from_entry
+      (registry : Package_registry.t)
+      (entry : Package_registry.entry)
+      ~package_universe
+      ~dir
   : Gen_rules.result Memo.t
   =
-  (* First check if this package is vendored *)
+  (* Check vendor status based on the entry source *)
   let* vendor_status =
-    match Pkg_digest.Map.find db.pkg_digest_table pkg_digest with
-    | None -> Memo.return Vendor_status.Not_vendored
-    | Some { DB.Pkg_table.pkg; _ } -> Vendor_build.classify pkg
+    match entry.source with
+    | Package_registry.Source.From_vendor { stanza; _ } ->
+      (match stanza.build_method with
+       | Some Vendor_stanza.Build_method.Dune_native | None ->
+         Memo.return Vendor_status.Dune_native
+       | Some Opam_sandboxed -> Memo.return Vendor_status.Opam_sandboxed)
+    | Package_registry.Source.From_lock { pkg = _ } ->
+      (* Lock packages are not vendored (vendor takes precedence in registry) *)
+      Memo.return Vendor_status.Not_vendored
   in
   match vendor_status with
   | Vendor_status.Dune_native ->
@@ -2756,7 +2556,7 @@ let setup_package_rules (db : DB.t) ~package_universe ~dir ~pkg_digest
        They have NO pkg rules - the libraries/binaries come from normal dune build. *)
     Memo.return @@ Gen_rules.rules_here Gen_rules.Rules.empty
   | Vendor_status.Not_vendored | Vendor_status.Opam_sandboxed ->
-    let* pkg = Resolve.resolve db Loc.none pkg_digest package_universe in
+    let* pkg = Resolve.resolve_entry registry entry ~package_universe in
     let paths =
       Paths.make pkg.pkg_digest package_universe ~relative:Path.Build.relative
     in
@@ -2793,48 +2593,38 @@ let setup_pkg_context_rules ctx ~dir ~components =
     |> Memo.return
   | [ pkg_dir_string ] ->
     (* _build/.pkgs/<ctx>/<pkg_dir>/ - set up package build rules.
-       First check if this is a vendor package, then try lock file packages. *)
-    let* vendor_rules =
-      Vendor_rules.setup_vendor_package_rules ~context:ctx ~pkg_dir:pkg_dir_string
-    in
-    (match vendor_rules with
-     | Some action ->
-       (* This is a vendor package - generate rules for it *)
-       let rules = Rules.collect_unit (fun () -> rule action) in
-       let build_dir_only_sub_dirs =
-         Gen_rules.Build_only_sub_dirs.singleton ~dir Subdir_set.empty
-       in
-       (* Parse pkg_dir to get name.version for Paths computation *)
-       let pkg_digest = Pkg_digest.of_string pkg_dir_string in
-       let paths =
-         Paths.make pkg_digest (Dependencies ctx) ~relative:Path.Build.relative
-       in
-       let directory_targets = Path.Build.Map.singleton paths.target_dir Loc.none in
-       Memo.return (Gen_rules.make ~directory_targets ~build_dir_only_sub_dirs rules)
+       Use unified Package_registry to find the package. *)
+    let pkg_digest = Pkg_digest.of_string pkg_dir_string in
+    let* registry = Package_registry.of_ctx ctx in
+    (match
+       Package_registry.find_by_name_version
+         registry
+         ~name:pkg_digest.name
+         ~version:pkg_digest.version
+     with
      | None ->
-       (* Not a vendor package - try lock file package *)
-       let pkg_digest = Pkg_digest.of_string pkg_dir_string in
-       (match Dev_tool.of_context_name ctx with
-        | Some dev_tool ->
-          (* Dev tool context - use the dev tool's lock dir *)
-          let* db, _ = DB.of_dev_tool dev_tool in
-          setup_package_rules db ~package_universe:(Dependencies ctx) ~dir ~pkg_digest
-        | None ->
-          (* Regular context - check for project lock dir *)
-          let* lock_dir_active = Lock_dir.lock_dir_active ctx in
-          (match lock_dir_active with
-           | false -> Memo.return @@ Gen_rules.make (Memo.return Rules.empty)
-           | true ->
-             let* db = DB.of_ctx ctx in
-             setup_package_rules db ~package_universe:(Dependencies ctx) ~dir ~pkg_digest)))
+       (* Package not found in registry - no rules *)
+       Memo.return @@ Gen_rules.make (Memo.return Rules.empty)
+     | Some entry ->
+       setup_package_rules_from_entry
+         registry
+         entry
+         ~package_universe:(Dependencies ctx)
+         ~dir)
   | _ :: _ ->
     (* Subdirectories within a package build - redirect to parent *)
     Memo.return @@ Gen_rules.redirect_to_parent Gen_rules.Rules.empty
 ;;
 
 let resolve_pkg_dep context (loc, package_name) =
-  let* db, pkg_digest = DB.of_project_pkg context package_name in
-  Resolve.resolve db loc pkg_digest (Dependencies context)
+  let* registry = Package_registry.of_ctx context in
+  match Package_registry.find registry package_name with
+  | None ->
+    User_error.raise
+      ~loc
+      [ Pp.textf "Package %S not found" (Package.Name.to_string package_name) ]
+  | Some entry ->
+    Resolve.resolve_entry registry entry ~package_universe:(Dependencies context)
 ;;
 
 let ocaml_toolchain context =
@@ -2873,16 +2663,21 @@ let ocaml_toolchain context =
 ;;
 
 let all_deps universe =
-  let* db =
-    match (universe : Package_universe.t) with
-    | Dependencies ctx -> DB.of_ctx ctx
-    | Dev_tool tool -> DB.of_dev_tool tool >>| fst
-  in
-  Pkg_digest.Map.values db.pkg_digest_table
-  |> Memo.parallel_map ~f:(fun { DB.Pkg_table.pkg_digest; _ } ->
-    (* Use resolve_opt to filter out vendored dune packages - they return None
-       because they're built as vendored code, not via pkg rules *)
-    Resolve.resolve_opt db pkg_digest universe)
+  let ctx = Package_universe.context_name universe in
+  let* registry = Package_registry.of_ctx ctx in
+  Package_registry.to_list registry
+  |> Memo.parallel_map ~f:(fun entry ->
+    (* Filter out vendored dune packages - they're built as vendored code *)
+    match entry.Package_registry.source with
+    | Package_registry.Source.From_vendor { stanza; _ } ->
+      (match stanza.build_method with
+       | Some Vendor_stanza.Build_method.Dune_native | None -> Memo.return None
+       | Some Opam_sandboxed ->
+         let+ pkg = Resolve.resolve_entry registry entry ~package_universe:universe in
+         Some pkg)
+    | Package_registry.Source.From_lock _ ->
+      let+ pkg = Resolve.resolve_entry registry entry ~package_universe:universe in
+      Some pkg)
   >>| List.filter_map ~f:Fun.id
   >>| Resolved_pkg.top_closure
 ;;
@@ -2929,9 +2724,15 @@ let dev_tool_env tool =
       "lock directory environment for dev tools %S"
       (Package.Name.to_string package_name))
   @@ fun () ->
-  let* db, pkg_digest = DB.of_dev_tool tool in
-  let+ pkg = Resolve.resolve db Loc.none pkg_digest (Dev_tool tool) in
-  Resolved_pkg.exported_env pkg
+  let ctx = Dev_tool.context_name tool in
+  let* registry = Package_registry.of_ctx ctx in
+  match Package_registry.find registry package_name with
+  | None ->
+    User_error.raise
+      [ Pp.textf "Dev tool package %S not found" (Package.Name.to_string package_name) ]
+  | Some entry ->
+    let+ pkg = Resolve.resolve_entry registry entry ~package_universe:(Dev_tool tool) in
+    Resolved_pkg.exported_env pkg
 ;;
 
 let exported_env context =
@@ -2979,8 +2780,9 @@ let all_filtered_depexts_with_origins context =
 ;;
 
 let pkg_digest_of_project_dependency ctx package_name =
-  let+ db = DB.of_ctx ctx in
-  Pkg_digest.Map.keys db.pkg_digest_table
-  |> List.find ~f:(fun (pkg_digest : Pkg_digest.t) ->
-    Package.Name.equal pkg_digest.name package_name)
+  let+ registry = Package_registry.of_ctx ctx in
+  match Package_registry.find registry package_name with
+  | None -> None
+  | Some entry ->
+    Some (Pkg_digest.create ~name:entry.Package_registry.name ~version:entry.version)
 ;;
