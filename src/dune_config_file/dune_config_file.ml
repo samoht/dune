@@ -613,7 +613,7 @@ module Dune_config = struct
       field_o "action_stderr_on_success" (3, 0) Action_output_on_success.decode
     and+ project_defaults = field_o "project_defaults" (3, 17) Project_defaults.decode
     and+ pkg_enabled = field_o "pkg" (3, 20) Pkg_enabled.decode
-    and+ auto_lock = field_o "auto_lock" (3, 20) Auto_lock.decode
+    and+ auto_lock = field_o "lock" (3, 20) Auto_lock.decode
     and+ auto_fetch =
       field_o "auto_fetch" (3, 20) (enum [ "enabled", true; "disabled", false ])
     and+ experimental =

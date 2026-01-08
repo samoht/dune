@@ -720,9 +720,11 @@ let raise_on_lock_dir_out_of_sync =
                   ]
               ; concat
                   ~sep:(text " ")
-                  [ text "Or add"
-                  ; User_message.command "(auto_lock enabled)"
-                  ; text "to ~/.config/dune/config for automatic re-locking"
+                  [ text "Or use"
+                  ; User_message.command "--lock=always"
+                  ; text "or set"
+                  ; User_message.command "(lock always)"
+                  ; text "in ~/.config/dune/config for automatic re-locking"
                   ]
               ]
           in

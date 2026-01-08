@@ -741,6 +741,8 @@ module Action_expander = struct
           ; version
           ; depexts = _
           ; all_package_versions
+          ; self_build_id
+          ; build_ids
           }
           ~source
           (pform : Pform.t)
@@ -767,6 +769,8 @@ module Action_expander = struct
           ~context
           ~loc
           ~all_package_versions
+          ~self_build_id
+          ~build_ids
           paths
           depends
           macro_invocation

@@ -231,6 +231,10 @@ module Derive_spec = struct
     ; source_file : 'path
     ; solver_env_from_context : Solver_env.t
     ; unset_solver_vars : Package_variable_name.Set.t
+    ; local_packages : Local_package.t Package_name.Map.t
+      (* local_packages is NOT in cache key - see encode below.
+         This allows out-of-sync detection: if dune-project changes without
+         re-locking, the cached derivation has stale hash vs current packages. *)
     }
 
   let name = "derive-lock"
@@ -242,13 +246,18 @@ module Derive_spec = struct
   let bimap t f g = { t with source_file = f t.source_file; target = g t.target }
   let is_useful_to ~memoize = memoize
 
-  (* NOTE: dependency_hash is NOT in the cache key. It's computed at runtime
-     from current local_packages. This means:
+  (* NOTE: local_packages is NOT in the cache key - it's used at action time
+     to compute dependency_hash. This means:
      - Derivation only re-runs when source lock file changes
      - If dune-project changes without re-locking, derived lock has stale hash
      - Out-of-sync detection catches this mismatch *)
   let encode
-        { target; source_file; solver_env_from_context; unset_solver_vars }
+        { target
+        ; source_file
+        ; solver_env_from_context
+        ; unset_solver_vars
+        ; local_packages = _
+        }
         encode_path
         encode_target
     =
@@ -271,7 +280,12 @@ module Derive_spec = struct
   ;;
 
   let action
-        { target; source_file; solver_env_from_context; unset_solver_vars }
+        { target
+        ; source_file
+        ; solver_env_from_context
+        ; unset_solver_vars
+        ; local_packages
+        }
         ~ectx:_
         ~eenv:{ Action.Ext.Exec.env; _ }
     =
@@ -294,28 +308,13 @@ module Derive_spec = struct
       Solver_env.unset_multi solver_env unset_solver_vars
     in
     (* Read and derive the single-file lock.
-       Pass ~local_packages:[] - we compute dependency_hash separately below. *)
+       Pass ~local_packages:[] since we compute dependency_hash from the
+       local_packages captured in the spec. *)
     let+ lock_dir = Lock_pkg.read_disk ~solver_env ~local_packages:[] source_file in
-    (* Compute dependency_hash from current local_packages.
-       This is read at derivation time (not cached), so if dune-project changes
-       without re-locking, the derived lock's hash reflects what was current
-       when derivation ran, enabling out-of-sync detection. *)
-    let dependency_hash =
-      (* Read dune-project to get local package dependencies *)
-      let dune_project_path = Path.of_string "dune-project" in
-      if Path.Untracked.exists dune_project_path
-      then (
-        try
-          let project = Dune_project.load dune_project_path in
-          let packages = Dune_project.packages project in
-          let local_packages =
-            Package.Name.Map.map packages ~f:Local_package.of_package
-          in
-          Package_universe.dependency_digest local_packages
-        with
-        | _ -> None)
-      else None
-    in
+    (* Compute dependency_hash from local_packages captured when the rule was set up.
+       This enables out-of-sync detection: if dune-project changes without re-locking,
+       the derived lock's hash reflects the OLD state, which won't match current packages. *)
+    let dependency_hash = Package_universe.dependency_digest local_packages in
     let lock_dir =
       Lock.with_dependency_hash
         lock_dir
@@ -333,9 +332,20 @@ end
 
 module Derive_action = Action_ext.Make (Derive_spec)
 
-let derive_lock_action ~target ~source_file ~solver_env_from_context ~unset_solver_vars =
+let derive_lock_action
+      ~target
+      ~source_file
+      ~solver_env_from_context
+      ~unset_solver_vars
+      ~local_packages
+  =
   Derive_action.action
-    { Derive_spec.target; source_file; solver_env_from_context; unset_solver_vars }
+    { Derive_spec.target
+    ; source_file
+    ; solver_env_from_context
+    ; unset_solver_vars
+    ; local_packages
+    }
 ;;
 
 let lock_action
@@ -588,10 +598,14 @@ let setup_copy_rules ~dir:target ~lock_dir =
 (* Set up rules to derive single-file lock format to directory format.
    This uses the derive action which reads the single-file, fetches opam repo
    info, and writes the full directory format to the build directory.
-   The dependency_hash for out-of-sync detection is preserved from the source file. *)
+   The dependency_hash for out-of-sync detection is computed from local_packages
+   captured when the rule is set up. *)
 let setup_single_file_derive_rules ~dir:target ~lock_file ~lock_dir_local =
   let rules =
-    let+ workspace = Workspace.workspace () in
+    let* workspace = Workspace.workspace () in
+    let* local_packages =
+      Dune_load.packages () >>| Dune_lang.Package.Name.Map.map ~f:Local_package.of_package
+    in
     let lock_dir_path = Path.of_local lock_dir_local in
     let lock_dir = Workspace.find_lock_dir workspace lock_dir_path in
     let solver_env_from_context =
@@ -621,13 +635,14 @@ let setup_single_file_derive_rules ~dir:target ~lock_file ~lock_dir_local =
               ~source_file:lock_file
               ~solver_env_from_context
               ~unset_solver_vars
+              ~local_packages
             |> Action.Full.make ~can_go_in_shared_cache:false
             |> Action_builder.return))
       |> Action_builder.with_no_targets
       |> Action_builder.With_targets.add_directories ~directory_targets:[ target ]
     in
     let rule = Rule.make ~targets build in
-    Rules.of_rules [ rule ]
+    Memo.return (Rules.of_rules [ rule ])
   in
   let directory_targets = Path.Build.Map.singleton target Loc.none in
   Gen_rules.make ~directory_targets rules
