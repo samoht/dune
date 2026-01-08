@@ -59,6 +59,21 @@ module Pkg_install = struct
   ;;
 end
 
+(** Convert Pform section to Install section *)
+let pform_section_to_install_section (section : Pform.Var.Pkg.Section.t) : Section.t =
+  match section with
+  | Lib -> Lib
+  | Libexec -> Libexec
+  | Bin -> Bin
+  | Sbin -> Sbin
+  | Share -> Share
+  | Etc -> Etc
+  | Doc -> Doc
+  | Man -> Man
+  | Toplevel -> Toplevel
+  | Stublibs -> Stublibs
+;;
+
 (** Map install sections to directories *)
 let section_dir_of_root (roots : _ Install.Roots.t) (section : Pform.Var.Pkg.Section.t) =
   match section with
@@ -123,6 +138,7 @@ let resolve_builtin_var
       ~scope
       ~self_build_id
       ~build_ids
+      ~dep_install_paths
       variable_name
   =
   match Package_variable_name.to_string variable_name with
@@ -161,8 +177,16 @@ let resolve_builtin_var
         with
         | None -> None
         | Some section ->
-          let roots = Pkg_install.roots_for_package ~pkg_name:package_name ~context in
-          Some (Memo.return @@ Ok [ Value.Dir (section_dir_of_root roots section) ])))
+          (* Use package-specific paths if available, otherwise fall back to shared roots *)
+          let dir =
+            match dep_install_paths with
+            | Some paths ->
+              Install.Paths.get paths (pform_section_to_install_section section)
+            | None ->
+              let roots = Pkg_install.roots_for_package ~pkg_name:package_name ~context in
+              section_dir_of_root roots section
+          in
+          Some (Memo.return @@ Ok [ Value.Dir dir ])))
 ;;
 
 (** Apply opam's var?default semantics: if var is truthy, return default, else "" *)

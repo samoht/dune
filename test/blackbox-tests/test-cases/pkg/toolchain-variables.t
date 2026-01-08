@@ -79,11 +79,11 @@ We generate a fake package to use it
   > print_endline "Hello, World!"
   > EOF
 
-We try to build the dependency to show that it echoes the wong path. Until we
-fix the problem, it shows the sandbox path
+We try to build the dependency to show that it echoes the correct path. For
+toolchain packages, the path points to the toolchain cache directory.
 
   $ XDG_CACHE_HOME=$PWD/fake-cache dune build @pkg-install 2>&1 \
   > | dune_cmd subst '[[:alnum:]]{32}' '<hash>' \
   > | dune_cmd subst '[^ ]*_build' '$TESTCASE_ROOT/_build'
-  $TESTCASE_ROOT/_build/.sandbox/<hash>/_private/default/.pkg/ocaml-base-compiler.1-<hash>/target/share/ocaml-base-compiler
+  $TESTCASE_ROOT/_build/.sandbox/<hash>/default/test/blackbox-tests/test-cases/pkg/fake-cache/dune/toolchains/ocaml-base-compiler.1-<hash>/target/share/ocaml-base-compiler
 

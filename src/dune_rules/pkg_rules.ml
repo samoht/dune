@@ -709,6 +709,9 @@ module Action_expander = struct
         | None -> Package_variable_name.Map.empty, None
         | Some (var, paths) -> var, Some paths
       in
+      let dep_install_paths =
+        Option.map dep_paths ~f:(fun paths -> Lazy.force paths.Paths.install_paths)
+      in
       let+ result =
         match Package_variable_name.Map.find variables variable_name with
         | Some v -> Memo.return @@ Ok (Variable.dune_value v)
@@ -723,6 +726,7 @@ module Action_expander = struct
                ~scope
                ~self_build_id
                ~build_ids
+               ~dep_install_paths
                variable_name
            with
            | Some result -> result
