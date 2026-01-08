@@ -279,7 +279,19 @@ print_source() {
 }
 
 solve() {
-  make_project $@ | solve_project
+  local format_arg=""
+  local pkgs=""
+  for arg in "$@"; do
+    case "$arg" in
+      --format=*)
+        format_arg="$arg"
+        ;;
+      *)
+        pkgs="$pkgs $arg"
+        ;;
+    esac
+  done
+  make_project $pkgs | solve_project $format_arg
 }
 
 # Pass a string of the form PACKAGE_NAME.PACKAGE_VERSION and replaces the

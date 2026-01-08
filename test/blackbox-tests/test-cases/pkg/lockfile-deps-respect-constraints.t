@@ -20,7 +20,7 @@ rather than "a.0.0.1".
   > depends: [ "a" {= "0.0.2"} ]
   > EOF
 
-  $ solve_project <<EOF
+  $ solve_project --format=directory <<EOF
   > (lang dune 3.11)
   > (package
   >  (name foo)

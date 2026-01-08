@@ -32,10 +32,11 @@ Local conflict class defined in a local package:
   Unable to solve dependencies while generating lock directory: dune.lock
   
   Couldn't solve the package dependency formula.
-  Selected candidates: foo.dev x.dev foo&x
+  Selected candidates: foo.dev x.dev
   - bar -> (conflict)
       In same conflict class (ccc) as foo [0.0.1]
   [1]
+
 
 Now the conflict class comes from the opam repository
 

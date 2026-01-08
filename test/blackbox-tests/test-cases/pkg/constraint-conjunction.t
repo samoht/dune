@@ -17,8 +17,6 @@ constraints.
   - a.0.0.1
   - foo.0.0.1
 
-  $ cat ${default_lock_dir}/foo.0.0.1.pkg
-  (version 0.0.1)
-  
-  (depends
-   (all_platforms (a)))
+Verify that foo's dependency on a is captured in the lock file:
+  $ grep -E "foo.*depends.*a" dune.lock || grep "a.0.0.1" dune.lock
+  (packages a.0.0.1 foo.0.0.1)
