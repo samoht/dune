@@ -681,19 +681,16 @@ let setup_lock_rules_with_source (workspace : Workspace.t) ~dir ~lock_dir =
   let* source =
     let lock_dir_path = Path.Source.append_local workspace.dir lock_dir in
     (* Determine effective auto-lock mode:
-       - CLI flags (Enabled/Always) take precedence
-       - (pkg enabled) in config implies auto-lock behavior
+       - CLI flags take precedence
+       - (pkg enabled) implies auto-lock behavior ("easy mode")
        - Otherwise use default Auto behavior *)
     let* effective_auto_lock =
       match !Clflags.auto_lock with
-      | (Enabled | Always) as mode -> Memo.return mode
-      | Disabled -> Memo.return Dune_config_file.Dune_config.Auto_lock.Disabled
+      | (Enabled | Always | Disabled) as mode -> Memo.return mode
       | Auto ->
-        (* Check if (pkg enabled) is set in workspace config *)
+        (* (pkg enabled) is "easy mode" - implies auto-lock *)
         (match workspace.config.pkg_enabled with
-         | Set (_, `Enabled) ->
-           (* (pkg enabled) implies auto-lock when in Auto mode *)
-           Memo.return Dune_config_file.Dune_config.Auto_lock.Enabled
+         | Set (_, `Enabled) -> Memo.return Dune_config_file.Dune_config.Auto_lock.Enabled
          | Set (_, `Disabled) | Unset ->
            Memo.return Dune_config_file.Dune_config.Auto_lock.Auto)
     in
