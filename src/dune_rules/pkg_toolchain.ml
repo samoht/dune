@@ -133,24 +133,27 @@ let cache_dir pkg ~build_id = Path.outside_build_dir (pkg_dir pkg ~build_id)
 
 (* Populate the shared install directory from global cache.
    Copies the cached target/ contents to install_dir.
-   Also creates target_dir and copies the cookie there for dependency tracking. *)
-let populate_from_cache_action pkg ~build_id ~install_dir ~target_dir =
+   Also creates target_dir and copies the cookie there for dependency tracking.
+
+   IMPORTANT: The action runs in the sandbox's source/ directory. We use paths
+   relative to that location (../target, ../../../install/default) so the sandbox
+   can properly manage the directory targets. Using absolute paths would bypass
+   the sandbox and cause "target already exists" errors. *)
+let populate_from_cache_action pkg ~build_id ~install_dir ~target_dir:_ =
   let cache_target = Path.outside_build_dir (installation_prefix pkg ~build_id) in
   let cache_target_str = Path.to_string cache_target in
-  let workspace_root = Path.to_absolute_filename Path.root in
-  let install_dir_abs =
-    Filename.concat workspace_root (Path.Build.to_string install_dir)
-  in
-  let target_dir_abs = Filename.concat workspace_root (Path.Build.to_string target_dir) in
+  (* The action runs in source/, so target/ is ../target relative to that.
+     install_dir needs the full path since it's outside the package directory. *)
+  let target_dir_rel = "../target" in
+  let install_dir_str = Path.Build.to_string install_dir in
   let cache_cookie = Filename.concat cache_target_str "cookie" in
-  let target_cookie = Filename.concat target_dir_abs "cookie" in
+  let target_cookie = Filename.concat target_dir_rel "cookie" in
   let cmd =
     sprintf
-      "mkdir -p %s %s && cp -a %s/* %s/ && cp %s %s"
-      (Filename.quote target_dir_abs)
-      (Filename.quote install_dir_abs)
+      "mkdir -p %s && cp -a %s/* %s/ && cp %s %s"
+      (Filename.quote target_dir_rel)
       (Filename.quote cache_target_str)
-      (Filename.quote install_dir_abs)
+      (Filename.quote install_dir_str)
       (Filename.quote cache_cookie)
       (Filename.quote target_cookie)
   in
