@@ -1,6 +1,8 @@
 Tests that changing the dependencies of a project cause lockdir validation to
 fail due to the dependency hash not matching the hash stored in the lockdir.
 
+Note: This test uses directory format locks since it tests lock.dune contents.
+
 Dummy opam repo so we can generate lockdirs
 
   $ mkrepo
@@ -8,19 +10,21 @@ Dummy opam repo so we can generate lockdirs
   > EOF
 
 Start with a project with a single package with no dependencies:
-  $ solve_project <<EOF
+  $ solve_project --format=directory <<EOF
   > (lang dune 3.11)
   > (package
   >  (name foo))
   > EOF
   Solution for dune.lock (0 packages):
   (no dependencies to lock)
-  $ cat ${default_lock_dir}/lock.dune
+  $ cat ${default_lock_dir}/lock.dune | strip_sandbox | sed 's/#[a-f0-9]\{40\}/#HASH/'
   (lang package 0.1)
   
   (repositories
-   (complete false)
-   (used))
+   (complete true)
+   (used
+    ((source
+      $SANDBOX/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository#HASH))))
   
   (solved_for_platforms
    ((arch x86_64)
@@ -31,6 +35,8 @@ Start with a project with a single package with no dependencies:
     (os macos))
    ((arch arm64)
     (os macos)))
+
+
   $ dune pkg validate-lockdir
 
 Add a dependency to the project:
@@ -51,7 +57,7 @@ Add a dependency to the project:
   [1]
 
 Add a non-local dependency to the package:
-  $ solve_project <<EOF
+  $ solve_project --format=directory <<EOF
   > (lang dune 3.11)
   > (package
   >  (name foo)
@@ -60,14 +66,16 @@ Add a non-local dependency to the package:
   Solution for dune.lock (1 package):
   opam:
   - a.0.0.1
-  $ cat ${default_lock_dir}/lock.dune
+  $ cat ${default_lock_dir}/lock.dune | strip_sandbox | sed 's/#[a-f0-9]\{40\}/#HASH/'
   (lang package 0.1)
   
   (dependency_hash 7ba1cacd46bb2609d7b9735909c3b8a5)
   
   (repositories
-   (complete false)
-   (used))
+   (complete true)
+   (used
+    ((source
+      $SANDBOX/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository#HASH))))
   
   (solved_for_platforms
    ((arch x86_64)
@@ -78,6 +86,10 @@ Add a non-local dependency to the package:
     (os macos))
    ((arch arm64)
     (os macos)))
+
+
+
+
   $ dune pkg validate-lockdir
 
 Add a second dependency to the project:
@@ -119,6 +131,7 @@ Remove all dependencies from the project:
 
 Exercise handling invalid dependency hashes.
   $ make_lock_metadata_with_hash() {
+  >   mkdir -p ${source_lock_dir}
   >   cat > ${source_lock_dir}/lock.dune <<EOF
   > (lang package 0.1)
   > (dependency_hash $1)
