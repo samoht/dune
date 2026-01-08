@@ -236,3 +236,84 @@ val source_files_dir
   -> Path.Source.t
 
 val merge_conditionals : t -> t -> t
+
+(** Helper module for converting opam files to Pkg.t *)
+module Opam_conversion : sig
+  (** Simplify a filter by partially evaluating it with solver variables. *)
+  val simplify_filter
+    :  (Package_variable_name.t -> Variable_value.t option)
+    -> OpamTypes.filter
+    -> OpamTypes.filter
+
+  (** Partially evaluate a filter, returning [`Skip] if definitely false. *)
+  val partial_eval_filter
+    :  OpamTypes.filter option
+    -> [ `Skip | `Filter of OpamTypes.filter option ]
+
+  (** Convert opam filter to Blang. *)
+  val filter_to_blang
+    :  package:OpamPackage.t
+    -> loc:Loc.t
+    -> OpamTypes.filter
+    -> (Slang.Blang.t, User_message.t) result
+
+  (** Convert opam commands to actions. *)
+  val opam_commands_to_actions
+    :  get_solver_var:(Package_variable_name.t -> Variable_value.t option)
+    -> loc:Loc.t
+    -> package:OpamPackage.t
+    -> OpamTypes.command list
+    -> (Action.t list, User_message.t) result
+
+  (** Combine a list of actions into a single action. *)
+  val make_action : Action.t list -> Action.t option
+
+  (** Extract all package names from an opam dependency formula. *)
+  val extract_dep_names : OpamTypes.filtered_formula -> OpamPackage.Name.t list
+
+  (** Convert opam depexts to Depexts.t list. *)
+  val depexts_to_list
+    :  package:OpamPackage.t
+    -> (OpamSysPkg.Set.t * OpamTypes.filter) list
+    -> (Depexts.t list, User_message.t) result
+
+  (** Convert opam env updates to dune's env update format. *)
+  val opam_env_update_to_env_update
+    :  string * Action.Env_update.Op.t * string * 'a
+    -> String_with_vars.t Action.Env_update.t
+
+  (** Convert substitution files to actions. *)
+  val substs_to_actions : OpamFile.OPAM.t -> Action.t list
+
+  (** Convert patches to actions. *)
+  val patches_to_actions
+    :  package:OpamPackage.t
+    -> OpamFile.OPAM.t
+    -> (Action.t list, User_message.t) result
+
+  (** Wrap an action with build environment updates from opam file. *)
+  val wrap_with_build_env : OpamFile.OPAM.t -> Action.t -> Action.t
+
+  (** Extract extra sources from opam file. *)
+  val extra_sources_of_opam_file : OpamFile.OPAM.t -> (Path.Local.t * Source.t) list
+
+  (** Extract source URL from opam file. *)
+  val source_of_opam_file : OpamFile.OPAM.t -> Source.t option
+end
+
+(** [of_opam_file ~name ~version ?source ~opam ()] constructs a [t] from opam file
+    metadata. This extracts:
+    - build_command from [OpamFile.OPAM.build]
+    - install_command from [OpamFile.OPAM.install]
+    - depends from [OpamFile.OPAM.depends]
+    - depexts from [OpamFile.OPAM.depexts]
+
+    @param source Optional source location for the package. Defaults to [None]
+    for local/vendored packages. *)
+val of_opam_file
+  :  name:Package_name.t
+  -> version:Package_version.t
+  -> ?source:Source.t
+  -> opam:OpamFile.OPAM.t
+  -> unit
+  -> (t, User_message.t) result

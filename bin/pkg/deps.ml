@@ -155,8 +155,8 @@ let run_deps ~lock_dirs_arg ~tree ~why () =
   let+ () =
     Fiber.sequential_iter lock_dirs ~f:(fun lock_dir_path ->
       let lock_dir_path = Path.source lock_dir_path in
-      let+ platform = solver_env_from_system_and_context ~lock_dir_path in
-      let lock_dir = Lock_dir.read_disk_exn lock_dir_path in
+      let* platform = solver_env_from_system_and_context ~lock_dir_path in
+      let+ lock_dir = Dune_pkg.Lock_pkg.read_disk ~solver_env:platform lock_dir_path in
       let graph = Dep_graph.of_lock_dir lock_dir ~platform in
       match why with
       | Some target ->

@@ -39,23 +39,23 @@ val file_to_lock_with_opam_files
   -> Lock.File.t
   -> (Lock.t * (Package_name.t * string) list) Fiber.t
 
-(** [read_disk_fiber ~solver_env path] reads a lock from either directory or
+(** [read_disk ~solver_env path] reads a lock from either directory or
     single-file format. For directory format, it uses the synchronous reader.
     For single-file format, it parses the file and derives full package metadata
     from the opam repos specified in the file.
 
     @param solver_env Used for platform-specific dependency evaluation
     @param path Path to either dune.lock directory or dune.lock file *)
-val read_disk_fiber : solver_env:Solver_env.t -> Path.t -> Lock.t Fiber.t
+val read_disk : solver_env:Solver_env.t -> Path.t -> Lock.t Fiber.t
 
-(** Like [read_disk_fiber] but also returns opam file contents for each package.
+(** Like [read_disk] but also returns opam file contents for each package.
     Used by fetch to write opam files to duniverse. For single-file format,
     returns the opam file content derived from the repo. For directory format,
     returns an empty list (opam files not available).
 
     @param solver_env Used for platform-specific dependency evaluation
     @param path Path to either dune.lock directory or dune.lock file *)
-val read_disk_fiber_with_opam_files
+val read_disk_with_opam_files
   :  solver_env:Solver_env.t
   -> Path.t
   -> (Lock.t * (Package_name.t * string) list) Fiber.t

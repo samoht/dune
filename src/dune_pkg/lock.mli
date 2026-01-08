@@ -233,7 +233,7 @@ end
 val read_disk : Path.t -> (t, User_message.t) result
 val read_disk_exn : Path.t -> t
 
-(** To read either format (directory or single-file), use [Lock_pkg.read_disk_fiber]
+(** To read either format (directory or single-file), use [Lock_pkg.read_disk]
     which handles format detection and derivation for single-file format. *)
 
 module Make_load (Io : sig

@@ -285,7 +285,7 @@ module Derive_spec = struct
       Solver_env.unset_multi solver_env unset_solver_vars
     in
     (* Read and derive the single-file lock *)
-    let+ lock_dir = Lock_pkg.read_disk_fiber ~solver_env source_file in
+    let+ lock_dir = Lock_pkg.read_disk ~solver_env source_file in
     let lock_dir_path = Path.build target in
     Lock.Write_disk.prepare
       ~portable_lock_dir

@@ -335,9 +335,7 @@ let fetch_source_group ~rev_store ~platform ~patches_dir ~pkgs_by_name group =
 let fetch_duniverse ~lock_dir_path ~solver_env () =
   let open Fiber.O in
   let lock_path = Path.source lock_dir_path in
-  let* lock_dir, opam_files =
-    Lock_pkg.read_disk_fiber_with_opam_files ~solver_env lock_path
-  in
+  let* lock_dir, opam_files = Lock_pkg.read_disk_with_opam_files ~solver_env lock_path in
   let all_pkgs = Lock_dir.Packages.to_pkg_list lock_dir.packages in
   let fetchable_pkgs =
     List.filter all_pkgs ~f:(fun (pkg : Pkg.t) -> Option.is_some pkg.info.source)
@@ -478,7 +476,7 @@ let fetch_duniverse ~lock_dir_path ~solver_env () =
 let auto_fetch_missing ~lock_dir_path ~solver_env () =
   let open Fiber.O in
   let lock_path = Path.source lock_dir_path in
-  let* lock_dir = Lock_pkg.read_disk_fiber ~solver_env lock_path in
+  let* lock_dir = Lock_pkg.read_disk ~solver_env lock_path in
   let all_pkgs = Lock_dir.Packages.to_pkg_list lock_dir.packages in
   (* Filter to packages with sources (both dune and opam packages) *)
   let fetchable_pkgs =
