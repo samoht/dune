@@ -89,11 +89,12 @@ Package which has boolean where string was expected. This should be caught while
   Solution for dune.lock (4 packages):
   dune:
   - standard-dune.0.0.1
-
+  
   opam:
   - variable-types.0.0.1
   - with-interpolation.0.0.1
   - with-percent-sign.0.0.1
+
 
 
   $ cat ${default_lock_dir}/standard-dune.0.0.1.pkg
@@ -143,7 +144,7 @@ Package which has boolean where string was expected. This should be caught while
        (run echo %{os_family}))))))
 
   $ solve with-malformed-interpolation
-  File "packages/with-malformed-interpolation/with-malformed-interpolation.0.0.1/opam", line 1, characters 0-0:
+  File "$TESTCASE_ROOT/mock-opam-repository/packages/with-malformed-interpolation/with-malformed-interpolation.0.0.1/opam", line 1, characters 0-0:
   Error: Encountered malformed variable interpolation while processing commands
   for package with-malformed-interpolation.0.0.1.
   The variable interpolation:
@@ -157,7 +158,7 @@ Package which has boolean where string was expected. This should be caught while
 
   $ cat ${default_lock_dir}/exercise-filters.0.0.1.pkg
   (version 0.0.1)
-
+  
   (build
    (all_platforms
     ((action
@@ -194,6 +195,7 @@ Package which has boolean where string was expected. This should be caught while
        (when
         (and %{pkg:foo:installed} %{pkg:bar:installed} %{pkg:baz:installed})
         (run echo m)))))))
+
 
 
 Test that if opam filter translation is disabled the output doesn't contain any translated filters:
@@ -262,7 +264,9 @@ Test that if opam filter translation is disabled the output doesn't contain any 
         c))))))
 
   $ solve filter-error-bool-where-string-expected
-  File "$TESTCASE_ROOT/packages/filter-error-bool-where-string-expected/filter-error-bool-where-string-expected.0.0.1/opam", line 3, characters 33-34:
+  File "$TESTCASE_ROOT/mock-opam-repository/packages/filter-error-bool-where-string-expected/filter-error-bool-where-string-expected.0.0.1/opam", line 3, characters 33-34:
+  3 |   [ "echo" "a" ] { foo:version < (foo = bar) }
+                                       ^
   Error: unable to parse opam file
   Parse error
   [1]
