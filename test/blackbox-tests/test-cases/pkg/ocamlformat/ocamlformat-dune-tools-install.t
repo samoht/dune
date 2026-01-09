@@ -45,7 +45,7 @@ We have no lock dir for ocamlformat, it should use the one from path
 Installing ocamlformat via `dune tools install` should work:
 
   $ dune tools install ocamlformat
-  Solution for _build/lock/tools-ocamlformat (1 package)
+  Solution for _build/.locks/tools-ocamlformat (1 package)
   dune:
   - ocamlformat.0.26.2
 

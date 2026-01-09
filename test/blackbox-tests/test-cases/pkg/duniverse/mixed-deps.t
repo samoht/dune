@@ -485,14 +485,12 @@ Verify dune packages are built in duniverse (workspace):
   $ ls _build/default/duniverse/dune-top.1.0.0/.dune_top.objs/byte/*.cmo
   _build/default/duniverse/dune-top.1.0.0/.dune_top.objs/byte/dune_top.cmo
 
-Verify opam packages are built in .pkg sandbox:
+Verify opam packages are built in .pkg sandbox (files not present in old location):
 
-  $ ls _build/default/.pkg/opam-leaf/target/lib/opam-leaf/data.txt
-  ls: _build/default/.pkg/opam-leaf/target/lib/opam-leaf/data.txt: No such file or directory
-  [1]
-  $ ls _build/default/.pkg/opam-mid1/target/lib/opam-mid1/data.txt
-  ls: _build/default/.pkg/opam-mid1/target/lib/opam-mid1/data.txt: No such file or directory
-  [1]
+  $ test -f _build/default/.pkg/opam-leaf/target/lib/opam-leaf/data.txt || echo "opam-leaf data.txt not in old location"
+  opam-leaf data.txt not in old location
+  $ test -f _build/default/.pkg/opam-mid1/target/lib/opam-mid1/data.txt || echo "opam-mid1 data.txt not in old location"
+  opam-mid1 data.txt not in old location
 
 Verify dune packages do NOT have .pkg build artifacts:
 

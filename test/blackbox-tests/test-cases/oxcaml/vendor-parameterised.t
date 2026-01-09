@@ -88,9 +88,8 @@ Similarly for the vendored binary:
 This run uses the same instantiation as the root, so no `vendored`-specific
 instantation are created:
 
-  $ ls vendored/_build/default/.parameterised/*
-  ls: cannot access 'vendored/_build/default/.parameterised/*': No such file or directory
-  [2]
+  $ ls vendored/_build/default/.parameterised/* 2>/dev/null || echo "no vendored-specific instantiations"
+  no vendored-specific instantiations
 
 But building the executable from the vendored directory doesn't:
 

@@ -1,4 +1,4 @@
-dev_tool_lock_dir="_build/lock/tools-ocamlformat"
+dev_tool_lock_dir="_build/.locks/tools-ocamlformat"
 
 make_fake_ocamlformat() {
   version=$1

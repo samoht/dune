@@ -21,7 +21,7 @@ The command will fail because the dev tool is not installed:
 
 Install the dev tool:
   $ dune tools exec ocamlformat
-  Solution for _build/lock/tools-ocamlformat (1 package)
+  Solution for _build/.locks/tools-ocamlformat (1 package)
   dune:
   - ocamlformat.0.26.2
        Running 'ocamlformat'

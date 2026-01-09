@@ -1,4 +1,4 @@
-dev_tool_lock_dir="_build/lock/tools-merlin"
+dev_tool_lock_dir="_build/.locks/tools-merlin"
 
 # Create a dune-workspace file with mock repos configured for the main
 # project lockdir and the merlin dev-tool lockdir.

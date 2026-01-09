@@ -1,4 +1,4 @@
-dev_tool_lock_dir="_build/lock/tools-odoc"
+dev_tool_lock_dir="_build/.locks/tools-odoc"
 
 # Create a dune-workspace file with mock repos set up for the main
 # project and the odoc lockdir.

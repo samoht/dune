@@ -34,7 +34,7 @@ Set up a custom cache directory for testing.
 Install ocamlformat. The binary should be cached globally.
 
   $ dune tools install ocamlformat
-  Solution for _build/lock/tools-ocamlformat (1 package)
+  Solution for _build/.locks/tools-ocamlformat (1 package)
   dune:
   - ocamlformat.0.26.2
 
@@ -102,7 +102,7 @@ Create another version of ocamlformat.
 Install a specific version using the tool.version syntax.
 
   $ dune tools install ocamlformat.0.27.0
-  Solution for _build/lock/tools-ocamlformat (1 package)
+  Solution for _build/.locks/tools-ocamlformat (1 package)
   dune:
   - ocamlformat.0.27.0
 

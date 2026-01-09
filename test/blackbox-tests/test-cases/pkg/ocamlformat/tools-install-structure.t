@@ -23,7 +23,7 @@ Set up project with .ocamlformat config:
 Install ocamlformat using `dune tools install`:
 
   $ dune tools install ocamlformat
-  Solution for _build/lock/tools-ocamlformat (1 package)
+  Solution for _build/.locks/tools-ocamlformat (1 package)
   dune:
   - ocamlformat.0.26.2
 
@@ -31,7 +31,7 @@ Verify the directory structure:
 
 The lock directory should be created:
 
-  $ ls _build/lock/tools-ocamlformat
+  $ ls _build/.locks/tools-ocamlformat
   lock.dune
   ocamlformat.pkg
 

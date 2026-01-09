@@ -25,7 +25,7 @@ same version of the ocaml compiler as the code that it's analyzing.
 
 Initially ocamllsp will depend on ocaml-base-compiler.5.2.0 to match the project.
   $ dune tools exec ocamllsp
-  Solution for _build/lock/tools-ocaml-lsp-server (4 packages)
+  Solution for _build/.locks/tools-ocaml-lsp-server (4 packages)
   opam:
   - ocaml.5.2.0
   - ocaml-base-compiler.5.2.0
@@ -43,7 +43,7 @@ We can re-run "dune tools exec ocamllsp" without relocking or rebuilding.
   lockdir has changed to 5.2.0 (formerly the compiler version was 5.2.0). The
   dev-tool "ocaml-lsp-server" will be re-locked and rebuilt with this version
   of the compiler.
-  Solution for _build/lock/tools-ocaml-lsp-server (4 packages)
+  Solution for _build/.locks/tools-ocaml-lsp-server (4 packages)
   opam:
   - ocaml.5.2.0
   - ocaml-base-compiler.5.2.0
@@ -73,7 +73,7 @@ before running. Ocamllsp now depends on ocaml.5.1.0.
   lockdir has changed to 5.1.0 (formerly the compiler version was 5.2.0). The
   dev-tool "ocaml-lsp-server" will be re-locked and rebuilt with this version
   of the compiler.
-  Solution for _build/lock/tools-ocaml-lsp-server (4 packages)
+  Solution for _build/.locks/tools-ocaml-lsp-server (4 packages)
   opam:
   - ocaml.5.1.0
   - ocaml-base-compiler.5.1.0

@@ -94,7 +94,7 @@ It shows that the project uses printer.2.0
 Format foo.ml, "dune fmt" uses printer.1.0 instead. There is no conflict with different
 versions of the same dependency.
   $ DUNE_CONFIG__LOCK_DEV_TOOL=enabled DUNE_CONFIG__AUTO_FETCH=disabled dune fmt --preview
-  Solution for _build/lock/tools-ocamlformat (2 packages)
+  Solution for _build/.locks/tools-ocamlformat (2 packages)
   dune:
   - ocamlformat.0.26.2
   - printer.1.0

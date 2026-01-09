@@ -33,7 +33,7 @@ Make sure we don't have a lock dir
 Install our fake ocamlformat, making sure to override the build directory.
 
   $ dune tools install ocamlformat --build-dir="${custom_build_dir}"
-  Solution for _other_build/lock/tools-ocamlformat (1 package)
+  Solution for _other_build/.locks/tools-ocamlformat (1 package)
   dune:
   - ocamlformat.0.26.2
 

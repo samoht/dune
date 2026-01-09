@@ -34,9 +34,7 @@ We inspect the contents of the build directory.
   _build/install/default/lib/coq/user-contrib/A/a1.vo
   $ ls "_build/default/lib A/a1.vo"
   _build/default/lib A/a1.vo
-  $ ls _build/install/default/lib/coq/user-contrib/B/b.vo
-  ls: cannot access '_build/install/default/lib/coq/user-contrib/B/b.vo': No such file or directory
-  [2]
-  $ ls "_build/default/lib B/b.vo"
-  ls: cannot access '_build/default/lib B/b.vo': No such file or directory
-  [2]
+  $ test -f _build/install/default/lib/coq/user-contrib/B/b.vo || echo "B/b.vo not installed (expected)"
+  B/b.vo not installed (expected)
+  $ test -f "_build/default/lib B/b.vo" || echo "lib B/b.vo not built (expected)"
+  lib B/b.vo not built (expected)
