@@ -122,7 +122,10 @@ let expand_pkg ~context ~source_dir ~prefix (pform : Pform.Var.Pkg.t) =
     let group = Unix.getgid () |> Unix.getgrgid in
     Memo.return [ Value.String group.gr_name ]
   | Section_dir section ->
-    let dir = section_dir_of_root (Pkg_install.roots ~context) section in
+    (* Derive roots from prefix for consistency with %{prefix}%.
+       This ensures %{lib}%, %{share}%, etc. are relative to the same prefix. *)
+    let roots = Install.Roots.opam_from_prefix ~relative:Path.relative prefix in
+    let dir = section_dir_of_root roots section in
     Memo.return [ Value.Dir dir ]
   | Name | Version ->
     (* Name and Version need to be handled by the caller with access to package info *)

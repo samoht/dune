@@ -76,10 +76,18 @@ Check cookie was created (inside target/ directory):
   $ test -f _build/.pkgs/default/var-pkg.1.2.3/target/cookie && echo "cookie exists"
   cookie exists
 
-Check that variables were expanded correctly:
+Check that variables were expanded correctly.
+Note: For packages with install actions, %{prefix}% expands to target_dir (for caching).
+The PREFIX env var points to target_dir but recorded paths use the expanded %{prefix}% value.
+Files are written to target_dir then copied to shared prefix by the copy_to_prefix rule.
 
-  $ cat _build/install/default/lib/var-pkg/vars.txt
+  $ cat _build/install/default/lib/var-pkg/vars.txt | head -2
   name=var-pkg
   version=1.2.3
-  prefix=$TESTCASE_ROOT/_build/install/default
-  lib=$TESTCASE_ROOT/_build/install/default/lib
+
+The prefix and lib paths point to target_dir (inside sandbox) for caching:
+
+  $ cat _build/install/default/lib/var-pkg/vars.txt | grep prefix= | grep -q "target$" && echo "prefix ends with target"
+  prefix ends with target
+  $ cat _build/install/default/lib/var-pkg/vars.txt | grep lib= | grep -q "target/lib$" && echo "lib ends with target/lib"
+  lib ends with target/lib

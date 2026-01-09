@@ -812,4 +812,4 @@ Non-dune packages with (build opam) should be built in opam sandbox:
 
   $ dune build @pkg-install 2>&1
   $ cat _build/.pkgs/default/make-pkg.1.0.0/target/cookie 2>&1 || echo "no cookie file"
-  DUNE-INSTALL-COOKIEv3:„•¦¾             @@
+  DUNE-INSTALL-COOKIEv3:„•¦¾   D            @ ’	9.pkgs/default/make-pkg.1.0.0/target/lib/make-pkg/data.txt@@@

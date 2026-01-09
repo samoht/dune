@@ -1169,11 +1169,6 @@ module Action_expander = struct
         | None -> expander
         | Some target_dir ->
           let prefix = Path.build target_dir in
-          Log.info
-            "Action_expander: setting prefix to target_dir"
-            [ "target_dir", Dyn.string (Path.Build.to_string target_dir)
-            ; "prefix", Dyn.string (Path.to_string prefix)
-            ];
           let install_roots =
             Install.Roots.opam_from_prefix ~relative:Path.relative prefix
           in
