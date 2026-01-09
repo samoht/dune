@@ -33,14 +33,24 @@ module Relocatable_check = struct
   (* Filenames (without extension) that should be checked *)
   let text_filenames = [ "META"; "dune-package" ]
 
+  (* Files that are exempt from relocatability checks.
+     These files are known to contain absolute paths by design. *)
+  let exempt_files =
+    [ "Makefile.config" (* OCaml compiler config - contains installation prefix *) ]
+  ;;
+
   let is_text_file path =
     let basename = Path.basename path in
-    let has_text_ext =
-      List.exists text_extensions ~f:(fun ext -> String.is_suffix basename ~suffix:ext)
-    in
-    let is_text_name = List.mem text_filenames basename ~equal:String.equal in
-    let is_dune_file = String.is_prefix basename ~prefix:"dune-" in
-    has_text_ext || is_text_name || is_dune_file
+    (* Skip exempt files *)
+    if List.mem exempt_files basename ~equal:String.equal
+    then false
+    else (
+      let has_text_ext =
+        List.exists text_extensions ~f:(fun ext -> String.is_suffix basename ~suffix:ext)
+      in
+      let is_text_name = List.mem text_filenames basename ~equal:String.equal in
+      let is_dune_file = String.is_prefix basename ~prefix:"dune-" in
+      has_text_ext || is_text_name || is_dune_file)
   ;;
 
   let check_file ~prefix_path path =
@@ -409,6 +419,8 @@ module Resolved_pkg = struct
     ; toolchain_cache_dir : Path.t option
       (* Path to the global toolchain cache directory if this is a cached toolchain *)
     ; context : Context_name.t
+    ; is_dev_tool : bool
+      (* Whether this package is the main dev tool package (installs to default context) *)
     }
 
   module Top_closure = Top_closure.Make (Id.Set) (Monad.Id)
@@ -1633,6 +1645,12 @@ end = struct
         ; is_cached_toolchain = is_cached
         ; toolchain_cache_dir
         ; context
+        ; is_dev_tool =
+            (match package_universe with
+             | Package_universe.Dev_tool dev_tool ->
+               (* Only the main dev tool package (not its deps) installs to default context *)
+               Package.Name.equal info.name (Dune_pkg.Dev_tool.package_name dev_tool)
+             | Package_universe.Dependencies _ -> false)
         }
       in
       let+ exported_env =
@@ -2461,7 +2479,11 @@ let installed_marker_path (pkg : Resolved_pkg.t) =
    This rule modifies the shared install directory and should not be cached. *)
 let copy_to_prefix_rule (pkg : Resolved_pkg.t) =
   let cookie_path = install_cookie_path pkg in
-  let shared_prefix = Pkg_opam.Pkg_install.dir ~context:pkg.context in
+  (* Dev tools install to the default context so their binaries are available in PATH *)
+  let shared_prefix =
+    let context = if pkg.is_dev_tool then Context_name.default else pkg.context in
+    Pkg_opam.Pkg_install.dir ~context
+  in
   (* The copy action *)
   let copy_action =
     Copy_to_prefix_action.action
@@ -2504,6 +2526,24 @@ let copy_to_prefix_rule (pkg : Resolved_pkg.t) =
   Action_builder.path (Path.build cookie_path)
   |> Action_builder.with_no_targets
   >>> Action_builder.progn [ progress_action; copy_action; marker_action ]
+;;
+
+(* For dev tools, create a rule that symlinks the installed binary from the
+   dev tool's target_dir to the default context's install dir. This allows
+   other rules to depend on the binary via Dev_tool.exe_path. *)
+let dev_tool_symlink_rule (pkg : Resolved_pkg.t) (dev_tool : Dune_pkg.Dev_tool.t) =
+  let exe_components = Dune_pkg.Dev_tool.exe_path_components_within_package dev_tool in
+  let source_exe =
+    List.fold_left exe_components ~init:pkg.write_paths.target_dir ~f:Path.Build.relative
+  in
+  let target_exe = Dev_tool.exe_path dev_tool in
+  let symlink_action =
+    (* Depend on the installed marker to ensure copy_to_prefix has run *)
+    let open Action_builder.O in
+    let+ () = Action_builder.path (Path.build (installed_marker_path pkg)) in
+    Action.symlink ~src:(Path.build source_exe) ~dst:target_exe
+  in
+  symlink_action |> Action_builder.with_file_targets ~file_targets:[ target_exe ]
 ;;
 
 let gen_rules context_name (pkg : Resolved_pkg.t) =
