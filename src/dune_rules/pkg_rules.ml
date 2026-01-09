@@ -1194,9 +1194,11 @@ module Action_expander = struct
 
   let install_command context (pkg : Resolved_pkg.t) =
     (* Install commands run without sandbox because they write to the shared
-       PREFIX directory which is outside the package's target directory. *)
+       PREFIX directory which is outside the package's target directory.
+       They also cannot go in shared cache since their side effects (writes to PREFIX)
+       are not captured by declared targets. *)
     Option.map pkg.install_command ~f:(fun action ->
-      expand ~sandbox:install_sandbox context pkg action)
+      expand ~can_go_in_shared_cache:false ~sandbox:install_sandbox context pkg action)
   ;;
 
   let exported_env (expander : Expander.t) (env : _ Env_update.t) =
