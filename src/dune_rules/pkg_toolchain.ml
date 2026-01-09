@@ -150,8 +150,9 @@ let populate_from_cache_action pkg ~build_id ~install_dir ~target_dir:_ =
   let target_cookie = Filename.concat target_dir_rel "cookie" in
   let cmd =
     sprintf
-      "mkdir -p %s && cp -a %s/* %s/ && cp %s %s"
+      "mkdir -p %s && mkdir -p %s && cp -a %s/* %s/ && cp %s %s"
       (Filename.quote target_dir_rel)
+      (Filename.quote install_dir_str)
       (Filename.quote cache_target_str)
       (Filename.quote install_dir_str)
       (Filename.quote cache_cookie)

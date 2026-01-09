@@ -21,6 +21,11 @@ val project_ocamlpath : Context_name.t -> Path.t list Memo.t
 val dev_tool_ocamlpath : Dune_pkg.Dev_tool.t -> Path.t list Memo.t
 val find_package : Context_name.t -> Package.Name.t -> unit Action_builder.t option Memo.t
 val dev_tool_env : Dune_pkg.Dev_tool.t -> Env.t Memo.t
+
+(** Generate install rules for a dev tool. This creates symlink rules that
+    make the dev tool binary available at Dev_tool.exe_path. *)
+val dev_tool_install_rules : Dune_pkg.Dev_tool.t -> Rules.t Memo.t
+
 val all_filtered_depexts : Context_name.t -> string list Memo.t
 
 val all_filtered_depexts_with_origins

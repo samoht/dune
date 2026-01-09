@@ -2541,9 +2541,9 @@ let dev_tool_symlink_rule (pkg : Resolved_pkg.t) (dev_tool : Dune_pkg.Dev_tool.t
     (* Depend on the installed marker to ensure copy_to_prefix has run *)
     let open Action_builder.O in
     let+ () = Action_builder.path (Path.build (installed_marker_path pkg)) in
-    Action.symlink ~src:(Path.build source_exe) ~dst:target_exe
+    Action.Full.make (Action.symlink (Path.build source_exe) target_exe)
   in
-  symlink_action |> Action_builder.with_file_targets ~file_targets:[ target_exe ]
+  target_exe, symlink_action
 ;;
 
 let gen_rules context_name (pkg : Resolved_pkg.t) =
@@ -3011,6 +3011,30 @@ let dev_tool_env tool =
   | Some entry ->
     let+ pkg = Resolve.resolve_entry registry entry ~package_universe:(Dev_tool tool) in
     Resolved_pkg.exported_env pkg
+;;
+
+(* Generate install rules for a dev tool. This creates a symlink from the
+   built binary in target_dir to the install directory so other rules can
+   depend on Dev_tool.exe_path. *)
+let dev_tool_install_rules (tool : Dune_pkg.Dev_tool.t) =
+  let lock_path = Dev_tool.lock_dir tool in
+  let lock_dir_exists = Path.build lock_path |> Path.Untracked.exists in
+  if not lock_dir_exists
+  then Memo.return Rules.empty
+  else (
+    let ctx = Dev_tool.context_name tool in
+    let package_name = Dune_pkg.Dev_tool.package_name tool in
+    let* registry = Package_registry.of_ctx ctx in
+    match Package_registry.find registry package_name with
+    | None -> Memo.return Rules.empty
+    | Some entry ->
+      let+ pkg = Resolve.resolve_entry registry entry ~package_universe:(Dev_tool tool) in
+      (* Create symlink rule from source to install dir *)
+      let target_exe, build = dev_tool_symlink_rule pkg tool in
+      let info = Rule.Info.of_loc_opt (Some Loc.none) in
+      let targets = Targets.File.create target_exe in
+      let rule = Rule.make ~info ~targets build in
+      Rules.of_rules [ rule ])
 ;;
 
 let exported_env context =

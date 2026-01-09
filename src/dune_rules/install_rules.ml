@@ -1430,13 +1430,27 @@ let scheme_per_ctx_memo =
 ;;
 
 let symlink_rules sctx ~dir =
-  let+ rules, subdirs =
+  let* scheme_rules, subdirs =
     Memo.exec scheme_per_ctx_memo sctx >>= Scheme.Evaluated.get_rules ~dir
   in
-  ( Subdir_set.of_set subdirs
-  , match rules with
+  let scheme_rules =
+    match scheme_rules with
     | None -> Rules.empty
-    | Some rules -> Rules.of_dir_rules ~dir rules )
+    | Some rules -> Rules.of_dir_rules ~dir rules
+  in
+  (* For the default context, also include dev tool install rules.
+     Dev tools install their binaries to _build/install/default/bin/ *)
+  let context = Super_context.context sctx |> Context.build_context in
+  let+ dev_tool_rules =
+    if Context_name.equal context.name Context_name.default
+    then
+      (* Generate install rules for all dev tools *)
+      Dune_pkg.Dev_tool.all
+      |> Memo.parallel_map ~f:Pkg_rules.dev_tool_install_rules
+      >>| List.fold_left ~init:Rules.empty ~f:Rules.union
+    else Memo.return Rules.empty
+  in
+  Subdir_set.of_set subdirs, Rules.union scheme_rules dev_tool_rules
 ;;
 
 let gen_install_alias sctx (package : Package.t) =
