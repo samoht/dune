@@ -1974,10 +1974,16 @@ module Install_action = struct
           match install_action with
           | `No_install_action -> Section.Map.empty
           | `Has_install_action ->
-            (* Install action wrote to target_dir, scan it for installed files *)
+            (* Install action wrote to target_dir, scan it for installed files.
+               Use the actual target_dir path, not Paths.of_root which would
+               create nested directories. *)
+            let roots =
+              Install.Roots.opam_from_prefix
+                ~relative:Path.relative
+                (Path.build target_dir)
+            in
             let install_paths =
-              Paths.of_root package ~root:(Path.build target_dir) ~relative:Path.relative
-              |> Paths.install_paths
+              Install.Paths.make ~relative:Path.relative ~package ~roots
             in
             section_map_of_dir install_paths
         in

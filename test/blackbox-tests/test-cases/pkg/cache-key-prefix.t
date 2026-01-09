@@ -80,23 +80,38 @@ Test that the installed marker file contains metadata:
   version: 0.0.1
   prefix: _build/install/default
 
-Test that files written to PREFIX during build end up in target_dir:
+Test that files written to PREFIX during build are tracked in cookie and copied to shared prefix:
 
-  $ make_lockpkg targettest <<EOF
+  $ make_lockpkg copytest <<EOF
   > (version 0.0.1)
   > (build
-  >  (run sh -c "mkdir -p \$PREFIX/bin && echo 'hello' > \$PREFIX/bin/mytool"))
+  >  (run sh -c "mkdir -p \$PREFIX/bin && echo 'hello from copytest' > \$PREFIX/bin/copytest"))
   > (install
   >  (run sh -c "echo installed"))
   > EOF
 
-  $ build_pkg targettest
+  $ build_pkg copytest
   installed
 
 The file should exist in the target directory:
 
-  $ cat "$(get_build_pkg_dir targettest)/target/bin/mytool"
-  hello
+  $ cat "$(get_build_pkg_dir copytest)/target/bin/copytest"
+  hello from copytest
+
+Check what's in the cookie (should list the bin/copytest file):
+
+  $ show_pkg_cookie copytest
+  { files =
+      [ (BIN,
+         [ In_build_dir ".pkgs/default/copytest.0.0.1/target/bin/copytest" ])
+      ]
+  ; variables = []
+  }
+
+The file should be copied to the shared install directory:
+
+  $ cat _build/install/default/bin/copytest
+  hello from copytest
 
 Test BUILD_PATH_PREFIX_MAP contains the expected mappings:
 
