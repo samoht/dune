@@ -22,3 +22,7 @@ val action
   -> prefix:Path.t
   -> ocamlfind_destdir:Path.t
   -> Action.t
+
+(** System action with BUILD_PATH_PREFIX_MAP for relocatable builds.
+    Uses canonical placeholders in cache key for cross-project cache sharing. *)
+val system_action : cmd:string -> prefix:Path.t -> ocamlfind_destdir:Path.t -> Action.t

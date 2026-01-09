@@ -974,24 +974,12 @@ module Action_expander = struct
       let+ cmd =
         Expander.expand_pform_gen ~mode:Single expander arg >>| Value.to_string ~dir
       in
-      (* Wrap System actions with BUILD_PATH_PREFIX_MAP for relocatable builds.
-         Match Run_with_path.ml's mappings for consistency. *)
+      (* Use Run_with_path.system_action for proper cache key handling.
+         BUILD_PATH_PREFIX_MAP is set at execution time, while cache key uses
+         canonical placeholders for cross-project cache sharing. *)
       let prefix, roots = get_install_prefix_and_roots () in
-      let prefix_value = Path.to_string prefix in
-      let ocamlfind_destdir_value = Path.Build.to_string roots.lib_root in
-      let build_path_prefix_map =
-        Build_path_prefix_map.encode_map
-          [ Some
-              { Build_path_prefix_map.source = ocamlfind_destdir_value
-              ; target = "/OPAMROOT/lib"
-              }
-          ; Some { source = prefix_value; target = "/OPAMROOT" }
-          ]
-      in
-      Action.Setenv
-        ( Dune_util.Build_path_prefix_map._BUILD_PATH_PREFIX_MAP
-        , build_path_prefix_map
-        , System.action cmd )
+      let ocamlfind_destdir = Path.build roots.lib_root in
+      Run_with_path.system_action ~cmd ~prefix ~ocamlfind_destdir
     | Patch p ->
       let+ patch =
         Expander.expand_pform_gen ~mode:Single expander p >>| Value.to_path ~dir
@@ -1173,6 +1161,37 @@ module Action_expander = struct
     =
     let+ action =
       let expander = expander context pkg in
+      (* When install_prefix is provided, update the expander's paths so that
+         %{prefix}%, %{lib}%, etc. expand to the install prefix location.
+         This ensures install commands write to target_dir for caching. *)
+      let expander =
+        match install_prefix with
+        | None -> expander
+        | Some target_dir ->
+          let prefix = Path.build target_dir in
+          Log.info
+            "Action_expander: setting prefix to target_dir"
+            [ "target_dir", Dyn.string (Path.Build.to_string target_dir)
+            ; "prefix", Dyn.string (Path.to_string prefix)
+            ];
+          let install_roots =
+            Install.Roots.opam_from_prefix ~relative:Path.relative prefix
+          in
+          let install_paths =
+            Install.Paths.make
+              ~relative:Path.relative
+              ~package:pkg.info.name
+              ~roots:install_roots
+          in
+          { expander with
+            paths =
+              { expander.paths with
+                prefix
+              ; install_roots = lazy install_roots
+              ; install_paths = lazy install_paths
+              }
+          }
+      in
       let+ action = expand ?install_prefix action ~expander in
       if chdir then Action.chdir pkg.paths.source_dir action else action
     in

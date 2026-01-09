@@ -148,7 +148,7 @@ module Spec = struct
     }
 
   let name = "run-with-path"
-  let version = 3
+  let version = 4
 
   let map_arg arg ~f =
     Array.Immutable.map arg ~f:(function
@@ -167,7 +167,13 @@ module Spec = struct
 
   let is_useful_to ~memoize:_ = true
 
-  let encode { prog; args; prefix; ocamlfind_destdir; pkg = _; depexts = _ } path _
+  (* For cache key computation, use canonical placeholders for prefix paths.
+     This enables cache sharing across projects since BUILD_PATH_PREFIX_MAP
+     ensures outputs are relocatable. The actual paths are used at execution time. *)
+  let encode
+        { prog; args; prefix = _; ocamlfind_destdir = _; pkg = _; depexts = _ }
+        path
+        _
     : Sexp.t
     =
     let prog : Sexp.t =
@@ -182,7 +188,9 @@ module Spec = struct
              | String s -> Sexp.Atom s
              | Path p -> path p)))
     in
-    List [ List ([ prog ] @ args); path prefix; path ocamlfind_destdir ]
+    (* Use canonical placeholders - actual paths don't affect build output
+       because BUILD_PATH_PREFIX_MAP makes outputs relocatable *)
+    List [ List ([ prog ] @ args); Atom "/PREFIX"; Atom "/OCAMLFIND_DESTDIR" ]
   ;;
 
   let action
@@ -267,4 +275,75 @@ module A = Action_ext.Make (Spec)
 
 let action ~pkg ~depexts prog args ~prefix ~ocamlfind_destdir =
   A.action { Spec.prog; args; prefix; ocamlfind_destdir; pkg; depexts }
+;;
+
+(* System_spec: like Spec but for shell commands (system actions).
+   Separates cache key from execution-time prefix values for cross-project caching. *)
+module System_spec = struct
+  type ('path, 'target) t =
+    { cmd : string
+    ; prefix : 'path
+    ; ocamlfind_destdir : 'path
+    }
+
+  let name = "system-with-path"
+  let version = 1
+
+  let bimap t f _g =
+    { t with prefix = f t.prefix; ocamlfind_destdir = f t.ocamlfind_destdir }
+  ;;
+
+  let is_useful_to ~memoize:_ = true
+
+  (* For cache key computation, use canonical placeholders for prefix paths.
+     This enables cache sharing across projects since BUILD_PATH_PREFIX_MAP
+     ensures outputs are relocatable. The actual paths are used at execution time. *)
+  let encode { cmd; prefix = _; ocamlfind_destdir = _ } _path _ : Sexp.t =
+    (* Use canonical placeholders - actual paths don't affect build output
+       because BUILD_PATH_PREFIX_MAP makes outputs relocatable *)
+    List [ Atom cmd; Atom "/PREFIX"; Atom "/OCAMLFIND_DESTDIR" ]
+  ;;
+
+  let action
+        { cmd; prefix; ocamlfind_destdir }
+        ~(ectx : Action.context)
+        ~(eenv : Action.env)
+    =
+    let open Fiber.O in
+    let prefix_value = Path.to_absolute_filename prefix in
+    let ocamlfind_destdir_value = Path.to_absolute_filename ocamlfind_destdir in
+    (* Set up BUILD_PATH_PREFIX_MAP for relocatable builds *)
+    let env =
+      Dune_util.Build_path_prefix_map.extend_build_path_prefix_map
+        eenv.env
+        `New_rules_have_precedence
+        [ Some { source = prefix_value; target = "/OPAMROOT" }
+        ; Some { source = ocamlfind_destdir_value; target = "/OPAMROOT/lib" }
+        ]
+    in
+    let prog, arg =
+      Env_path.system_shell_exn ~needed_to:"interpret (system ...) actions"
+    in
+    let display = !Clflags.display in
+    Process.run
+      (Accept eenv.exit_codes)
+      prog
+      [ arg; cmd ]
+      ~display
+      ~metadata:ectx.metadata
+      ~stdout_to:eenv.stdout_to
+      ~stderr_to:eenv.stderr_to
+      ~stdin_from:eenv.stdin_from
+      ~dir:eenv.working_dir
+      ~env
+    >>| function
+    | Error _ -> ()
+    | Ok _ -> ()
+  ;;
+end
+
+module System_A = Action_ext.Make (System_spec)
+
+let system_action ~cmd ~prefix ~ocamlfind_destdir =
+  System_A.action { System_spec.cmd; prefix; ocamlfind_destdir }
 ;;
