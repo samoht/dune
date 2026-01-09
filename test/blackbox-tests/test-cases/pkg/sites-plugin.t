@@ -155,15 +155,7 @@ We should observe the same behaviour that when running test above.
   - app.0.0.1
   - plugin1.0.0.1
   $ dune build --fetch=disabled @runtest 2>&1 | dune_cmd sanitize
-  File "dune.lock/plugin1.0.0.1.pkg", line 4, characters 30-34:
-  4 |  (all_platforms ((action (run dune build -p %{pkg-self:name})))))
-                                    ^^^^
-  Error: Logs for package plugin1
-  File "plugin/dune", line 10, characters 7-20:
-  10 |  (site (app plugins)))
-              ^^^^^^^^^^^^^
-  Error: The package app is not found
-  
+  Main app starts...
 
 Should have printed:
 ```

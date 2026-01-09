@@ -71,9 +71,9 @@ Build:
 
   $ dune build @pkg-install 2>&1
 
-Check cookie was created (now at root level, sibling of target/):
+Check cookie was created (inside target/ directory):
 
-  $ test -f _build/.pkgs/default/var-pkg.1.2.3/cookie && echo "cookie exists"
+  $ test -f _build/.pkgs/default/var-pkg.1.2.3/target/cookie && echo "cookie exists"
   cookie exists
 
 Check that variables were expanded correctly:

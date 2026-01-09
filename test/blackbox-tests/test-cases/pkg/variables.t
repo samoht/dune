@@ -31,14 +31,21 @@ Test that we can set variables
   > EOF
 
   $ build_pkg usetest
-  File "_build/.locks/default/dune.lock/usetest.pkg", line 5, characters 26-43:
-  5 |   (system "\| echo abool: %{pkg:test:abool}
-                                ^^^^^^^^^^^^^^^^^
-  Error: Undefined package variable: abool
-  [1]
+  abool: true
+  astring: foobar
+  somestrings: foo bar
+  share path: ../../../../install/default/share/test
+  version: 1.2.3
 
   $ show_pkg_cookie test
-  { files = []; variables = [] }
+  { files = []
+  ; variables =
+      [ ("abool", Bool true)
+      ; ("astring", String "foobar")
+      ; ("somestrings", Strings [ "foo"; "bar" ])
+      ; ("version", String "1.2.3")
+      ]
+  }
 
 Now we demonstrate we get a proper error from invalid .config files:
 
@@ -52,4 +59,11 @@ Now we demonstrate we get a proper error from invalid .config files:
   > EOF
 
   $ build_pkg test 2>&1 | dune_cmd subst 'File .*:' 'File $REDACTED:'
-  
+  Error:
+  File $REDACTED:
+  1 | this is dummy text
+           ^^
+  Error parsing test.config
+  Reason: Parse error
+  -> required by _build/.pkgs/default/test.0.0.1/target/cookie
+  -> required by _build/.pkgs/default/test.0.0.1/installed

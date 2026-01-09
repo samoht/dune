@@ -37,8 +37,8 @@ build_pkg() {
   prefix=$(get_build_pkg_dir $1)
   status=$?
   if [ "$status" -eq "0" ]; then
-    # Build the cookie file which triggers the full package build+install
-    $dune build "$prefix/cookie"
+    # Build the installed marker which triggers the full package build+install+copy-to-prefix
+    $dune build "$prefix/installed"
   else
     return 1
   fi
@@ -60,8 +60,8 @@ show_pkg_targets() {
 }
 
 show_pkg_cookie() {
-  # Cookie is now at root level (sibling of target/)
-  $dune internal dump "$(get_build_pkg_dir $1)/cookie"
+  # Cookie is inside target/ directory
+  $dune internal dump "$(get_build_pkg_dir $1)/target/cookie"
 }
 
 mock_packages="mock-opam-repository/packages"

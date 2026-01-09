@@ -81,106 +81,24 @@ Also test that XDG_CACHE_HOME is respected.
 Disable auto-fetch to prevent creating duniverse/ which would interfere
 with the second run's package detection.
   $ XDG_CACHE_HOME=$PWD/fake-cache DUNE_CONFIG__TOOLCHAINS=enabled DUNE_CONFIG__AUTO_FETCH=disabled build_pkg ocaml-base-compiler
-  Internal error, please report upstream including the contents of _build/log.
-  Description:
-    ("[as_in_build_dir_exn] called on something not in build dir",
-     { t =
-         External
-           "$TESTCASE_ROOT/fake-cache/dune/toolchains/ocaml-base-compiler.1-995989dcb5de9e383cd0dea0034da8a1/target/lib/ocaml-base-compiler"
-     })
-  Raised at Stdune__Code_error.raise in file
-    "otherlibs/stdune/src/code_error.ml", line 10, characters 30-62
-  Called from Dune_rules__Pkg_rules.build_only_rule.(fun) in file
-    "src/dune_rules/pkg_rules.ml", line 2249, characters 6-73
-  Called from Stdlib__List.rev_map.rmap_f in file "list.ml", line 107,
-    characters 22-25
-  Called from Dune_rules__Pkg_rules.build_only_rule in file
-    "src/dune_rules/pkg_rules.ml", lines 2247-2249, characters 4-90
-  Called from Fiber__Core.O.(>>|).(fun) in file "src/fiber/src/core.ml", line
-    257, characters 36-41
-  Called from Fiber__Scheduler.exec in file "src/fiber/src/scheduler.ml", line
-    76, characters 8-11
-  Re-raised at Stdune__Exn.raise_with_backtrace in file
-    "otherlibs/stdune/src/exn.ml", line 38, characters 27-56
-  Called from Fiber__Scheduler.exec in file "src/fiber/src/scheduler.ml", line
-    76, characters 8-11
-  Re-raised at Stdune__Exn.raise_with_backtrace in file
-    "otherlibs/stdune/src/exn.ml", line 38, characters 27-56
-  Called from Fiber__Scheduler.exec in file "src/fiber/src/scheduler.ml", line
-    76, characters 8-11
-  Re-raised at Stdune__Exn.raise_with_backtrace in file
-    "otherlibs/stdune/src/exn.ml", line 38, characters 27-56
-  Called from Fiber__Scheduler.exec in file "src/fiber/src/scheduler.ml", line
-    76, characters 8-11
-  Re-raised at Stdune__Exn.raise_with_backtrace in file
-    "otherlibs/stdune/src/exn.ml", line 38, characters 27-56
-  Called from Fiber__Scheduler.exec in file "src/fiber/src/scheduler.ml", line
-    76, characters 8-11
-  -> required by ("<unnamed>", ())
-  -> required by
-     ("load-dir", In_build_dir ".pkgs/default/ocaml-base-compiler.1")
-  -> required by ("toplevel", ())
-  
-  I must not crash.  Uncertainty is the mind-killer. Exceptions are the
-  little-death that brings total obliteration.  I will fully express my cases. 
-  Execution will pass over me and through me.  And when it has gone past, I
-  will unwind the stack along its path.  Where the cases are handled there will
-  be nothing.  Only I will remain.
-  [1]
 
 Enumerate the contents of the fake toolchains directory:
   $ find fake-cache/dune/toolchains | sort | remove_hash
   fake-cache/dune/toolchains
+  fake-cache/dune/toolchains/ocaml-base-compiler.1-HASH
+  fake-cache/dune/toolchains/ocaml-base-compiler.1-HASH/target
+  fake-cache/dune/toolchains/ocaml-base-compiler.1-HASH/target/bin
+  fake-cache/dune/toolchains/ocaml-base-compiler.1-HASH/target/bin/ocamlc
+  fake-cache/dune/toolchains/ocaml-base-compiler.1-HASH/target/cookie
 
 Also test that DUNE_CACHE_ROOT is respected.
   $ DUNE_CACHE_ROOT=$PWD/other-fake-cache DUNE_CONFIG__TOOLCHAINS=enabled DUNE_CONFIG__AUTO_FETCH=disabled build_pkg ocaml-base-compiler
-  Internal error, please report upstream including the contents of _build/log.
-  Description:
-    ("[as_in_build_dir_exn] called on something not in build dir",
-     { t =
-         External
-           "$TESTCASE_ROOT/other-fake-cache/toolchains/ocaml-base-compiler.1-995989dcb5de9e383cd0dea0034da8a1/target/lib/ocaml-base-compiler"
-     })
-  Raised at Stdune__Code_error.raise in file
-    "otherlibs/stdune/src/code_error.ml", line 10, characters 30-62
-  Called from Dune_rules__Pkg_rules.build_only_rule.(fun) in file
-    "src/dune_rules/pkg_rules.ml", line 2249, characters 6-73
-  Called from Stdlib__List.rev_map.rmap_f in file "list.ml", line 107,
-    characters 22-25
-  Called from Dune_rules__Pkg_rules.build_only_rule in file
-    "src/dune_rules/pkg_rules.ml", lines 2247-2249, characters 4-90
-  Called from Fiber__Core.O.(>>|).(fun) in file "src/fiber/src/core.ml", line
-    257, characters 36-41
-  Called from Fiber__Scheduler.exec in file "src/fiber/src/scheduler.ml", line
-    76, characters 8-11
-  Re-raised at Stdune__Exn.raise_with_backtrace in file
-    "otherlibs/stdune/src/exn.ml", line 38, characters 27-56
-  Called from Fiber__Scheduler.exec in file "src/fiber/src/scheduler.ml", line
-    76, characters 8-11
-  Re-raised at Stdune__Exn.raise_with_backtrace in file
-    "otherlibs/stdune/src/exn.ml", line 38, characters 27-56
-  Called from Fiber__Scheduler.exec in file "src/fiber/src/scheduler.ml", line
-    76, characters 8-11
-  Re-raised at Stdune__Exn.raise_with_backtrace in file
-    "otherlibs/stdune/src/exn.ml", line 38, characters 27-56
-  Called from Fiber__Scheduler.exec in file "src/fiber/src/scheduler.ml", line
-    76, characters 8-11
-  Re-raised at Stdune__Exn.raise_with_backtrace in file
-    "otherlibs/stdune/src/exn.ml", line 38, characters 27-56
-  Called from Fiber__Scheduler.exec in file "src/fiber/src/scheduler.ml", line
-    76, characters 8-11
-  -> required by ("<unnamed>", ())
-  -> required by
-     ("load-dir", In_build_dir ".pkgs/default/ocaml-base-compiler.1")
-  -> required by ("toplevel", ())
-  
-  I must not crash.  Uncertainty is the mind-killer. Exceptions are the
-  little-death that brings total obliteration.  I will fully express my cases. 
-  Execution will pass over me and through me.  And when it has gone past, I
-  will unwind the stack along its path.  Where the cases are handled there will
-  be nothing.  Only I will remain.
-  [1]
 
 Enumerate the contents of the fake toolchains directory:
   $ find other-fake-cache/toolchains/ | sort | remove_hash
   other-fake-cache/toolchains/
+  other-fake-cache/toolchains/ocaml-base-compiler.1-HASH
+  other-fake-cache/toolchains/ocaml-base-compiler.1-HASH/target
+  other-fake-cache/toolchains/ocaml-base-compiler.1-HASH/target/bin
+  other-fake-cache/toolchains/ocaml-base-compiler.1-HASH/target/bin/ocamlc
+  other-fake-cache/toolchains/ocaml-base-compiler.1-HASH/target/cookie

@@ -408,10 +408,10 @@ let marker_for_package ~context pkg_name =
       | None -> Package_version.of_string "dev"
       | Some info -> info.version
     in
-    (* _build/.pkgs/<ctx>/<name>.<version>/cookie (root level, sibling of target/) *)
+    (* _build/.pkgs/<ctx>/<name>.<version>/installed (marker at root level, sibling of target/) *)
     let root = pkg_build_root ~context ~pkg_name ~pkg_version:version in
-    (* Cookie is now at root level *)
-    Some (Path.Build.relative root "cookie"))
+    (* Installed marker at root level *)
+    Some (Path.Build.relative root "installed"))
   else None
 ;;
 

@@ -196,13 +196,19 @@ module Paths = struct
   let root_of_target_dir target_dir = Path.Build.parent_exn target_dir
   let root_of_target_dir_path target_dir = Path.parent_exn target_dir
 
-  (* Cookie path at root level (sibling of target/) for split rules *)
-  let install_cookie_root_build target_dir =
-    Path.Build.relative (root_of_target_dir target_dir) "cookie"
+  (* Cookie path inside target_dir - gets cached with the installed files.
+     The cookie contains the list of installed files and package variables. *)
+  let install_cookie_build target_dir = Path.Build.relative target_dir "cookie"
+  let install_cookie target_dir = Path.relative target_dir "cookie"
+
+  (* Installed marker at root level - produced by copy_to_prefix rule.
+     This marker indicates that files have been copied to the shared prefix. *)
+  let installed_marker_build target_dir =
+    Path.Build.relative (root_of_target_dir target_dir) "installed"
   ;;
 
-  let install_cookie_root target_dir =
-    Path.relative (root_of_target_dir_path target_dir) "cookie"
+  let installed_marker target_dir =
+    Path.relative (root_of_target_dir_path target_dir) "installed"
   ;;
 
   let install_file t =
@@ -470,7 +476,8 @@ module Resolved_pkg = struct
     | Some root -> loop root Path.Local.Set.empty Path.Local.root
   ;;
 
-  let dep t = Dep.file (Paths.install_cookie_root t.paths.target_dir)
+  (* Depend on the installed marker, which indicates files are in shared prefix *)
+  let dep t = Dep.file (Paths.installed_marker t.paths.target_dir)
 
   let package_deps t =
     deps_closure t
@@ -557,8 +564,8 @@ module Pkg_installed = struct
   let of_paths (paths : Path.t Paths.t) =
     let cookie =
       let open Action_builder.O in
-      (* Cookie is now at root level (sibling of target/) *)
-      let path = Paths.install_cookie_root paths.target_dir in
+      (* Cookie is inside target_dir, gets cached with installed files *)
+      let path = Paths.install_cookie paths.target_dir in
       let+ () = path |> Dep.file |> Action_builder.dep in
       Install_cookie.load_exn path
     in
@@ -898,8 +905,22 @@ module Action_expander = struct
     ;;
   end
 
-  let rec expand (action : Dune_lang.Action.t) ~(expander : Expander.t) =
+  (* [install_prefix] is where install commands write to. If None, uses the
+     shared install directory. For caching, this should be set to target_dir
+     so installed files can be cached independently of the shared prefix. *)
+  let rec expand ?install_prefix (action : Dune_lang.Action.t) ~(expander : Expander.t) =
     let dir = expander.paths.source_dir in
+    (* Determine the actual install prefix and roots to use *)
+    let get_install_prefix_and_roots () =
+      match install_prefix with
+      | Some prefix ->
+        let roots = Install.Roots.opam_from_prefix ~relative:Path.Build.relative prefix in
+        Path.build prefix, roots
+      | None ->
+        let shared_roots = Pkg_opam.Pkg_install.roots_build ~context:expander.context in
+        let prefix = Pkg_opam.Pkg_install.dir ~context:expander.context |> Path.build in
+        prefix, shared_roots
+    in
     match action with
     | Run args ->
       Expander.eval_slangs_located expander args
@@ -937,11 +958,8 @@ module Action_expander = struct
                | String s -> Run_with_path.Spec.String s
                | Path p | Dir p -> Path p))
          in
-         (* Use shared install directory for PREFIX and OCAMLFIND_DESTDIR so packages
-            can find files installed by dependencies *)
-         let shared_roots = Pkg_opam.Pkg_install.roots_build ~context:expander.context in
-         let prefix = Pkg_opam.Pkg_install.dir ~context:expander.context |> Path.build in
-         let ocamlfind_destdir = Path.build shared_roots.lib_root in
+         let prefix, roots = get_install_prefix_and_roots () in
+         let ocamlfind_destdir = Path.build roots.lib_root in
          Run_with_path.action
            ~depexts
            ~pkg:(expander.name, prog_loc)
@@ -950,7 +968,7 @@ module Action_expander = struct
            ~prefix
            ~ocamlfind_destdir)
     | Progn t ->
-      let+ args = Memo.parallel_map t ~f:(expand ~expander) in
+      let+ args = Memo.parallel_map t ~f:(expand ?install_prefix ~expander) in
       Action.Progn args
     | System arg ->
       let+ cmd =
@@ -958,9 +976,8 @@ module Action_expander = struct
       in
       (* Wrap System actions with BUILD_PATH_PREFIX_MAP for relocatable builds.
          Match Run_with_path.ml's mappings for consistency. *)
-      let prefix = Pkg_opam.Pkg_install.dir ~context:expander.context in
-      let roots = Pkg_opam.Pkg_install.roots_build ~context:expander.context in
-      let prefix_value = Path.Build.to_string prefix in
+      let prefix, roots = get_install_prefix_and_roots () in
+      let prefix_value = Path.to_string prefix in
       let ocamlfind_destdir_value = Path.Build.to_string roots.lib_root in
       let build_path_prefix_map =
         Build_path_prefix_map.encode_map
@@ -989,11 +1006,11 @@ module Action_expander = struct
         >>| Expander0.as_in_build_dir ~what:"substitute" ~loc:(String_with_vars.loc dst)
       in
       Substitute.action expander ~src ~dst
-    | Withenv (updates, action) -> expand_withenv expander updates action
+    | Withenv (updates, action) -> expand_withenv ?install_prefix expander updates action
     | When (condition, action) ->
       Expander.eval_blang expander condition
       >>= (function
-       | true -> expand action ~expander
+       | true -> expand ?install_prefix action ~expander
        | false -> Memo.return (Action.progn []))
     | Write_file (path_sw, perm, contents_sw) ->
       let+ path =
@@ -1012,7 +1029,7 @@ module Action_expander = struct
         "Pkg_rules.action_expander.expand: unsupported action"
         [ "action", Dune_lang.Action.to_dyn action ]
 
-  and expand_withenv (expander : Expander.t) updates action =
+  and expand_withenv ?install_prefix (expander : Expander.t) updates action =
     let* env, updates =
       let dir = expander.paths.source_dir in
       Memo.List.fold_left
@@ -1041,7 +1058,7 @@ module Action_expander = struct
     in
     let+ action =
       let expander = { expander with env } in
-      expand action ~expander
+      expand ?install_prefix action ~expander
     in
     List.fold_left updates ~init:action ~f:(fun action (k, v) ->
       Action.Setenv (k, v, action))
@@ -1135,12 +1152,6 @@ module Action_expander = struct
     }
   ;;
 
-  (* Install commands write to the shared PREFIX directory, which is an absolute
-     path outside the sandbox, so they work regardless of sandbox mode. Use
-     no_special_requirements to avoid conflicting with build_sandbox when actions
-     are combined via Action_builder.progn (which intersects sandbox configs). *)
-  let install_sandbox = Sandbox_config.no_special_requirements
-
   (* Build commands require Copy sandbox mode to get a writable copy of the
      source directory. Symlink/Hardlink modes won't work because source files
      from tarballs are often read-only, and symlinks/hardlinks preserve that.
@@ -1151,8 +1162,9 @@ module Action_expander = struct
       | Some Symlink | Some Hardlink | None | Some Patch_back_source_tree -> false)
   ;;
 
-  let expand
+  let expand_action
         ?(can_go_in_shared_cache = true)
+        ?install_prefix
         ~sandbox
         ?(chdir = true)
         context
@@ -1161,11 +1173,9 @@ module Action_expander = struct
     =
     let+ action =
       let expander = expander context pkg in
-      let+ action = expand action ~expander in
+      let+ action = expand ?install_prefix action ~expander in
       if chdir then Action.chdir pkg.paths.source_dir action else action
     in
-    (* TODO copying is needed for build systems that aren't dune and those
-       with an explicit install step *)
     Action.Full.make ~sandbox ~can_go_in_shared_cache action
     |> Action_builder.return
     |> Action_builder.with_no_targets
@@ -1179,10 +1189,17 @@ module Action_expander = struct
   ;;
 
   let build_command context (pkg : Resolved_pkg.t) =
-    (* Build commands run sandboxed for isolation. They can still access
-       PREFIX via absolute path since it's outside the sandbox. *)
+    (* Build commands run sandboxed for isolation.
+       - WITH install action: PREFIX=target_dir (consistent with install, cacheable)
+       - WITHOUT install action: PREFIX=shared (to find dependencies) *)
+    let install_prefix =
+      match pkg.install_command with
+      | Some _ -> Some pkg.write_paths.target_dir
+      | None -> None
+    in
     Option.map pkg.build_command ~f:(function
-      | Action action -> expand ~sandbox:build_sandbox context pkg action
+      | Action action ->
+        expand_action ?install_prefix ~sandbox:build_sandbox context pkg action
       | Dune ->
         (* CR-someday rgrinberg: respect [dune subst] settings. *)
         Command.run_dyn_prog
@@ -1192,13 +1209,19 @@ module Action_expander = struct
         |> Memo.return)
   ;;
 
-  let install_command context (pkg : Resolved_pkg.t) =
-    (* Install commands run without sandbox because they write to the shared
-       PREFIX directory which is outside the package's target directory.
-       They also cannot go in shared cache since their side effects (writes to PREFIX)
-       are not captured by declared targets. *)
+  (* Install command that writes to target_dir for caching.
+     The target_dir becomes the cacheable artifact - installed files are later
+     copied to the shared prefix by a separate non-cached rule. *)
+  let install_command_to_target_dir context (pkg : Resolved_pkg.t) =
     Option.map pkg.install_command ~f:(fun action ->
-      expand ~can_go_in_shared_cache:false ~sandbox:install_sandbox context pkg action)
+      (* Install to target_dir instead of shared prefix for caching *)
+      expand_action
+        ~can_go_in_shared_cache:true
+        ~install_prefix:pkg.write_paths.target_dir
+        ~sandbox:build_sandbox
+        context
+        pkg
+        action)
   ;;
 
   let exported_env (expander : Expander.t) (env : _ Env_update.t) =
@@ -1874,11 +1897,12 @@ module Install_action = struct
         |> List.map ~f:(fun (name, value) -> Package_variable_name.of_opam name, value)
     ;;
 
+    (* Install a single entry from .install file to target_dir.
+       The copy to shared prefix is handled by copy_to_prefix_rule. *)
     let install_entry
           ~src
           ~install_file
           ~target_dir
-          ~prefix_dir
           (entry : Path.t Install.Entry.Expanded.t)
       =
       match Path.Untracked.exists src, entry.optional with
@@ -1892,21 +1916,7 @@ module Install_action = struct
               (Path.to_string install_file)
           ]
       | true, _ ->
-        (* Copy to target_dir for caching *)
-        let dst_target = prepare_copy ~install_file ~target_dir entry in
-        (* Also compute destination in prefix_dir for global installation *)
-        let dst_prefix =
-          let package =
-            Path.basename install_file
-            |> Filename.remove_extension
-            |> Package.Name.of_string
-          in
-          let roots = Install.Roots.opam_from_prefix ~relative:Path.relative prefix_dir in
-          let paths = Install.Paths.make ~relative:Path.relative ~package ~roots in
-          let dst = Install.Entry.relative_installed_path entry ~paths in
-          Path.mkdir_p (Path.parent_exn dst);
-          dst
-        in
+        let dst = prepare_copy ~install_file ~target_dir entry in
         let src =
           match Path.to_string src |> Unix.readlink with
           | exception Unix.Unix_error (_, _, _) -> src
@@ -1916,17 +1926,14 @@ module Install_action = struct
                Filename.concat (Path.to_absolute_filename base) link
                |> Path.External.of_string)
         in
-        (* Copy to target_dir for caching *)
-        Io.portable_hardlink ~src ~dst:dst_target;
-        maybe_set_executable entry.section dst_target;
-        (* Copy to prefix_dir for global installation (if different from target) *)
-        if not (Path.equal dst_target dst_prefix)
-        then (
-          Io.portable_hardlink ~src ~dst:dst_prefix;
-          maybe_set_executable entry.section dst_prefix);
-        Some (entry.section, dst_target)
+        Io.portable_hardlink ~src ~dst;
+        maybe_set_executable entry.section dst;
+        Some (entry.section, dst)
     ;;
 
+    (* Process install action: scan target_dir for installed files and create cookie.
+       All files are installed to target_dir only - copying to shared prefix is done
+       by a separate rule to enable caching of target_dir contents. *)
     let action
           { package
           ; install_file
@@ -1941,23 +1948,16 @@ module Install_action = struct
       =
       let open Fiber.O in
       let* () = Fiber.return () in
-      (* Compute prefix_dir: where installed files should go for global installation.
-         This is either the shared install directory or the toolchain cache. *)
-      let prefix_dir =
-        match prefix_outside_build_dir with
-        | Some prefix_outside_build_dir -> Path.outside_build_dir prefix_outside_build_dir
-        | None -> prefix
-      in
+      (* For install actions, scan target_dir (where PREFIX pointed during install).
+         The install command ran with PREFIX=target_dir so files are there. *)
       let* files =
         let from_install_action =
-          (* Install actions write to the prefix directory (which is either the
-             shared install directory or the toolchain cache for cached toolchains).
-             Look there for installed files. *)
           match install_action with
           | `No_install_action -> Section.Map.empty
           | `Has_install_action ->
+            (* Install action wrote to target_dir, scan it for installed files *)
             let install_paths =
-              Paths.of_root package ~root:prefix_dir ~relative:Path.relative
+              Paths.of_root package ~root:(Path.build target_dir) ~relative:Path.relative
               |> Paths.install_paths
             in
             section_map_of_dir install_paths
@@ -1987,7 +1987,7 @@ module Install_action = struct
                 |> List.concat
                 |> Fiber.parallel_map ~f:(fun (src, entry) ->
                   Async.async (fun () ->
-                    install_entry ~src ~install_file ~target_dir ~prefix_dir entry))
+                    install_entry ~src ~install_file ~target_dir entry))
                 >>| List.filter_opt
               in
               List.rev_map install_entries ~f:(fun (section, file) ->
@@ -2001,7 +2001,7 @@ module Install_action = struct
             map
         in
         (* Combine the artifacts declared in the .install, and the ones we discovered
-           by runing the install action *)
+           by running the install action *)
         (* TODO we should make sure that overwrites aren't allowed *)
         Section.Map.union from_install_action from_install_file ~f:(fun _ x y ->
           Some (x @ y))
@@ -2012,7 +2012,7 @@ module Install_action = struct
         { Install_cookie.Gen.files; variables }
       in
       (* Produce the cookie file at root level (sibling of target/) for split rules *)
-      let cookie_file = Path.build @@ Paths.install_cookie_root_build target_dir in
+      let cookie_file = Path.build @@ Paths.install_cookie_build target_dir in
       let* () =
         Async.async (fun () ->
           cookie_file |> Path.parent_exn |> Path.mkdir_p;
@@ -2175,12 +2175,6 @@ let files path =
   Dep.Set.of_source_files ~files ~empty_directories, files
 ;;
 
-(* Sandbox mode for install-related actions. These actions write to the shared
-   PREFIX directory, which is an absolute path outside the sandbox, so they
-   work regardless of sandbox mode. Use no_special_requirements to avoid
-   conflicting with build_sandbox when actions are combined. *)
-let install_action_sandbox = Sandbox_config.no_special_requirements
-
 let dune_dep =
   lazy (Sys.executable_name |> Path.External.of_string |> Path.external_ |> Dep.file)
 ;;
@@ -2188,17 +2182,21 @@ let dune_dep =
 (* Build sandbox mode - restricts writes to declared targets *)
 let build_sandbox = Sandbox_config.needs_sandboxing
 
-(* Marker file path at root level (sibling of target/) to signal build completion *)
-let build_marker_path (pkg : Resolved_pkg.t) =
-  Path.Build.relative
-    (Paths.root_of_target_dir pkg.write_paths.target_dir)
-    ".dune-pkg-build-done"
+(* Cookie file path inside target_dir *)
+let install_cookie_path (pkg : Resolved_pkg.t) =
+  Paths.install_cookie_build pkg.write_paths.target_dir
 ;;
 
-(* Rule 1: Build rule (sandboxed) - copies sources and runs build command.
-   Produces target_dir with build outputs and a marker file. *)
-let build_only_rule context_name ~source_deps (pkg : Resolved_pkg.t) =
-  let+ build_action =
+(* Rule 1: Build + Install to target_dir (CACHEABLE)
+   - Copies sources
+   - Runs build command
+   - Runs install command with PREFIX=target_dir
+   - Processes .install file, scans target_dir for installed files
+   - Produces target_dir (directory target) + cookie file
+
+   This rule's output (target_dir) can be cached and restored on cache hit. *)
+let build_and_install_rule context_name ~source_deps (pkg : Resolved_pkg.t) =
+  let+ build_and_install_actions =
     let+ copy_action =
       let+ copy_action =
         let+ () = Memo.return () in
@@ -2244,10 +2242,15 @@ let build_only_rule context_name ~source_deps (pkg : Resolved_pkg.t) =
       match Action_expander.build_command context_name pkg with
       | None -> Memo.return []
       | Some build_command -> build_command >>| List.singleton
+    and+ install_action =
+      (* Install command writes to target_dir for caching *)
+      match Action_expander.install_command_to_target_dir context_name pkg with
+      | None -> Memo.return []
+      | Some install_command -> install_command >>| List.singleton
     in
-    copy_action, build_action
+    copy_action, build_action, install_action
   in
-  let copy_action, build_action = build_action in
+  let copy_action, build_action, install_action = build_and_install_actions in
   (* Action to print a progress message for the package *)
   let progress_building =
     let status = if pkg.is_cached_toolchain then `Cached else `Building in
@@ -2256,40 +2259,60 @@ let build_only_rule context_name ~source_deps (pkg : Resolved_pkg.t) =
     |> Action_builder.return
     |> Action_builder.with_no_targets
   in
-  (* Create source and target directories - needed for packages without sources *)
+  (* Create source and target directories *)
   let mkdir_pkg_dirs =
     Action.progn
       [ Action.mkdir pkg.write_paths.source_dir; Action.mkdir pkg.write_paths.target_dir ]
     |> Action.Full.make ~sandbox:build_sandbox
     |> Action_builder.With_targets.return
   in
-  (* Create install directories before build - some packages copy files during build.
-     TODO: remove when we have proper bubblewrap sandboxing that enforces build/install
-     separation. Packages should only write to target_dir during build. *)
+  (* Create install directories in target_dir before build/install.
+     Install paths now point to target_dir since that's our install prefix. *)
   let mkdir_install_dirs =
-    let install_paths = Paths.install_paths pkg.paths in
+    let target_install_paths =
+      let roots =
+        Install.Roots.opam_from_prefix
+          ~relative:Path.Build.relative
+          pkg.write_paths.target_dir
+      in
+      Install.Paths.make ~relative:Path.Build.relative ~package:pkg.info.name ~roots
+    in
     Install_action.installable_sections
     |> List.rev_map ~f:(fun section ->
-      Install.Paths.get install_paths section |> Path.as_in_build_dir_exn |> Action.mkdir)
+      Install.Paths.get target_install_paths section |> Action.mkdir)
     |> Action.progn
     |> Action.Full.make ~sandbox:build_sandbox
     |> Action_builder.With_targets.return
   in
-  (* Create marker file to signal build completion *)
-  let marker_action =
-    Action.write_file (build_marker_path pkg) ""
+  (* Process .install file and scan for installed files, create cookie.
+     All files are written to target_dir - copy_to_prefix_rule handles copying to shared prefix. *)
+  let has_install_action =
+    Option.is_some (Action_expander.install_command_to_target_dir context_name pkg)
+  in
+  let install_file_action =
+    let prefix_outside_build_dir = Path.as_outside_build_dir pkg.paths.prefix in
+    Install_action.action
+      pkg.write_paths
+      (if has_install_action then `Has_install_action else `No_install_action)
+      ~prefix:(Path.build pkg.write_paths.target_dir)
+      ~prefix_outside_build_dir
     |> Action.Full.make ~sandbox:build_sandbox
     |> Action_builder.return
-    |> Action_builder.with_file_targets ~file_targets:[ build_marker_path pkg ]
+    (* Cookie is inside target_dir, so it's implicitly a target via the directory target *)
+    |> Action_builder.with_no_targets
   in
   let actions =
     [ copy_action
     ; [ progress_building; mkdir_pkg_dirs; mkdir_install_dirs ]
     ; build_action
-    ; [ marker_action ]
+    ; install_action
+    ; [ install_file_action ]
     ]
     |> List.concat
     |> Action_builder.progn
+    (* Declare target_dir as a directory target for caching *)
+    |> Action_builder.With_targets.add_directories
+         ~directory_targets:[ pkg.write_paths.target_dir ]
   in
   let open Action_builder.With_targets.O in
   (let deps =
@@ -2312,75 +2335,164 @@ let build_only_rule context_name ~source_deps (pkg : Resolved_pkg.t) =
   >>> add_env (Resolved_pkg.exported_env pkg) actions
 ;;
 
-(* Cookie file path for the install rule *)
-let install_cookie_path (pkg : Resolved_pkg.t) =
-  Paths.install_cookie_root_build pkg.write_paths.target_dir
+(* Action spec for copying files from target_dir to shared prefix *)
+module Copy_to_prefix_action = struct
+  module Spec = struct
+    type ('path, 'target) t =
+      { cookie_file : 'path
+      ; target_dir : 'path
+      ; prefix : 'target (* shared install prefix *)
+      ; package : Package.Name.t
+      }
+
+    let name = "copy-to-prefix"
+    let version = 1
+
+    let bimap { cookie_file; target_dir; prefix; package } f g =
+      { cookie_file = f cookie_file
+      ; target_dir = f target_dir
+      ; prefix = g prefix
+      ; package
+      }
+    ;;
+
+    let is_useful_to ~memoize:_ = false (* Don't cache this action *)
+
+    let encode { cookie_file; target_dir; prefix; package } path target : Sexp.t =
+      List
+        [ path cookie_file
+        ; path target_dir
+        ; target prefix
+        ; Atom (Package.Name.to_string package)
+        ]
+    ;;
+
+    (* Copy a single file from src to dst, using hardlink with fallback to copy
+       for cross-filesystem scenarios (EXDEV error). *)
+    let copy_file ~src ~dst =
+      Path.mkdir_p (Path.parent_exn dst);
+      try Io.portable_hardlink ~src ~dst with
+      | Unix.Unix_error (Unix.EXDEV, _, _) ->
+        (* Cross-device link not permitted - fall back to copy *)
+        Io.copy_file ~src ~dst ()
+    ;;
+
+    let action { cookie_file; target_dir; prefix; package } ~ectx:_ ~eenv:_ =
+      let open Fiber.O in
+      let* () = Fiber.return () in
+      (* Read the cookie to get the list of files.
+         Provide a clear error message including the package name if loading fails. *)
+      let* cookie =
+        Async.async (fun () ->
+          match Install_cookie.Persistent.load cookie_file with
+          | Some cookie ->
+            { Install_cookie.Gen.files = Section.Map.of_list_exn cookie.files
+            ; variables = cookie.variables
+            }
+          | None ->
+            User_error.raise
+              [ Pp.textf
+                  "Failed to load install cookie for package %s"
+                  (Package.Name.to_string package)
+              ; Pp.textf "Cookie file: %s" (Path.to_string cookie_file)
+              ])
+      in
+      (* Copy each file from target_dir to prefix *)
+      let prefix_path = Path.build prefix in
+      let+ () =
+        Section.Map.to_list cookie.files
+        |> List.concat_map ~f:(fun (_section, files) -> files)
+        |> Fiber.parallel_iter ~f:(fun src_in_target ->
+          Async.async (fun () ->
+            (* src_in_target is the file path in target_dir.
+               Compute the relative path and apply it to prefix. *)
+            let target_dir_path = target_dir in
+            match Path.drop_prefix src_in_target ~prefix:target_dir_path with
+            | None ->
+              (* File is not under target_dir - might be from external source *)
+              ()
+            | Some relative ->
+              let dst = Path.append_local prefix_path relative in
+              if Path.Untracked.exists src_in_target
+              then copy_file ~src:src_in_target ~dst))
+      in
+      ()
+    ;;
+  end
+
+  module A = Action_ext.Make (Spec)
+
+  let action ~cookie_file ~target_dir ~prefix ~package =
+    A.action { Spec.cookie_file; target_dir; prefix; package }
+  ;;
+end
+
+(* Installed marker path - produced by copy_to_prefix rule *)
+let installed_marker_path (pkg : Resolved_pkg.t) =
+  Paths.installed_marker_build pkg.write_paths.target_dir
 ;;
 
-(* Rule 2: Install rule (unsandboxed) - runs install command and creates cookie.
-   Depends on build rule completion. Writes to shared install directory. *)
-let install_only_rule context_name (pkg : Resolved_pkg.t) =
-  let+ install_action =
-    let+ install_action =
-      match Action_expander.install_command context_name pkg with
-      | None -> Memo.return []
-      | Some install_action ->
-        let+ install_action = install_action in
-        (* Create directories in the shared install location *)
-        let mkdir_install_dirs =
-          let install_paths = Paths.install_paths pkg.paths in
-          Install_action.installable_sections
-          |> List.rev_map ~f:(fun section ->
-            Install.Paths.get install_paths section
-            |> Path.as_in_build_dir_exn
-            |> Action.mkdir)
-          |> Action.progn
-          |> Action.Full.make ~sandbox:install_action_sandbox
-          |> Action_builder.With_targets.return
-        in
-        [ mkdir_install_dirs; install_action ]
-    in
-    install_action
-  in
-  let install_file_action =
-    let prefix_outside_build_dir = Path.as_outside_build_dir pkg.paths.prefix in
-    Install_action.action
-      pkg.write_paths
-      (match Action_expander.install_command context_name pkg with
-       | None -> `No_install_action
-       | Some _ -> `Has_install_action)
-      ~prefix:pkg.paths.prefix
-      ~prefix_outside_build_dir
-    |> Action.Full.make ~sandbox:install_action_sandbox
-    |> Action_builder.return
-    (* Cookie is file target of this rule *)
-    |> Action_builder.with_file_targets ~file_targets:[ install_cookie_path pkg ]
-  in
-  let progress_installing =
-    Pkg_build_progress.progress_action pkg.info.name pkg.info.version `Installing
-    |> Action.Full.make ~sandbox:install_action_sandbox
+(* Rule 2: Copy from target_dir to shared prefix (NOT CACHED)
+   - Depends on cookie file (which means build+install completed)
+   - Reads cookie to get list of installed files
+   - Copies each file from target_dir to shared prefix
+   - Produces installed marker file
+
+   This rule modifies the shared install directory and should not be cached. *)
+let copy_to_prefix_rule (pkg : Resolved_pkg.t) =
+  let cookie_path = install_cookie_path pkg in
+  let shared_prefix = Pkg_opam.Pkg_install.dir ~context:pkg.context in
+  (* The copy action *)
+  let copy_action =
+    Copy_to_prefix_action.action
+      ~cookie_file:(Path.build cookie_path)
+      ~target_dir:(Path.build pkg.write_paths.target_dir)
+      ~prefix:shared_prefix
+      ~package:pkg.info.name
+    |> Action.Full.make
+         ~sandbox:Sandbox_config.no_special_requirements
+         ~can_go_in_shared_cache:false
     |> Action_builder.return
     |> Action_builder.with_no_targets
   in
-  let actions =
-    [ [ progress_installing ]; install_action; [ install_file_action ] ]
-    |> List.concat
-    |> Action_builder.progn
+  let progress_action =
+    Pkg_build_progress.progress_action pkg.info.name pkg.info.version `Installing
+    |> Action.Full.make
+         ~sandbox:Sandbox_config.no_special_requirements
+         ~can_go_in_shared_cache:false
+    |> Action_builder.return
+    |> Action_builder.with_no_targets
+  in
+  (* Create installed marker file with metadata for debugging *)
+  let marker_action =
+    let marker_contents =
+      sprintf
+        "package: %s\nversion: %s\nprefix: %s\n"
+        (Package.Name.to_string pkg.info.name)
+        (Package_version.to_string pkg.info.version)
+        (Path.Build.to_string shared_prefix)
+    in
+    Action.write_file (installed_marker_path pkg) marker_contents
+    |> Action.Full.make
+         ~sandbox:Sandbox_config.no_special_requirements
+         ~can_go_in_shared_cache:false
+    |> Action_builder.return
+    |> Action_builder.with_file_targets ~file_targets:[ installed_marker_path pkg ]
   in
   let open Action_builder.With_targets.O in
-  (* Depend on build completion marker *)
-  Action_builder.path (Path.build (build_marker_path pkg))
+  (* Depend on cookie file *)
+  Action_builder.path (Path.build cookie_path)
   |> Action_builder.with_no_targets
-  >>> add_env (Resolved_pkg.exported_env pkg) actions
+  >>> Action_builder.progn [ progress_action; copy_action; marker_action ]
 ;;
 
 let gen_rules context_name (pkg : Resolved_pkg.t) =
   let* source_deps, copy_rules = source_rules pkg in
   let* () = copy_rules
-  and* build_rule = build_only_rule context_name pkg ~source_deps
-  and* install_rule = install_only_rule context_name pkg in
-  let* () = rule ~loc:Loc.none build_rule in
-  rule ~loc:Loc.none install_rule
+  and* build_install_rule = build_and_install_rule context_name pkg ~source_deps
+  and* copy_rule = Memo.return (copy_to_prefix_rule pkg) in
+  let* () = rule ~loc:Loc.none build_install_rule in
+  rule ~loc:Loc.none copy_rule
 ;;
 
 module Gen_rules = Build_config.Gen_rules
@@ -2484,8 +2596,8 @@ module Vendor_build = struct
       let paths =
         Paths.make ~relative:Path.Build.relative pkg_digest (Dependencies ctx_name)
       in
-      (* Depend on the cookie file which is produced by the install rule *)
-      Paths.install_cookie_root_build paths.target_dir |> Path.build)
+      (* Depend on the installed marker which is produced by the copy_to_prefix rule *)
+      Paths.installed_marker_build paths.target_dir |> Path.build)
     |> Action_builder.paths
   ;;
 
@@ -2509,7 +2621,7 @@ module Vendor_build = struct
       | Some v -> Package_version.of_string (OpamPackage.Version.to_string v)
       | None -> Package_version.of_string "dev"
     in
-    (* Marker is at _build/.pkgs/<ctx>/<name>.<version>/cookie (root level, sibling of target/) *)
+    (* Marker is at _build/.pkgs/<ctx>/<name>.<version>/installed (root level, sibling of target/) *)
     Vendor_rules.marker_for_package ~context:ctx_name pkg_name
     >>| function
     | Some marker -> marker
@@ -2522,8 +2634,8 @@ module Vendor_build = struct
           (Package_version.to_string pkg_version)
       in
       let root = Path.Build.relative (build_dir ctx_name) pkg_dir in
-      (* Cookie is now at root level, sibling of target/ *)
-      Path.Build.relative root "cookie"
+      (* Installed marker at root level, sibling of target/ *)
+      Path.Build.relative root "installed"
   ;;
 
   let classify_vendor_stanzas ctx_name =
@@ -2663,18 +2775,22 @@ let setup_package_rules_from_entry
       Paths.make pkg.pkg_digest package_universe ~relative:Path.Build.relative
     in
     let+ directory_targets =
-      (* source_dir is a directory target for packages with fetched sources.
-         target_dir is NOT a directory target since install goes to shared prefix. *)
+      (* source_dir is a directory target for packages with fetched sources (produced by source_rules).
+         target_dir is a directory target containing installed files (produced by build_and_install_rule). *)
       match pkg.info.source with
       | None ->
-        (* No source - source_dir is still needed as a directory target *)
-        Memo.return (Path.Build.Map.singleton paths.source_dir Loc.none)
+        (* No source - only target_dir is a directory target (source_dir is just mkdir'd) *)
+        Memo.return (Path.Build.Map.singleton paths.target_dir Loc.none)
       | Some source ->
         Lock_dir.source_kind source
         >>| (function
-         | `Local (`Directory, _) -> Path.Build.Map.empty
+         | `Local (`Directory, _) ->
+           (* Local directory source - only target_dir is a directory target *)
+           Path.Build.Map.singleton paths.target_dir Loc.none
          | `Local (`File, _) | `Fetch ->
-           Path.Build.Map.singleton paths.source_dir (fst source.url))
+           (* Fetched source - both source_dir (from fetch) and target_dir (from build+install) *)
+           Path.Build.Map.of_list_exn
+             [ paths.source_dir, fst source.url; paths.target_dir, Loc.none ])
     in
     let build_dir_only_sub_dirs =
       Gen_rules.Build_only_sub_dirs.singleton ~dir Subdir_set.empty
