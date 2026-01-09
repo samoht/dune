@@ -16,10 +16,8 @@ Local file system
   >  | dune_cmd subst "$PWD" 'PWD' \
   >  | dune_cmd delete ' *\^\^*$' \
   >  | dune_cmd delete '^File ".*dune.lock/foo.pkg", line 2, characters'
-  2 | (source (copy "PWD/dummy"))
   Error:
-  PWD/dummy
-  does not exist
+  stat(PWD/dummy): No such file or directory
 
 Git
   $ runtest "(fetch (url \"git+file://$PWD/dummy\"))" 2>&1 \
@@ -31,13 +29,11 @@ Git
   
   Please make sure you have the correct access rights
   and the repository exists.
+  File "dune.lock/foo.pkg", line 2, characters 20-153:
+  2 | (source (fetch (url "git+file://PWD/dummy")))
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   Error: Failed to run external command:
   'git ls-remote "file://PWD/dummy"'
-  -> required by _build/_fetch/url/DIGEST/dir
-  -> required by
-     _build/_private/default/.pkg/foo.dev-DIGEST_HASH/source
-  -> required by
-     _build/_private/default/.pkg/foo.dev-DIGEST_HASH/target
   Hint: Check that this Git URL in the project configuration is correct:
   "file://PWD/dummy"
 

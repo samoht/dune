@@ -225,16 +225,13 @@ make_lockpkg_file() {
 
 dune_pkg_lock_normalized() {
   out="$(mktemp)"
-  # Use dune's default format (single-file).
-  # Tests needing directory format should use --format=directory explicitly.
-  # DUNE_TEST_LOCK_FORMAT env var can override for backward compatibility.
+  # Default to directory format since most tests expect .pkg files.
+  # Tests can override with --format=single-file or DUNE_TEST_LOCK_FORMAT env var.
   local args="$@"
   local format_arg=""
   if ! echo "$args" | grep -q '\-\-format'; then
-    local format="${DUNE_TEST_LOCK_FORMAT:-}"
-    if [ -n "$format" ]; then
-      format_arg="--format=$format"
-    fi
+    local format="${DUNE_TEST_LOCK_FORMAT:-directory}"
+    format_arg="--format=$format"
   fi
   if dune pkg lock $format_arg $@ 2>> "${out}"; then
     processed="$(mktemp)"

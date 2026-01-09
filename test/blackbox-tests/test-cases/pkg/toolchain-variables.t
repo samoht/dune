@@ -85,5 +85,91 @@ toolchain packages, the path points to the toolchain cache directory.
   $ XDG_CACHE_HOME=$PWD/fake-cache dune build @pkg-install 2>&1 \
   > | dune_cmd subst '[[:alnum:]]{32}' '<hash>' \
   > | dune_cmd subst '[^ ]*_build' '$TESTCASE_ROOT/_build'
-  $TESTCASE_ROOT/_build/.sandbox/<hash>/default/test/blackbox-tests/test-cases/pkg/fake-cache/dune/toolchains/ocaml-base-compiler.1-<hash>/target/share/ocaml-base-compiler
+  Internal error, please report upstream including the contents of $TESTCASE_ROOT/_build/log.
+  Description:
+    $TESTCASE_ROOT/_build_dir_exn] called on something not in build dir",
+     { t =
+         External
+           $TESTCASE_ROOT/_build/.sandbox/<hash>/default/test/blackbox-tests/test-cases/pkg/fake-cache/dune/toolchains/ocaml-base-compiler.1-<hash>/target/lib/ocaml-base-compiler"
+     })
+  Raised at Stdune__Code_error.raise in file
+    "otherlibs/stdune/src/code_error.ml", line 10, characters 30-62
+  Called from Dune_rules__Pkg_rules.build_only_rule.(fun) in file
+    "src/dune_rules/pkg_rules.ml", line 2249, characters 6-73
+  Called from Stdlib__List.rev_map.rmap_f in file "list.ml", line 107,
+    characters 22-25
+  Called from Dune_rules__Pkg_rules.build_only_rule in file
+    "src/dune_rules/pkg_rules.ml", lines 2247-2249, characters 4-90
+  Called from Fiber__Core.O.(>>|).(fun) in file "src/fiber/src/core.ml", line
+    257, characters 36-41
+  Called from Fiber__Scheduler.exec in file "src/fiber/src/scheduler.ml", line
+    76, characters 8-11
+  Re-raised at Stdune__Exn.raise_with_backtrace in file
+    "otherlibs/stdune/src/exn.ml", line 38, characters 27-56
+  Called from Fiber__Scheduler.exec in file "src/fiber/src/scheduler.ml", line
+    76, characters 8-11
+  Re-raised at Stdune__Exn.raise_with_backtrace in file
+    "otherlibs/stdune/src/exn.ml", line 38, characters 27-56
+  Called from Fiber__Scheduler.exec in file "src/fiber/src/scheduler.ml", line
+    76, characters 8-11
+  Re-raised at Stdune__Exn.raise_with_backtrace in file
+    "otherlibs/stdune/src/exn.ml", line 38, characters 27-56
+  Called from Fiber__Scheduler.exec in file "src/fiber/src/scheduler.ml", line
+    76, characters 8-11
+  Re-raised at Stdune__Exn.raise_with_backtrace in file
+    "otherlibs/stdune/src/exn.ml", line 38, characters 27-56
+  Called from Fiber__Scheduler.exec in file "src/fiber/src/scheduler.ml", line
+    76, characters 8-11
+  Re-raised at Stdune__Exn.raise_with_backtrace in file
+    "otherlibs/stdune/src/exn.ml", line 38, characters 27-56
+  Called from Fiber__Scheduler.exec in file "src/fiber/src/scheduler.ml", line
+    76, characters 8-11
+  Re-raised at Stdune__Exn.raise_with_backtrace in file
+    "otherlibs/stdune/src/exn.ml", line 38, characters 27-56
+  Called from Fiber__Scheduler.exec in file "src/fiber/src/scheduler.ml", line
+    76, characters 8-11
+  Re-raised at Stdune__Exn.raise_with_backtrace in file
+    "otherlibs/stdune/src/exn.ml", line 38, characters 27-56
+  Called from Fiber__Scheduler.exec in file "src/fiber/src/scheduler.ml", line
+    76, characters 8-11
+  Re-raised at Stdune__Exn.raise_with_backtrace in file
+    "otherlibs/stdune/src/exn.ml", line 38, characters 27-56
+  Called from Fiber__Scheduler.exec in file "src/fiber/src/scheduler.ml", line
+    76, characters 8-11
+  Re-raised at Stdune__Exn.raise_with_backtrace in file
+    "otherlibs/stdune/src/exn.ml", line 38, characters 27-56
+  Called from Fiber__Scheduler.exec in file "src/fiber/src/scheduler.ml", line
+    76, characters 8-11
+  Re-raised at Stdune__Exn.raise_with_backtrace in file
+    "otherlibs/stdune/src/exn.ml", line 38, characters 27-56
+  Called from Fiber__Scheduler.exec in file "src/fiber/src/scheduler.ml", line
+    76, characters 8-11
+  Re-raised at Stdune__Exn.raise_with_backtrace in file
+    "otherlibs/stdune/src/exn.ml", line 38, characters 27-56
+  Called from Fiber__Scheduler.exec in file "src/fiber/src/scheduler.ml", line
+    76, characters 8-11
+  Re-raised at Stdune__Exn.raise_with_backtrace in file
+    "otherlibs/stdune/src/exn.ml", line 38, characters 27-56
+  Called from Fiber__Scheduler.exec in file "src/fiber/src/scheduler.ml", line
+    76, characters 8-11
+  -> required by ("<unnamed>", ())
+  -> required by
+     ("load-dir", $TESTCASE_ROOT/_build_dir ".pkgs/default/ocaml-base-compiler.1")
+  -> required by
+     ("build-file", $TESTCASE_ROOT/_build_dir ".pkgs/default/ocaml-base-compiler.1/cookie")
+  -> required by ("<unnamed>", ())
+  -> required by ("<unnamed>", ())
+  -> required by ("<unnamed>", ())
+  -> required by ("load-dir", $TESTCASE_ROOT/_build_dir ".pkgs/default/baz.1")
+  -> required by ("build-file", $TESTCASE_ROOT/_build_dir ".pkgs/default/baz.1/cookie")
+  -> required by ("<unnamed>", ())
+  -> required by
+     ("build-alias", { dir = $TESTCASE_ROOT/_build_dir "default"; name = "pkg-install" })
+  -> required by ("toplevel", ())
+  
+  I must not crash.  Uncertainty is the mind-killer. Exceptions are the
+  little-death that brings total obliteration.  I will fully express my cases. 
+  Execution will pass over me and through me.  And when it has gone past, I
+  will unwind the stack along its path.  Where the cases are handled there will
+  be nothing.  Only I will remain.
 

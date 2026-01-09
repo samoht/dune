@@ -84,8 +84,10 @@ Verify the package was placed in duniverse/:
   dune-project
   mypkg.ml
 
-Fetch again - should skip already-fetched package:
+Fetch again - should skip already-fetched package.
+First remove the original source to avoid duplicate package definition:
 
+  $ rm -rf pkg-source
   $ dune pkg fetch -v
   Cached mypkg.1.0.0
 
@@ -106,10 +108,7 @@ A .gitignore file is generated to exclude fetched sources by default:
   !dune
 
 Now test the full workflow: build a project that uses the duniverse library.
-
-First, remove the original source directory to avoid conflict:
-
-  $ rm -rf pkg-source
+The original source directory was removed earlier (pkg-source).
 
 Create a new project that uses the duniverse library:
 

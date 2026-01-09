@@ -47,12 +47,21 @@ In our mock repository, we make sure to add the package submodule as
   $ cd mock-opam-repository
   $ git init --quiet
   $ GIT_ALLOW_PROTOCOL=file git submodule add ${SUBMODULE_LOCATION} packages
-  Cloning into '$TESTCASE_ROOT/mock-opam-repository/packages'...
-  done.
+  fatal: 'packages' already exists in the index
+  [128]
   $ git commit -m "Initial opam-repo commit" --quiet
+  On branch main
+  Changes not staged for commit:
+    (use "git add/rm <file>..." to update what will be committed)
+    (use "git restore <file>..." to discard changes in working directory)
+  	deleted:    packages/bar/bar.0.0.1/opam
+  	deleted:    packages/foo/foo.0.0.1/opam
+  
+  no changes added to commit (use "git add" and/or "git commit -a")
+  [1]
   $ git submodule init
   $ git ls-tree -r HEAD | grep "commit ${SUBMODULE_REVISION}" > /dev/null && echo "Submodule exists at expected revision"
-  Submodule exists at expected revision
+  [1]
   $ cd ..
 
 We'll use the mock repository as source and depend on `bar`:

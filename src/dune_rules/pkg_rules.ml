@@ -1876,6 +1876,7 @@ module Install_action = struct
           ~src
           ~install_file
           ~target_dir
+          ~prefix_dir
           (entry : Path.t Install.Entry.Expanded.t)
       =
       match Path.Untracked.exists src, entry.optional with
@@ -1889,19 +1890,39 @@ module Install_action = struct
               (Path.to_string install_file)
           ]
       | true, _ ->
-        let dst = prepare_copy ~install_file ~target_dir entry in
-        (let src =
-           match Path.to_string src |> Unix.readlink with
-           | exception Unix.Unix_error (_, _, _) -> src
-           | link ->
-             Path.external_
-               (let base = Path.parent_exn src in
-                Filename.concat (Path.to_absolute_filename base) link
-                |> Path.External.of_string)
-         in
-         Io.portable_hardlink ~src ~dst);
-        maybe_set_executable entry.section dst;
-        Some (entry.section, dst)
+        (* Copy to target_dir for caching *)
+        let dst_target = prepare_copy ~install_file ~target_dir entry in
+        (* Also compute destination in prefix_dir for global installation *)
+        let dst_prefix =
+          let package =
+            Path.basename install_file
+            |> Filename.remove_extension
+            |> Package.Name.of_string
+          in
+          let roots = Install.Roots.opam_from_prefix ~relative:Path.relative prefix_dir in
+          let paths = Install.Paths.make ~relative:Path.relative ~package ~roots in
+          let dst = Install.Entry.relative_installed_path entry ~paths in
+          Path.mkdir_p (Path.parent_exn dst);
+          dst
+        in
+        let src =
+          match Path.to_string src |> Unix.readlink with
+          | exception Unix.Unix_error (_, _, _) -> src
+          | link ->
+            Path.external_
+              (let base = Path.parent_exn src in
+               Filename.concat (Path.to_absolute_filename base) link
+               |> Path.External.of_string)
+        in
+        (* Copy to target_dir for caching *)
+        Io.portable_hardlink ~src ~dst:dst_target;
+        maybe_set_executable entry.section dst_target;
+        (* Copy to prefix_dir for global installation (if different from target) *)
+        if not (Path.equal dst_target dst_prefix)
+        then (
+          Io.portable_hardlink ~src ~dst:dst_prefix;
+          maybe_set_executable entry.section dst_prefix);
+        Some (entry.section, dst_target)
     ;;
 
     let action
@@ -1918,17 +1939,18 @@ module Install_action = struct
       =
       let open Fiber.O in
       let* () = Fiber.return () in
+      (* Compute prefix_dir: where installed files should go for global installation.
+         This is either the shared install directory or the toolchain cache. *)
+      let prefix_dir =
+        match prefix_outside_build_dir with
+        | Some prefix_outside_build_dir -> Path.outside_build_dir prefix_outside_build_dir
+        | None -> prefix
+      in
       let* files =
         let from_install_action =
           (* Install actions write to the prefix directory (which is either the
              shared install directory or the toolchain cache for cached toolchains).
              Look there for installed files. *)
-          let prefix_dir =
-            match prefix_outside_build_dir with
-            | Some prefix_outside_build_dir ->
-              Path.outside_build_dir prefix_outside_build_dir
-            | None -> prefix
-          in
           match install_action with
           | `No_install_action -> Section.Map.empty
           | `Has_install_action ->
@@ -1963,7 +1985,7 @@ module Install_action = struct
                 |> List.concat
                 |> Fiber.parallel_map ~f:(fun (src, entry) ->
                   Async.async (fun () ->
-                    install_entry ~src ~install_file ~target_dir entry))
+                    install_entry ~src ~install_file ~target_dir ~prefix_dir entry))
                 >>| List.filter_opt
               in
               List.rev_map install_entries ~f:(fun (section, file) ->
@@ -2232,6 +2254,13 @@ let build_only_rule context_name ~source_deps (pkg : Resolved_pkg.t) =
     |> Action_builder.return
     |> Action_builder.with_no_targets
   in
+  (* Create source and target directories - needed for packages without sources *)
+  let mkdir_pkg_dirs =
+    Action.progn
+      [ Action.mkdir pkg.write_paths.source_dir; Action.mkdir pkg.write_paths.target_dir ]
+    |> Action.Full.make ~sandbox:build_sandbox
+    |> Action_builder.With_targets.return
+  in
   (* Create install directories before build - some packages copy files during build.
      TODO: remove when we have proper bubblewrap sandboxing that enforces build/install
      separation. Packages should only write to target_dir during build. *)
@@ -2253,7 +2282,7 @@ let build_only_rule context_name ~source_deps (pkg : Resolved_pkg.t) =
   in
   let actions =
     [ copy_action
-    ; [ progress_building; mkdir_install_dirs ]
+    ; [ progress_building; mkdir_pkg_dirs; mkdir_install_dirs ]
     ; build_action
     ; [ marker_action ]
     ]
@@ -2384,39 +2413,45 @@ module Vendor_build = struct
       (* Lock packages need pkg rules to fetch/build - they'll be vendored by the rules *)
       Memo.return Vendor_status.Not_vendored
     | Package_registry.Source.From_vendor { source_dir; stanza } ->
-      (* Vendor packages - determine build method *)
-      let stanza_forces_opam =
-        match stanza.Vendor_stanza.build_method with
-        | Some Vendor_stanza.Build_method.Opam_sandboxed -> true
-        | _ -> false
-      in
-      if stanza_forces_opam
-      then Memo.return Vendor_status.Opam_sandboxed
-      else (
-        (* Load opam file to check if it uses dune build *)
-        let pkg_name = Package.Name.to_string entry.name in
-        match Vendor_rules.find_opam_file ~pkg_name ~pkg_dir:source_dir with
-        | None -> Memo.return Vendor_status.Opam_sandboxed
-        | Some opam_path ->
-          let contents = Io.read_file ~binary:true (Path.source opam_path) in
-          (match OpamFile.OPAM.read_from_string contents with
-           | exception _ -> Memo.return Vendor_status.Opam_sandboxed
-           | opam ->
-             let abs_path =
-               Path.source source_dir
-               |> Path.to_absolute_filename
-               |> Path.External.of_string
-             in
-             let source = Source.external_copy (Loc.none, abs_path) in
-             (match
-                Pkg.of_opam_file ~name:entry.name ~version:entry.version ~source ~opam ()
-              with
-              | Error _ -> Memo.return Vendor_status.Opam_sandboxed
-              | Ok pkg ->
-                let method_ = Vendor.classify_build_method pkg in
-                (match method_ with
-                 | Vendor.Dune_native -> Memo.return Vendor_status.Dune_native
-                 | Vendor.Opam_sandboxed -> Memo.return Vendor_status.Opam_sandboxed))))
+      (* Vendor packages - determine build method from stanza first *)
+      (match stanza.Vendor_stanza.build_method with
+       | Some Vendor_stanza.Build_method.Opam_sandboxed ->
+         Memo.return Vendor_status.Opam_sandboxed
+       | Some Vendor_stanza.Build_method.Dune_native ->
+         Memo.return Vendor_status.Dune_native
+       | None ->
+         (* No explicit build method - check opam file if it exists *)
+         let pkg_name = Package.Name.to_string entry.name in
+         (match Vendor_rules.find_opam_file ~pkg_name ~pkg_dir:source_dir with
+          | None ->
+            (* No opam file and no explicit stanza - default to Dune_native
+              since dune packages don't need opam files *)
+            Memo.return Vendor_status.Dune_native
+          | Some opam_path ->
+            let contents = Io.read_file ~binary:true (Path.source opam_path) in
+            (match OpamFile.OPAM.read_from_string contents with
+             | exception _ -> Memo.return Vendor_status.Opam_sandboxed
+             | opam ->
+               let abs_path =
+                 Path.source source_dir
+                 |> Path.to_absolute_filename
+                 |> Path.External.of_string
+               in
+               let source = Source.external_copy (Loc.none, abs_path) in
+               (match
+                  Pkg.of_opam_file
+                    ~name:entry.name
+                    ~version:entry.version
+                    ~source
+                    ~opam
+                    ()
+                with
+                | Error _ -> Memo.return Vendor_status.Opam_sandboxed
+                | Ok pkg ->
+                  let method_ = Vendor.classify_build_method pkg in
+                  (match method_ with
+                   | Vendor.Dune_native -> Memo.return Vendor_status.Dune_native
+                   | Vendor.Opam_sandboxed -> Memo.return Vendor_status.Opam_sandboxed)))))
   ;;
 
   let build_packages_of_context ctx_name =
@@ -2626,11 +2661,12 @@ let setup_package_rules_from_entry
       Paths.make pkg.pkg_digest package_universe ~relative:Path.Build.relative
     in
     let+ directory_targets =
-      (* With split rules, we no longer produce target_dir as a directory target.
-         We only produce file targets (build marker and cookie) at the root level.
-         source_dir is still a directory target when source is fetched. *)
+      (* source_dir is a directory target for packages with fetched sources.
+         target_dir is NOT a directory target since install goes to shared prefix. *)
       match pkg.info.source with
-      | None -> Memo.return Path.Build.Map.empty
+      | None ->
+        (* No source - source_dir is still needed as a directory target *)
+        Memo.return (Path.Build.Map.singleton paths.source_dir Loc.none)
       | Some source ->
         Lock_dir.source_kind source
         >>| (function

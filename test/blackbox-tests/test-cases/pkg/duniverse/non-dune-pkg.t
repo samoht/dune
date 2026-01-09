@@ -112,9 +112,9 @@ Check source directory exists:
 
   $ dune build @pkg-install 2>&1
 
-Check build directory was created:
+Check package was built (opam packages use .pkgs sandbox, not duniverse build):
 
-  $ ls _build/default/duniverse/make-pkg.1.0.0/
+  $ ls _build/.pkgs/default/make-pkg.1.0.0/source/
   Makefile
   opam
 

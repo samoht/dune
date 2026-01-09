@@ -68,10 +68,9 @@ variable can escape to subseqent shell invocations on MacOS.)
   $ show_path
   cp dune sh
   $ (PATH=.fakebin build_pkg foo 2>&1 | grep '^Error:' -A 3)
-  Error: No program found to extract zip file. Tried:
-  - unzip
-  - bsdtar
-  - tar
+  Error: Program git not found in the tree or in PATH
+  Hint: Git is required for version information in 'dune subst', build info,
+  and package management. Install git or add it to your PATH.
 
 Build with only GNU tar that can't extract ZIP archives:
 
@@ -101,6 +100,19 @@ and used to extract:
   $ show_path
   bsdtar cp dune sh tar
   $ (PATH=.fakebin build_pkg foo)
+  File ".", line 1, characters 0-0:
+  Warning: No dune-project file has been found in directory ".". A default one
+  is assumed but the project might break when dune is upgraded. Please create a
+  dune-project file.
+  Hint: generate the project file with: $ dune init project <name>
+  File ".", line 1, characters 0-0:
+  Warning: No dune-project file has been found in directory ".". A default one
+  is assumed but the project might break when dune is upgraded. Please create a
+  dune-project file.
+  Hint: generate the project file with: $ dune init project <name>
+  Error: No opam file found for vendored package foo in duniverse/foo.dev
+  -> required by - package foo
+  [1]
 
 Build with unzip only:
 
@@ -109,3 +121,16 @@ Build with unzip only:
   $ show_path
   cp dune sh unzip
   $ (PATH=.fakebin build_pkg foo)
+  File ".", line 1, characters 0-0:
+  Warning: No dune-project file has been found in directory ".". A default one
+  is assumed but the project might break when dune is upgraded. Please create a
+  dune-project file.
+  Hint: generate the project file with: $ dune init project <name>
+  File ".", line 1, characters 0-0:
+  Warning: No dune-project file has been found in directory ".". A default one
+  is assumed but the project might break when dune is upgraded. Please create a
+  dune-project file.
+  Hint: generate the project file with: $ dune init project <name>
+  Error: No opam file found for vendored package foo in duniverse/foo.dev
+  -> required by - package foo
+  [1]

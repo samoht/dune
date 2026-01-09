@@ -60,19 +60,23 @@ let of_ctx =
         vendor_stanzas
         ~init:(Package.Name.Map.empty, String.Map.empty)
         ~f:(fun (entries, libs) (source_dir, stanza) ->
+          let subdir = Path.Source.basename source_dir in
           let pkg_name =
             (* Try to get package name from opam file, fallback to directory name *)
-            let subdir = Path.Source.basename source_dir in
             match Vendor_rules.read_project_name source_dir with
             | Some name -> name
             | None -> Vendor_rules.parse_pkg_name_from_dir subdir
           in
           let name = Package.Name.of_string pkg_name in
           let version, libraries =
-            (* Scan version from opam file *)
+            (* Scan version from opam file, fall back to directory name *)
             let version =
               match Vendor_rules.find_opam_file ~pkg_name ~pkg_dir:source_dir with
-              | None -> Package_version.of_string "dev"
+              | None ->
+                (* No opam file - try to extract version from directory name like "pkg.1.0.0" *)
+                (match Vendor_rules.parse_name_version subdir with
+                 | Some (_, v) -> Package_version.of_string v
+                 | None -> Package_version.of_string "dev")
               | Some opam_file ->
                 let contents = Io.read_file ~binary:true (Path.source opam_file) in
                 (match OpamFile.OPAM.read_from_string contents with
