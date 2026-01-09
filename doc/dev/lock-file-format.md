@@ -191,25 +191,16 @@ If dune-workspace exists, solver reads it. CLI options override/extend.
 The lock file records what was solved for - it's output, not input. The workspace
 (or CLI) is the source of truth for what compilers/platforms to solve for.
 
-## Current Format (Directory)
+## Lock File Formats
 
-```
-dune.lock/
-  lock.dune           # metadata
-  foo.0.9.0.pkg       # package spec (build, install, source, deps...)
-  bar.1.2.3.pkg
-  bar.1.2.3.files/    # patches and extra files
-```
+### Single-File Format (Canonical)
 
-**Characteristics:**
-- One file per package
-- Full package specs stored (build commands, source URLs, deps)
-- Info is duplicated from opam-repo (can be re-derived from repo + version)
-
-## New Format (Single File) - Minimal
+The single-file format is the canonical lock format. It's human-readable,
+VCS-friendly, and contains only the essential information needed to reproduce
+the dependency resolution.
 
 ```lisp
-; dune.lock
+; dune.lock (single file in source tree)
 (lang package 0.2)
 
 ; Pin the repository state for reproducibility
@@ -229,29 +220,75 @@ dune.lock/
  (fmt patches/fmt@0.9.0.patch))
 ```
 
-That's it. ~10 lines vs hundreds of lines in current format.
+### Directory Format (Derived)
 
-## Derivation on Build
+The directory format contains expanded package specs and is derived from
+the single-file lock. It's stored in `_build/.locks/<ctx>/pkgs/` and used
+internally for building packages.
 
-When building, dune:
+```
+_build/.locks/default/pkgs/
+  lock.dune           # metadata
+  foo.0.9.0.pkg       # package spec (build, install, source, deps...)
+  bar.1.2.3.pkg
+  bar.1.2.3.files/    # patches and extra files
+```
+
+**Characteristics:**
+- One file per package
+- Full package specs (build commands, source URLs, deps)
+- Derived from single-file + opam repo lookup
+- Not committed to version control
+
+## Build Directory Structure
+
+When building with package management enabled:
+
+```
+_build/
+  .locks/
+    default/                    # context name
+      dune.lock                 # single-file lock (generated, promoted to source)
+      pkgs/                     # derived directory (expanded .pkg files)
+        lock.dune
+        foo.0.9.0.pkg
+        bar.1.2.3.pkg
+        ...
+```
+
+### Flow
+
+1. **Solver runs** → generates single-file `_build/.locks/<ctx>/dune.lock`
+2. **Promote to source** → copy to `dune.lock` in project root
+3. **Derive lock directory** → expand single-file to `_build/.locks/<ctx>/pkgs/`
+4. **Build packages** → use derived directory (`pkgs/`)
+
+### Derivation
+
+When deriving the `pkgs/` directory from the single-file lock, dune:
 
 1. **Fetches opam-repo at pinned hash** (cached in ~/.cache/dune)
 2. **Looks up each package** → gets source URL, checksum, build commands, deps
 3. **Classifies** → duniverse (dune-built) or opam
 4. **Applies patches** → from opam repo + user patches
-5. **Builds** → as today
+5. **Writes .pkg files** → to `_build/.locks/<ctx>/pkgs/`
 
 This is the same as what happens with auto-lock, just with pinned repo + versions.
 
-## Benefits
+## Lock File Equivalence
 
-| Aspect | Current (Directory) | New (Single File) |
-|--------|---------------------|-------------------|
-| Size | ~100 lines/package | 1 line/package |
-| Files | N+1 files | 1 file |
-| Merge conflicts | Common | Rare |
-| Review | Hard (noise) | Easy (just versions) |
-| Redundancy | High | None |
+All lock formats are **semantically equivalent** - they represent the same
+dependency solution. The formats differ only in efficiency for different use cases:
+
+| Format | Optimized For |
+|--------|---------------|
+| Single-file (`dune.lock`) | Human review, VCS, source tree |
+| Directory (`pkgs/`) | Machine processing, incremental updates, network resilience |
+
+More expanded formats contain more information locally, making them more isolated
+from network errors and external dependencies. The single-file format is the
+**canonical** representation that users interact with. The directory format is
+**derived** for efficient and resilient package building.
 
 ## What About Offline Builds?
 
@@ -282,33 +319,30 @@ No need to store in `dune.lock.d/` - that would bring back the directory problem
 
 ## Implementation
 
-### Current Architecture
+### Architecture
 
 ```
-Lock_dir.t  ←──  Lock_dir.read_disk()  ←──  dune.lock/ directory
-     │                                           │
-     │                                      lock.dune (metadata)
-     │                                      foo.0.9.0.pkg (full spec)
-     │                                      bar.1.2.3.pkg (full spec)
-     │
-     ↓
-  file_contents_by_path()  ──→  Write_disk.commit()  ──→  dune.lock/
+                                    dune.lock (source tree)
+                                         ↑
+                                    [promote]
+                                         │
+Solver  ──→  _build/.locks/<ctx>/dune.lock (single-file, canonical)
+                                         │
+                                    [derive]
+                                         ↓
+             _build/.locks/<ctx>/pkgs/  (directory with .pkg files)
+                      │
+                      ↓
+               Lock_dir.t (in memory)
+                      │
+                      ↓
+              Package builds
 ```
 
-Key insight: `Lock_dir.t` already contains `Pkg.t` with full specs.
-The directory format stores these verbatim. The minimal format stores just versions.
-
-### New Architecture
-
-```
-Lock_dir.t  ←──  derive_from_repo()  ←──  Opam_repo + versions
-     ↑                                        │
-     │                                   dune.lock (minimal file)
-     │                                   - repo hash
-     │                                   - package versions only
-     │
-encode_minimal()  ──→  Io.write_file()  ──→  dune.lock
-```
+**Key paths:**
+- `dune.lock` - source tree, promoted, committed to VCS
+- `_build/.locks/<ctx>/dune.lock` - generated single-file lock
+- `_build/.locks/<ctx>/pkgs/` - derived directory with expanded .pkg files
 
 ### Changes Required
 
@@ -356,19 +390,28 @@ val load_package_at_hash
 - Added `Lock.File` module with encoder/decoder
 - Renamed `Lock_dir` to `Lock` for cleaner naming
 
-### Phase 2: Add Derivation from Repo
-- Modify `Opam_repo` to support lookup by hash
-- Add `derive` function
-- Cache derived Lock.t in `_build/.locks/<context>/`
+### Phase 2: Generate Single-File Lock
+- Solver outputs to `_build/.locks/<ctx>/dune.lock` (single-file)
+- Modify `lock_rules.ml` to write single-file format
 
-### Phase 3: Integration
-- Modify `Write_disk.prepare` to use file format
-- Modify `Make_load` to detect and read both formats
-- Add migration path: read directory → write file
+### Phase 3: Add Promotion
+- After generating `_build/.locks/<ctx>/dune.lock`, promote to source tree
+- Respect `--no-promote` flag if specified
+- Promotion creates/updates `dune.lock` in project root
 
-### Phase 4: Cleanup
-- Deprecation warning for directory format
-- Eventually remove directory format support
+### Phase 4: Add Derivation
+- Derive `_build/.locks/<ctx>/pkgs/` from single-file lock
+- Reuse existing `setup_single_file_derive_rules` logic
+- Update `Lock_dir.get_exn` to read from `pkgs/` directory
+
+### Phase 5: Update Path Constants
+- Update `lock_dir.ml` paths for new structure
+- `_build/.locks/<ctx>/dune.lock` (file)
+- `_build/.locks/<ctx>/pkgs/` (directory)
+
+### Phase 6: Cleanup
+- Deprecation warning for directory format in source tree
+- Eventually remove support for `dune.lock/` directory in source
 
 ## Virtual Packages
 

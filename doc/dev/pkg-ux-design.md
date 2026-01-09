@@ -294,7 +294,7 @@ Hint: Install 'curl' with your system package manager.
 **Current (conflict):**
 ```
 Error:
-Unable to solve dependencies while generating lock directory: dune.lock
+Unable to solve dependencies for lock file: dune.lock
 
 Couldn't solve the package dependency formula.
 Selected candidates: bar.0.0.1 x.dev
@@ -339,8 +339,8 @@ npm why lodash                # Why is this installed?
 **Dune currently:** No equivalent command.
 
 **Assessment:** Dependency trees are useful for debugging, but consider:
-- The lock directory already contains dependency information in machine-readable format
-- A "why" query could be implemented as a one-off script reading the lock dir
+- The lock file already contains dependency information in machine-readable format
+- A "why" query could be implemented as a one-off script reading the lock file
 
 **Recommendation:** If adding, use a single command with flags rather than multiple commands:
 ```bash
@@ -515,8 +515,8 @@ Pp.textf "Solution for %s (%d package%s)" ... pkg_count (if pkg_count = 1 then "
 
 **Current behavior:**
 ```
-File "dune.lock/lock.dune", line 1, characters 0-0:
-Error: The lock dir is not sync with your dune-project
+File "dune.lock", line 1, characters 0-0:
+Error: The lock file is not in sync with your dune-project
 Hint: run dune pkg lock
 ```
 
