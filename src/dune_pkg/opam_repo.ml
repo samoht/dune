@@ -120,14 +120,16 @@ let of_git_repo loc url =
      | Ok s -> OpamUrl.fetch_revision url ~loc s rev_store)
     >>| User_error.ok_exn
   in
+  let base_url = OpamUrl.base_url url in
+  (* Don't serialize local file:// URLs as they contain machine-specific paths *)
   let serializable =
-    Some
-      (sprintf
-         "%s#%s"
-         (OpamUrl.base_url url)
-         (Rev_store.Object.to_hex (Rev_store.At_rev.rev at_rev))
-       |> OpamUrl.of_string
-       |> OpamUrl.to_string)
+    if String.is_prefix base_url ~prefix:"file://"
+    then None
+    else
+      Some
+        (sprintf "%s#%s" base_url (Rev_store.Object.to_hex (Rev_store.At_rev.rev at_rev))
+         |> OpamUrl.of_string
+         |> OpamUrl.to_string)
   in
   { source = Repo at_rev; serializable; loc }
 ;;

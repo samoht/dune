@@ -24,9 +24,7 @@ Create the package "foo" with an invalid opam file:
   > EOF
 
   $ dune pkg lock
-  File "$TESTCASE_ROOT/mock-opam-repository/packages/foo/foo.0.0.1/opam", line 2, characters 8-12:
-  2 | invalid opam file
-              ^^^^
+  File "$TESTCASE_ROOT/packages/foo/foo.0.0.1/opam", line 2, characters 8-12:
   Error: unable to parse opam file
   Parse error
   [1]
@@ -48,7 +46,7 @@ Create the package "foo" with an invalid variable interpolation:
   > EOF
 
   $ dune pkg lock
-  File "$TESTCASE_ROOT/mock-opam-repository/packages/foo/foo.0.0.1/opam", line 1, characters 0-0:
+  File "packages/foo/foo.0.0.1/opam", line 1, characters 0-0:
   Error: Encountered malformed variable interpolation while processing commands
   for package foo.0.0.1.
   The variable interpolation:

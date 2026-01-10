@@ -45,10 +45,8 @@ Create a package that writes a different value to some files depending on the os
   (dependency_hash 36e640fbcda71963e7e2f689f6c96c3e)
   
   (repositories
-   (complete true)
-   (used
-    ((source
-      $SANDBOX/default/test/blackbox-tests/test-cases/pkg/portable-lockdirs/mock-opam-repository#HASH))))
+   (complete false)
+   (used))
   
   (solved_for_platforms
    ((arch x86_64)
