@@ -1429,6 +1429,59 @@ let scheme_per_ctx_memo =
        >>= Scheme.evaluate ~union:Rules.Dir_rules.union)
 ;;
 
+(* Generate promotion rules for dev tools.
+   For each dev tool with a lock directory, create a rule that symlinks
+   the binary from target_dir to the default context's install bin dir.
+
+   This is called from the default context's install rules, so the rules
+   are registered in the right place to produce _build/install/default/bin/<exe>. *)
+let dev_tool_promotion_rules () =
+  let open Memo.O in
+  Dune_pkg.Dev_tool.all
+  |> Memo.parallel_map ~f:(fun tool ->
+    let* lock_dir_opt = Dev_tool.load_lock_dir_if_exists tool in
+    match lock_dir_opt with
+    | None -> Memo.return Rules.empty
+    | Some lock_dir ->
+      let package_name = Dune_pkg.Dev_tool.package_name tool in
+      let* platform = Lock_dir.Sys_vars.solver_env in
+      let pkgs = Dune_pkg.Lock.packages_on_platform lock_dir ~platform in
+      (match Package.Name.Map.find pkgs package_name with
+       | None -> Memo.return Rules.empty
+       | Some pkg ->
+         let ctx = Dev_tool.context_name tool in
+         let version = pkg.Dune_pkg.Pkg.info.version in
+         (* Construct paths we need *)
+         let pkg_id = Pkg_rules.Pkg_id.create ~name:package_name ~version in
+         let pkg_root =
+           Path.Build.relative
+             (Pkg_rules.build_dir ctx)
+             (Pkg_rules.Pkg_id.to_string pkg_id)
+         in
+         let target_dir = Path.Build.relative pkg_root "target" in
+         (* The installed marker is created by copy_to_prefix_rule in pkg_rules.ml *)
+         let installed_marker = Path.Build.relative pkg_root "installed" in
+         let exe_components = Dune_pkg.Dev_tool.exe_path_components_within_package tool in
+         let source_exe =
+           List.fold_left exe_components ~init:target_dir ~f:Path.Build.relative
+         in
+         let target_exe = Dev_tool.exe_path tool in
+         (* Create symlink action *)
+         let symlink_action =
+           let open Action_builder.O in
+           let+ () = Action_builder.path (Path.build installed_marker) in
+           Action.Full.make (Action.symlink (Path.build source_exe) target_exe)
+         in
+         let { Action_builder.With_targets.build; targets } =
+           Action_builder.with_file_targets symlink_action ~file_targets:[ target_exe ]
+           |> Action_builder.With_targets.map ~f:(fun act -> Action.Full.reduce [ act ])
+         in
+         let info = Rule.Info.of_loc_opt (Some Loc.none) in
+         let rule = Rule.make ~info ~targets build in
+         Memo.return (Rules.of_rules [ rule ])))
+  >>| List.fold_left ~init:Rules.empty ~f:Rules.union
+;;
+
 let symlink_rules sctx ~dir =
   let* scheme_rules, subdirs =
     Memo.exec scheme_per_ctx_memo sctx >>= Scheme.Evaluated.get_rules ~dir
@@ -1438,17 +1491,36 @@ let symlink_rules sctx ~dir =
     | None -> Rules.empty
     | Some rules -> Rules.of_dir_rules ~dir rules
   in
-  (* For the default context, also include dev tool install rules.
-     Dev tools install their binaries to _build/install/default/bin/ *)
+  (* For the default context, handle dev tool promotion rules.
+     Dev tools build in their own context (e.g., tools-odoc) and we create
+     symlinks from _build/install/default/bin/<exe> to the built binary. *)
   let context = Super_context.context sctx |> Context.build_context in
-  let+ dev_tool_rules =
+  let install_dir = Install.Context.dir ~context:context.name in
+  let bin_dir = Install.Context.bin_dir ~context:context.name in
+  let* dev_tools_with_locks =
     if Context_name.equal context.name Context_name.default
     then
-      (* Generate install rules for all dev tools *)
       Dune_pkg.Dev_tool.all
-      |> Memo.parallel_map ~f:Pkg_rules.dev_tool_install_rules
-      >>| List.fold_left ~init:Rules.empty ~f:Rules.union
+      |> Memo.parallel_map ~f:(fun tool ->
+        let+ lock_dir_opt = Dev_tool.load_lock_dir_if_exists tool in
+        match lock_dir_opt with
+        | None -> None
+        | Some _ -> Some tool)
+      >>| List.filter_map ~f:Fun.id
+    else Memo.return []
+  in
+  let has_dev_tools = not (List.is_empty dev_tools_with_locks) in
+  let+ dev_tool_rules =
+    if has_dev_tools && Path.Build.equal dir bin_dir
+    then dev_tool_promotion_rules ()
     else Memo.return Rules.empty
+  in
+  (* When we're at the install dir for the default context and have dev tools,
+     ensure "bin" is in the allowed subdirs so we can generate rules there. *)
+  let subdirs =
+    if has_dev_tools && Path.Build.equal dir install_dir
+    then String.Set.add subdirs "bin"
+    else subdirs
   in
   Subdir_set.of_set subdirs, Rules.union scheme_rules dev_tool_rules
 ;;

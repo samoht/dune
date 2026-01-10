@@ -741,12 +741,18 @@ let raise_on_lock_dir_out_of_sync =
 let pkg_context_rules ~dir components =
   match components with
   | [] ->
-    (* _build/.pkgs/ - list all contexts *)
+    (* _build/.pkgs/ - list all contexts (workspace contexts + dev tool contexts) *)
     let+ context_dirs =
       let+ workspace = Workspace.workspace () in
-      Workspace.build_contexts workspace
-      |> List.map ~f:(fun (ctx : Build_context.t) -> Context_name.to_string ctx.name)
-      |> Subdir_set.of_list
+      let workspace_ctxs =
+        Workspace.build_contexts workspace
+        |> List.map ~f:(fun (ctx : Build_context.t) -> Context_name.to_string ctx.name)
+      in
+      let dev_tool_ctxs =
+        List.map Dune_pkg.Dev_tool.all ~f:(fun tool ->
+          Context_name.to_string (Dev_tool.context_name tool))
+      in
+      Subdir_set.of_list (workspace_ctxs @ dev_tool_ctxs)
     in
     let build_dir_only_sub_dirs =
       Gen_rules.Build_only_sub_dirs.singleton ~dir context_dirs

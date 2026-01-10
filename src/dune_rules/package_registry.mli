@@ -53,3 +53,7 @@ val version : t -> Package.Name.t -> Package_version.t option
 (** Find which package provides a given library name.
     Only works for vendor packages that expose library information. *)
 val package_for_library : t -> string -> Package.Name.t option
+
+(** Create a registry from a map of lock file packages.
+    Used for dev tool contexts which don't have a workspace context. *)
+val of_lock_packages : Dune_pkg.Pkg.t Package.Name.Map.t -> t

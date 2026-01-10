@@ -410,7 +410,10 @@ let project_pins =
     Pin.DB.combine_exn acc pins)
 ;;
 
+(* Generate single-file lock at _build/.locks/<ctx>/dune.lock (file, not directory).
+   This is the canonical format that gets promoted to the source tree. *)
 let setup_lock_rules ~dir ~lock_dir : Gen_rules.result =
+  (* Target is a file, not a directory *)
   let target = Path.Build.append_local dir lock_dir in
   let lock_dir_param = lock_dir in
   let rules =
@@ -520,13 +523,18 @@ let setup_lock_rules ~dir ~lock_dir : Gen_rules.result =
             ~can_go_in_shared_cache:false (* TODO: probably ok this allow this? *)
             ~sandbox:Sandbox_config.needs_sandboxing)
       |> Action_builder.with_no_targets
-      |> Action_builder.With_targets.add_directories ~directory_targets:[ target ]
+      (* File target instead of directory target *)
+      |> Action_builder.With_targets.add ~file_targets:[ target ]
     in
+    (* TODO: Add promotion to source tree.
+       The built-in promotion mechanism doesn't work for .locks/ directory
+       because it doesn't have an associated context. We need to handle
+       promotion separately, either via a post-build hook or a separate rule. *)
     let rule = Rule.make ~targets build in
     Rules.of_rules [ rule ]
   in
-  let directory_targets = Path.Build.Map.singleton target Loc.none in
-  Gen_rules.make ~directory_targets rules
+  (* File target - no directory_targets needed *)
+  Gen_rules.make rules
 ;;
 
 let copy_lock_dir ~target ~lock_dir ~deps ~files =
@@ -623,13 +631,17 @@ let setup_single_file_derive_rules ~dir:target ~lock_file ~lock_dir_local =
     in
     let { Action_builder.With_targets.build; targets } =
       (let open Action_builder.O in
-       (* Depend on the source single-file lock via source file tracking *)
-       let deps =
-         Dep.Set.of_source_files
-           ~files:(Path.Set.singleton lock_file)
-           ~empty_directories:Path.Set.empty
-       in
-       Action_builder.deps deps
+       (* Depend on the single-file lock.
+          Use Action_builder.path for build files, Dep.Set for source files *)
+       (match lock_file with
+        | Path.In_build_dir _ -> Action_builder.path lock_file
+        | _ ->
+          let deps =
+            Dep.Set.of_source_files
+              ~files:(Path.Set.singleton lock_file)
+              ~empty_directories:Path.Set.empty
+          in
+          Action_builder.deps deps)
        >>> (derive_lock_action
               ~target
               ~source_file:lock_file
@@ -675,6 +687,29 @@ let lock_is_in_sync lock_dir_path =
         (match Package_universe.up_to_date local_packages ~dependency_hash:saved_hash with
          | `Valid -> true
          | `Invalid -> false)
+;;
+
+(* Set up rules to generate lock and derive pkgs/ directory.
+   When generating a new lock:
+   1. Generate single-file at _build/.locks/<ctx>/dune.lock (file)
+   2. Derive pkgs/ directory at _build/.locks/<ctx>/pkgs/
+   3. Promote single-file to source tree dune.lock *)
+let setup_generated_lock_rules ~dir ~lock_dir ~lock_dir_local =
+  (* Single-file target: _build/.locks/<ctx>/dune.lock *)
+  let lock_file_target = Path.Build.append_local dir lock_dir in
+  (* Pkgs directory target: _build/.locks/<ctx>/pkgs/ *)
+  let pkgs_dir_target = Path.Build.relative dir "pkgs" in
+  (* Generate single-file lock rules *)
+  let single_file_rules = setup_lock_rules ~dir ~lock_dir in
+  (* Derive pkgs/ from the generated single-file *)
+  let derive_rules =
+    setup_single_file_derive_rules
+      ~dir:pkgs_dir_target
+      ~lock_file:(Path.build lock_file_target)
+      ~lock_dir_local
+  in
+  (* Combine both rule sets *)
+  Gen_rules.combine single_file_rules derive_rules
 ;;
 
 let setup_lock_rules_with_source (workspace : Workspace.t) ~dir ~lock_dir =
@@ -728,13 +763,16 @@ let setup_lock_rules_with_source (workspace : Workspace.t) ~dir ~lock_dir =
     let dir = Path.Build.append_source dir lock_dir_src in
     setup_copy_rules ~dir ~lock_dir:(Path.source lock_dir_src)
   | `Single_file lock_file ->
-    let dir = Path.Build.append_source dir lock_file in
+    (* Derive pkgs/ from the source single-file lock *)
+    let pkgs_dir_target = Path.Build.relative dir "pkgs" in
     Memo.return
       (setup_single_file_derive_rules
-         ~dir
+         ~dir:pkgs_dir_target
          ~lock_file:(Path.source lock_file)
          ~lock_dir_local:lock_dir)
-  | `Generated -> Memo.return (setup_lock_rules ~dir ~lock_dir)
+  | `Generated ->
+    (* Generate single-file + derive pkgs/ *)
+    Memo.return (setup_generated_lock_rules ~dir ~lock_dir ~lock_dir_local:lock_dir)
 ;;
 
 (* Rules for _build/_private/default/.lock/ (project lock dirs).

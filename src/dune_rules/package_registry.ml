@@ -39,6 +39,14 @@ let version t name =
 
 let package_for_library t lib_name = String.Map.find t.lib_to_package lib_name
 
+let of_lock_packages pkgs =
+  let entries =
+    Package.Name.Map.mapi pkgs ~f:(fun name pkg ->
+      { name; version = pkg.Dune_pkg.Pkg.info.version; source = Source.From_lock { pkg } })
+  in
+  { entries; lib_to_package = String.Map.empty }
+;;
+
 (* Lock files compile to the vendor registry with vendor stanzas taking precedence.
 
    Resolution order:
@@ -51,7 +59,7 @@ let package_for_library t lib_name = String.Map.find t.lib_to_package lib_name
    to manually vendor specific packages while still using the lock file for
    the rest of their dependencies. *)
 let of_ctx =
-  let impl ctx =
+  let impl_workspace ctx =
     let open Memo.O in
     (* Step 1: Scan all vendor stanzas - they take precedence over lock files *)
     let* vendor_stanzas = Source_tree.all_vendor_stanzas () in
@@ -127,6 +135,23 @@ let of_ctx =
         Some vendor)
     in
     { entries; lib_to_package }
+  in
+  let impl_dev_tool dev_tool =
+    let open Memo.O in
+    let* lock_dir_opt = Dev_tool.load_lock_dir_if_exists dev_tool in
+    match lock_dir_opt with
+    | None ->
+      Memo.return { entries = Package.Name.Map.empty; lib_to_package = String.Map.empty }
+    | Some lock_dir ->
+      let+ platform = Lock_dir.Sys_vars.solver_env in
+      let pkgs = Dune_pkg.Lock.packages_on_platform lock_dir ~platform in
+      of_lock_packages pkgs
+  in
+  let impl ctx =
+    (* Check if this is a dev tool context *)
+    match Dev_tool.of_context_name ctx with
+    | Some dev_tool -> impl_dev_tool dev_tool
+    | None -> impl_workspace ctx
   in
   let memo = Memo.create "package-registry" ~input:(module Context_name) impl in
   Memo.exec memo

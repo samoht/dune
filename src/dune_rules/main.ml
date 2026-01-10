@@ -100,9 +100,19 @@ let init
          let open Memo.O in
          let+ contexts = Workspace.workspace () >>| Workspace.build_contexts in
          let open Dune_engine.Build_config.Gen_rules.Context_type in
-         (Install.Context.install_context, Empty)
-         :: (Fetch_rules.context, Empty)
-         :: List.map contexts ~f:(fun ctx -> ctx, With_sources)))
+         (* Create dev tool contexts for all dev tools.
+            We always create these contexts because the lock directories
+            may be created during the build (by auto-lock) and the contexts
+            need to exist for rules to target them. *)
+         let dev_tool_contexts =
+           List.map Dune_pkg.Dev_tool.all ~f:(fun tool ->
+             let name = Dev_tool.context_name tool in
+             Dune_engine.Build_context.create ~name, Empty)
+         in
+         ((Install.Context.install_context, Empty)
+          :: (Fetch_rules.context, Empty)
+          :: dev_tool_contexts)
+         @ List.map contexts ~f:(fun ctx -> ctx, With_sources)))
     ~cache_config
     ~cache_debug_flags
     ~rule_generator:(module Gen_rules)

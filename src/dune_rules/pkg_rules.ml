@@ -2528,24 +2528,6 @@ let copy_to_prefix_rule (pkg : Resolved_pkg.t) =
   >>> Action_builder.progn [ progress_action; copy_action; marker_action ]
 ;;
 
-(* For dev tools, create a rule that symlinks the installed binary from the
-   dev tool's target_dir to the default context's install dir. This allows
-   other rules to depend on the binary via Dev_tool.exe_path. *)
-let dev_tool_symlink_rule (pkg : Resolved_pkg.t) (dev_tool : Dune_pkg.Dev_tool.t) =
-  let exe_components = Dune_pkg.Dev_tool.exe_path_components_within_package dev_tool in
-  let source_exe =
-    List.fold_left exe_components ~init:pkg.write_paths.target_dir ~f:Path.Build.relative
-  in
-  let target_exe = Dev_tool.exe_path dev_tool in
-  let symlink_action =
-    (* Depend on the installed marker to ensure copy_to_prefix has run *)
-    let open Action_builder.O in
-    let+ () = Action_builder.path (Path.build (installed_marker_path pkg)) in
-    Action.Full.make (Action.symlink (Path.build source_exe) target_exe)
-  in
-  target_exe, symlink_action
-;;
-
 let gen_rules context_name (pkg : Resolved_pkg.t) =
   let* source_deps, copy_rules = source_rules pkg in
   let* () = copy_rules
@@ -2860,6 +2842,40 @@ let setup_package_rules_from_entry
     Gen_rules.make ~directory_targets ~build_dir_only_sub_dirs rules
 ;;
 
+(* Set up package rules for a dev tool context.
+   Dev tool contexts are not workspace contexts, so we load their lock
+   directories directly instead of using Package_registry. *)
+let setup_dev_tool_pkg_rules dev_tool ~dir pkg_id =
+  let* lock_dir_opt = Dev_tool.load_lock_dir_if_exists dev_tool in
+  match lock_dir_opt with
+  | None -> Memo.return @@ Gen_rules.make (Memo.return Rules.empty)
+  | Some lock_dir ->
+    let* platform = Lock_dir.Sys_vars.solver_env in
+    let pkgs = Dune_pkg.Lock.packages_on_platform lock_dir ~platform in
+    (match Package.Name.Map.find pkgs pkg_id.Pkg_id.name with
+     | None -> Memo.return @@ Gen_rules.make (Memo.return Rules.empty)
+     | Some pkg
+       when not (Package_version.equal pkg.Dune_pkg.Pkg.info.version pkg_id.version) ->
+       (* Version mismatch *)
+       Memo.return @@ Gen_rules.make (Memo.return Rules.empty)
+     | Some _pkg ->
+       (* Create a registry from all lock packages for dependency resolution *)
+       let registry = Package_registry.of_lock_packages pkgs in
+       (match
+          Package_registry.find_by_name_version
+            registry
+            ~name:pkg_id.name
+            ~version:pkg_id.version
+        with
+        | None -> Memo.return @@ Gen_rules.make (Memo.return Rules.empty)
+        | Some entry ->
+          setup_package_rules_from_entry
+            registry
+            entry
+            ~package_universe:(Dev_tool dev_tool)
+            ~dir))
+;;
+
 let setup_pkg_context_rules ctx ~dir ~components =
   match components with
   | [] ->
@@ -2870,25 +2886,31 @@ let setup_pkg_context_rules ctx ~dir ~components =
       (Memo.return Rules.empty)
     |> Memo.return
   | [ pkg_dir_string ] ->
-    (* _build/.pkgs/<ctx>/<pkg_dir>/ - set up package build rules.
-       Use unified Package_registry to find the package. *)
-    let pkg_digest = Pkg_id.of_string pkg_dir_string in
-    let* registry = Package_registry.of_ctx ctx in
-    (match
-       Package_registry.find_by_name_version
-         registry
-         ~name:pkg_digest.name
-         ~version:pkg_digest.version
-     with
+    (* _build/.pkgs/<ctx>/<pkg_dir>/ - set up package build rules. *)
+    let pkg_id = Pkg_id.of_string pkg_dir_string in
+    (* Check if this is a dev tool context *)
+    (match Dev_tool.of_context_name ctx with
+     | Some dev_tool ->
+       (* Dev tool context - load lock directory directly *)
+       setup_dev_tool_pkg_rules dev_tool ~dir pkg_id
      | None ->
-       (* Package not found in registry - no rules *)
-       Memo.return @@ Gen_rules.make (Memo.return Rules.empty)
-     | Some entry ->
-       setup_package_rules_from_entry
-         registry
-         entry
-         ~package_universe:(Dependencies ctx)
-         ~dir)
+       (* Regular context - use Package_registry *)
+       let* registry = Package_registry.of_ctx ctx in
+       (match
+          Package_registry.find_by_name_version
+            registry
+            ~name:pkg_id.name
+            ~version:pkg_id.version
+        with
+        | None ->
+          (* Package not found in registry - no rules *)
+          Memo.return @@ Gen_rules.make (Memo.return Rules.empty)
+        | Some entry ->
+          setup_package_rules_from_entry
+            registry
+            entry
+            ~package_universe:(Dependencies ctx)
+            ~dir))
   | _ :: _ ->
     (* Subdirectories within a package build - redirect to parent *)
     Memo.return @@ Gen_rules.redirect_to_parent Gen_rules.Rules.empty
@@ -3011,30 +3033,6 @@ let dev_tool_env tool =
   | Some entry ->
     let+ pkg = Resolve.resolve_entry registry entry ~package_universe:(Dev_tool tool) in
     Resolved_pkg.exported_env pkg
-;;
-
-(* Generate install rules for a dev tool. This creates a symlink from the
-   built binary in target_dir to the install directory so other rules can
-   depend on Dev_tool.exe_path. *)
-let dev_tool_install_rules (tool : Dune_pkg.Dev_tool.t) =
-  let lock_path = Dev_tool.lock_dir tool in
-  let lock_dir_exists = Path.build lock_path |> Path.Untracked.exists in
-  if not lock_dir_exists
-  then Memo.return Rules.empty
-  else (
-    let ctx = Dev_tool.context_name tool in
-    let package_name = Dune_pkg.Dev_tool.package_name tool in
-    let* registry = Package_registry.of_ctx ctx in
-    match Package_registry.find registry package_name with
-    | None -> Memo.return Rules.empty
-    | Some entry ->
-      let+ pkg = Resolve.resolve_entry registry entry ~package_universe:(Dev_tool tool) in
-      (* Create symlink rule from source to install dir *)
-      let target_exe, build = dev_tool_symlink_rule pkg tool in
-      let info = Rule.Info.of_loc_opt (Some Loc.none) in
-      let targets = Targets.File.create target_exe in
-      let rule = Rule.make ~info ~targets build in
-      Rules.of_rules [ rule ])
 ;;
 
 let exported_env context =

@@ -136,9 +136,21 @@ let path_prefix = build_dir Context_name.default
 let default_path = Path.Build.relative path_prefix default_dir |> Path.build
 let default_source_path = Path.Source.(relative root default_dir)
 
-let lock_dir_of_source p =
-  let local = Path.Source.to_local p in
-  Path.Build.append_local path_prefix local |> Path.build
+(* Convert source lock path to build lock path.
+   - If source is a directory (old format), return _build/.locks/<ctx>/<name>/
+   - If source is a single-file (new format), return _build/.locks/<ctx>/pkgs/
+   - If source doesn't exist (generated), return _build/.locks/<ctx>/pkgs/ *)
+let lock_dir_of_source ctx_name p =
+  let* is_dir = Fs_memo.dir_exists (Path.Outside_build_dir.In_source_dir p) in
+  let build_prefix = build_dir ctx_name in
+  if is_dir
+  then (
+    (* Directory format: copy to _build/.locks/<ctx>/<name>/ *)
+    let local = Path.Source.to_local p in
+    Memo.return (Path.Build.append_local build_prefix local |> Path.build))
+  else
+    (* Single-file or generated: derive to _build/.locks/<ctx>/pkgs/ *)
+    Memo.return (Path.Build.relative build_prefix "pkgs" |> Path.build)
 ;;
 
 let get_source_path_for_context ctx_name =
@@ -157,8 +169,12 @@ let get_source_path_for_context ctx_name =
 ;;
 
 let get_path ctx_name =
-  let+ source_path = get_source_path_for_context ctx_name in
-  Option.map source_path ~f:lock_dir_of_source
+  let* source_path = get_source_path_for_context ctx_name in
+  match source_path with
+  | None -> Memo.return None
+  | Some p ->
+    let+ path = lock_dir_of_source ctx_name p in
+    Some path
 ;;
 
 let get_workspace_lock_dir ctx =
