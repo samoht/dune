@@ -2,18 +2,13 @@ open Import
 module Vendor = Dune_pkg.Vendor
 module Vendor_stanza = Dune_lang.Vendor_stanza
 
-(* Path to a package's build directory: _build/.pkgs/<ctx>/<name>.<version>/ *)
-let pkg_build_root ~context ~pkg_name ~pkg_version =
+(* Path to a package's build directory: _build/.pkgs/<ctx>/<name>/
+   Note: Path uses only package name (no version) to enable cleanup on upgrade. *)
+let pkg_build_root ~context ~pkg_name =
   let ctx_dir =
     Path.Build.relative Dpath.Build.pkgs_dir (Context_name.to_string context)
   in
-  let pkg_dir =
-    sprintf
-      "%s.%s"
-      (Package.Name.to_string pkg_name)
-      (Package_version.to_string pkg_version)
-  in
-  Path.Build.relative ctx_dir pkg_dir
+  Path.Build.relative ctx_dir (Package.Name.to_string pkg_name)
 ;;
 
 let extract_public_name_from_sexp sexp =
@@ -186,6 +181,9 @@ module Vendored_map = struct
     ; build_method : Dune_lang.Vendor_stanza.Build_method.t option
       (* None or Some Dune_native = built as workspace code, no marker needed
          Some Opam_sandboxed = built in sandbox, needs marker file *)
+    ; install_to_prefix : bool
+      (* Whether artifacts are copied to shared install prefix.
+         When false, depend on cookie file instead of installed marker. *)
     }
 
   type t =
@@ -195,8 +193,8 @@ module Vendored_map = struct
 
   let empty = { packages = Package.Name.Map.empty; lib_to_package = String.Map.empty }
 
-  let add t ~name ~version ~source_dir ~libraries ~build_method =
-    let info = { version; source_dir; libraries; build_method } in
+  let add t ~name ~version ~source_dir ~libraries ~build_method ~install_to_prefix =
+    let info = { version; source_dir; libraries; build_method; install_to_prefix } in
     let packages = Package.Name.Map.set t.packages name info in
     let lib_to_package =
       List.fold_left libraries ~init:t.lib_to_package ~f:(fun acc lib ->
@@ -230,6 +228,12 @@ module Vendored_map = struct
       (match info.build_method with
        | Some Vendor_stanza.Build_method.Opam_sandboxed -> true
        | Some Dune_native | None -> false)
+  ;;
+
+  let install_to_prefix t name =
+    match Package.Name.Map.find t.packages name with
+    | None -> true (* Default to true for unknown packages *)
+    | Some info -> info.install_to_prefix
   ;;
 end
 
@@ -273,6 +277,7 @@ let scan_vendor_dir vendor_dir =
             ~source_dir:pkg_dir
             ~libraries
             ~build_method:None
+            ~install_to_prefix:true
         | _ -> map))
 ;;
 
@@ -337,7 +342,8 @@ let get_vendored_map =
         ~version
         ~source_dir:pkg_dir
         ~libraries
-        ~build_method:stanza.Vendor_stanza.build_method)
+        ~build_method:stanza.Vendor_stanza.build_method
+        ~install_to_prefix:stanza.Vendor_stanza.install)
   in
   Memo.lazy_ ~name:"vendored-map" impl
 ;;
@@ -406,15 +412,14 @@ let marker_for_package ~context pkg_name =
   let+ map = get_vendored_map () in
   if Vendored_map.needs_marker map pkg_name
   then (
-    let version =
-      match Vendored_map.find map pkg_name with
-      | None -> Package_version.of_string "dev"
-      | Some info -> info.version
-    in
-    (* _build/.pkgs/<ctx>/<name>.<version>/installed (marker at root level, sibling of target/) *)
-    let root = pkg_build_root ~context ~pkg_name ~pkg_version:version in
-    (* Installed marker at root level *)
-    Some (Path.Build.relative root "installed"))
+    let root = pkg_build_root ~context ~pkg_name in
+    if Vendored_map.install_to_prefix map pkg_name
+    then
+      (* _build/.pkgs/<ctx>/<name>/installed (in shared prefix) *)
+      Some (Path.Build.relative root "installed")
+    else
+      (* _build/.pkgs/<ctx>/<name>/target/cookie (build completed, not promoted) *)
+      Some (Path.Build.relative (Path.Build.relative root "target") "cookie"))
   else None
 ;;
 

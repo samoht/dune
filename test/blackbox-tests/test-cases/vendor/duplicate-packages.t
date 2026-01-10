@@ -18,7 +18,7 @@ However, adding dune-project files causes the duplicate detection to fire:
   $ cp dune-project ./vendor/duped/
   $ cp dune-project ./vendor/pkg/vendor/duped/
   $ dune build @all
-  Error: The package "duped" is defined more than once:
+  Error: The package "duped" (version <none>) is defined more than once:
   - vendor/pkg/vendor/duped/duped.opam:1
   - vendor/duped/duped.opam:1
   [1]

@@ -55,6 +55,7 @@ module Vendored_map : sig
     ; source_dir : Path.Source.t
     ; libraries : string list
     ; build_method : Dune_lang.Vendor_stanza.Build_method.t option
+    ; install_to_prefix : bool
     }
 
   type t
@@ -68,6 +69,7 @@ module Vendored_map : sig
     -> source_dir:Path.Source.t
     -> libraries:string list
     -> build_method:Dune_lang.Vendor_stanza.Build_method.t option
+    -> install_to_prefix:bool
     -> t
 
   val find : t -> Package.Name.t -> package_info option
@@ -77,6 +79,7 @@ module Vendored_map : sig
   val package_for_library : t -> string -> Package.Name.t option
   val all_packages : t -> Package.Name.t list
   val needs_marker : t -> Package.Name.t -> bool
+  val install_to_prefix : t -> Package.Name.t -> bool
 end
 
 val scan_vendor_dir : Path.Source.t -> Vendored_map.t
