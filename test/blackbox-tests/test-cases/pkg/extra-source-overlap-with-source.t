@@ -25,12 +25,12 @@ file in the package's source.
   >  (depends foo))
   > EOF
 
-  $ build_pkg foo
+  $ build_pkg foo 2>&1 | strip_sandbox
   Internal error, please report upstream including the contents of _build/log.
   Description:
     ("fetch_local: unpack is not set",
      { url =
-         "file:///Users/samoht/git/dune/_build/.sandbox/50393909113907ce3a1bca70650d15d3/default/test/blackbox-tests/test-cases/pkg/foo.txt"
+         $SANDBOX/default/test/blackbox-tests/test-cases/pkg/foo.txt"
      })
   Raised at Stdune__Code_error.raise in file
     "otherlibs/stdune/src/code_error.ml", line 10, characters 30-62
@@ -56,7 +56,6 @@ file in the package's source.
   Execution will pass over me and through me.  And when it has gone past, I
   will unwind the stack along its path.  Where the cases are handled there will
   be nothing.  Only I will remain.
-  [1]
 
 Make sure that the package's source directory ends up with the version
 of foo.txt from extra_sources:

@@ -60,7 +60,7 @@ first checksum to the lockfile for this package.
   - with-sha256.0.0.1
   - with-sha512.0.0.1
 
-  $ cat ${default_lock_dir}/*
+  $ cat ${default_lock_dir}/* | strip_sandbox | sed 's/#[a-f0-9]\{40\}/#HASH/'
   (lang package 0.1)
   
   (dependency_hash 32180cf311133b30d0b5be2a40c89f43)
@@ -69,7 +69,7 @@ first checksum to the lockfile for this package.
    (complete true)
    (used
     ((source
-      file:///Users/samoht/git/dune/_build/.sandbox/7ae95636921db483598a39d18952af17/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository#fb187e6cd801e65b13e7ad07f2f91ddd1ee34d1d))))
+      $SANDBOX/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository#HASH))))
   
   (solved_for_platforms
    ((arch x86_64)
@@ -120,3 +120,6 @@ first checksum to the lockfile for this package.
      sha512=cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc)))
   
   (build_id 04fdeff74f54e24ff64b50d5e1ec8d68)
+
+
+

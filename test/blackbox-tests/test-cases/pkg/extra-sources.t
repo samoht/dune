@@ -18,12 +18,12 @@ Fetch from more than one source
   >  (system "find . | sort -u"))
   > EOF
 
-  $ build_pkg test
+  $ build_pkg test 2>&1 | strip_sandbox
   Internal error, please report upstream including the contents of _build/log.
   Description:
     ("fetch_local: unpack is not set",
      { url =
-         "file:///Users/samoht/git/dune/_build/.sandbox/aa35b52457bcc294800249d6d3389d96/default/test/blackbox-tests/test-cases/pkg/baz"
+         $SANDBOX/default/test/blackbox-tests/test-cases/pkg/baz"
      })
   Raised at Stdune__Code_error.raise in file
     "otherlibs/stdune/src/code_error.ml", line 10, characters 30-62
@@ -49,7 +49,6 @@ Fetch from more than one source
   Execution will pass over me and through me.  And when it has gone past, I
   will unwind the stack along its path.  Where the cases are handled there will
   be nothing.  Only I will remain.
-  [1]
 
 Make sure extra source patches are downloaded, checksum-verified and applied
 when building.
@@ -161,7 +160,7 @@ url and the extra source.
      (url http://localhost:2)
      (checksum md5=$HASH))))
   
-  (build_id 0e0a71c5c0022802054d92aa5f85f701)
+  (build_id 3876a12b9877f3d5d72d09ec982efc69)
 
 Running the binary should download the tarball & patch, build them and show the
 correct, patched, message:

@@ -18,8 +18,8 @@ Create a package that prints its build environment to verify BUILD_PATH_PREFIX_M
   > (build (system "echo BUILD_PATH_PREFIX_MAP=\$BUILD_PATH_PREFIX_MAP | head -c 200"))
   > EOF
 
-  $ build_pkg check-env 2>&1 | grep -o 'BUILD_PATH_PREFIX_MAP=.*' | head -1
-  BUILD_PATH_PREFIX_MAP=/workspace_root=/Users/samoht/git/dune/_build/.sandbox/ebbe831417c9a8d9b1e15b46bc5c897f/default:$TESTCASE_ROOT=/Users/samoht/git/dune/_build/.sandbox/ebbe831417c9a8d9b1e15b46bc5c
+  $ build_pkg check-env 2>&1 | grep -o 'BUILD_PATH_PREFIX_MAP=.*' | head -1 | strip_sandbox
+  $SANDBOX
 
 Test 2: Package with absolute paths (relocatability check TODO)
 ===============================================================

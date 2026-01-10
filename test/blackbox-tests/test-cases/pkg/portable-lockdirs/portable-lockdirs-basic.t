@@ -39,7 +39,7 @@ Create a package that writes a different value to some files depending on the os
   opam:
   - foo.0.0.1
 
-  $ cat ${default_lock_dir}/lock.dune
+  $ cat ${default_lock_dir}/lock.dune | strip_sandbox | sed 's/#[a-f0-9]\{40\}/#HASH/'
   (lang package 0.1)
   
   (dependency_hash 36e640fbcda71963e7e2f689f6c96c3e)
@@ -48,7 +48,7 @@ Create a package that writes a different value to some files depending on the os
    (complete true)
    (used
     ((source
-      file:///Users/samoht/git/dune/_build/.sandbox/bf059f20117192d201d3602f9ec6568d/default/test/blackbox-tests/test-cases/pkg/portable-lockdirs/mock-opam-repository#b1377c291a62015e711d4906668b1204c9634991))))
+      $SANDBOX/default/test/blackbox-tests/test-cases/pkg/portable-lockdirs/mock-opam-repository#HASH))))
   
   (solved_for_platforms
    ((arch x86_64)
@@ -59,6 +59,9 @@ Create a package that writes a different value to some files depending on the os
     (os macos))
    ((arch arm64)
     (os macos)))
+
+
+
 
   $ cat ${default_lock_dir}/foo.0.0.1.pkg
   (version 0.0.1)

@@ -87,7 +87,7 @@ The log file will contain errors about the package being unavailable.
   }
 
 The lockdir will contain a list of the platforms where solving succeeded.
-  $ cat ${default_lock_dir}/lock.dune
+  $ cat ${default_lock_dir}/lock.dune | strip_sandbox | sed 's/#[a-f0-9]\{40\}/#HASH/'
   (lang package 0.1)
   
   (dependency_hash 36e640fbcda71963e7e2f689f6c96c3e)
@@ -96,13 +96,16 @@ The lockdir will contain a list of the platforms where solving succeeded.
    (complete true)
    (used
     ((source
-      file:///Users/samoht/git/dune/_build/.sandbox/c618d82185fc664f9bc44f6be2047e88/default/test/blackbox-tests/test-cases/pkg/portable-lockdirs/mock-opam-repository#c77cf144f641d2d4031abb93704fa267d15b7b0f))))
+      $SANDBOX/default/test/blackbox-tests/test-cases/pkg/portable-lockdirs/mock-opam-repository#HASH))))
   
   (solved_for_platforms
    ((arch x86_64)
     (os macos))
    ((arch arm64)
     (os macos)))
+
+
+
 
 No errors when you try to build the platform on macos.
   $ DUNE_CONFIG__OS=macos DUNE_CONFIG__ARCH=x86_64 DUNE_CONFIG__OS_FAMILY=homebrew DUNE_CONFIG__OS_DISTRIBUTION=homebrew DUNE_CONFIG__OS_VERSION=15.3.1 dune build
