@@ -22,14 +22,20 @@ project/
     dune                      # Generated vendor stanzas
   _build/
     .pkgs/default/            # Package builds
-      zarith.1.14-<digest>/   # <name>.<version>-<lockfile+deps digest>
+      zarith/                 # <name> when install=true (supports upgrade/uninstall)
         source/               # Linked/copied from duniverse/ (rule inputs)
         target/               # Build artifacts (rule outputs)
+      yojson-<build-id>/      # <name>-<build-id> when install=false (multi-version)
+        source/
+        target/
     install/default/          # Shared install prefix
 ```
 
-Sources are always in `_build/.pkgs/<ctx>/<name>/source/` for proper rule
-input/output tracking. For vendored packages, this is linked from `duniverse/`.
+Build paths depend on the `(install ...)` setting:
+- `(install true)`: `_build/.pkgs/<ctx>/<name>/` - supports clean upgrade/uninstall
+- `(install false)`: `_build/.pkgs/<ctx>/<name>-<build-id>/` - allows multiple versions
+
+For vendored packages, source is linked from `duniverse/`.
 
 This enables:
 

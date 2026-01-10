@@ -183,8 +183,14 @@ Patches listed in `patches:` should be applied, including conditional patches
 - `setenv:` should export variables to dependent packages
 
 **Build location:**
-- Should build in `_build/.pkgs/<context>/<name>.<version>-<build-id>/`
+- When `(install true)`: build in `_build/.pkgs/<context>/<name>/`
+- When `(install false)`: build in `_build/.pkgs/<context>/<name>-<build-id>/`
 - Should install to `_build/install/<context>/`
+
+When `install=true`, the path uses `<name>` (without version or build-id) to support clean
+uninstall and upgrade: when a package version changes, the same directory is reused rather
+than accumulating stale directories. When `install=false`, the build-id is included to
+allow multiple versions of the same package to coexist.
 
 **Build-id computation:**
 The `build-id` is a content-addressable hash computed at lock time for deterministic caching.
