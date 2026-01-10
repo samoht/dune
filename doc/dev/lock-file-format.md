@@ -273,8 +273,11 @@ _build/
 1. **Solver runs** → generates single-file `_build/.locks/<ctx>/<lock>/lock`
 2. **Promote to source** → copy to `dune.lock` in project root
 3. **Derive pkgs directory** → expand to `_build/.locks/<ctx>/<lock>/pkgs/`
-   - Variables resolved for this context's os/platform (no opam variables in .pkg files)
+   - Conditionals preserved (e.g., `(choice ...)` for platform-specific actions)
+   - Opam variables preserved (e.g., `%{lib}%`) - resolved at build time
 4. **Build packages** → uses derived `pkgs/` directory
+   - Conditionals evaluated for current platform
+   - Variables resolved using context environment
 
 ### Derivation
 
@@ -282,21 +285,20 @@ When deriving the `pkgs/` directory from the single-file lock, dune:
 
 1. **Fetches opam-repo at pinned hash** (cached in ~/.cache/dune)
 2. **Looks up each package** → gets source URL, checksum, build commands, deps
-3. **Resolves opam variables** → evaluates for context's os/arch/platform
-   - `%{os}%`, `%{arch}%`, `%{os-family}%` resolved to concrete values
-   - Conditional dependencies filtered based on platform
-   - No opam variables remain in derived .pkg files
+3. **Preserves conditionals** → platform-specific actions kept as `(choice ...)`
+   - `%{os}%`, `%{arch}%` etc. remain as variables
+   - Conditional dependencies kept with platform filters
+   - Resolution deferred to build time for flexibility
 4. **Classifies** → duniverse (dune-built) or opam
 5. **Records patches** → references to patches from opam repo + user patches
    (patches are applied to package sources at build time, not during derivation)
-6. **Writes .pkg files** → to `_build/.locks/<ctx>/<lock>/pkgs/`
+6. **Computes build_id** → Merkle hash of (content, deps' build_ids, enabled_platforms)
+   - Computed on canonical content before any expansion
+   - Platform-independent packages have same build_id (cacheable)
+7. **Writes .pkg files** → to `_build/.locks/<ctx>/<lock>/pkgs/`
 
-The derived `pkgs/` directory is **platform-specific**: each context gets its own
-derivation with variables resolved for that context's os and platform. This means
-the same `dune.lock` can produce different `pkgs/` directories for different
-build contexts (e.g., linux vs macos, or native vs cross-compilation).
-
-This is the same as what happens with auto-lock, just with pinned repo + versions.
+Each context gets its own `pkgs/` directory. Variable resolution and conditional
+evaluation happen at build time using the context's platform information.
 
 ## Lock File Equivalence
 
