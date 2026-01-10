@@ -239,6 +239,7 @@ let opam_package_to_lock_file_pkg
   ; info
   ; exported_env
   ; enabled_on_platforms
+  ; build_id = None (* Computed later after all packages are resolved *)
   }
 ;;
 
@@ -313,11 +314,27 @@ let file_to_lock_impl
       stats.expanded_variables
       solver_env
   in
+  (* Identify the compiler package by checking conflict_class for ocaml-core-compiler.
+     This matches the heuristic used in opam_solver.ml:package_kind. *)
+  let ocaml =
+    let ocaml_core_compiler = OpamPackage.Name.of_string "ocaml-core-compiler" in
+    List.find_map
+      resolved_packages
+      ~f:(fun (name, _version, _platforms, resolved_package) ->
+        let opam_file = Resolved_package.opam_file resolved_package in
+        if
+          List.mem
+            opam_file.conflict_class
+            ocaml_core_compiler
+            ~equal:OpamPackage.Name.equal
+        then Some (Loc.none, name)
+        else None)
+  in
   let lock =
     Lock.create_latest_version
       packages
       ~local_packages (* dependency_hash computed from local_packages during derivation *)
-      ~ocaml:None
+      ~ocaml
       ~repos:(Some repos)
       ~expanded_solver_variable_bindings
       ~solved_for_platform:(Some solver_env)
@@ -506,6 +523,7 @@ let minimal_pkg ~name ~version =
       }
   ; exported_env = []
   ; enabled_on_platforms = [] (* empty = enabled on all platforms *)
+  ; build_id = None
   }
 ;;
 

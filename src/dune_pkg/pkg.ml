@@ -524,6 +524,9 @@ type t =
   ; info : Info.t
   ; exported_env : String_with_vars.t Action.Env_update.t list
   ; enabled_on_platforms : Solver_env_disjunction.t
+  ; build_id : Dune_digest.t option
+    (* Recursive build-id: hash(content, deps' build_ids).
+       Computed at lock time for deterministic toolchain/dev-tool caching. *)
   }
 
 let equal
@@ -535,6 +538,7 @@ let equal
       ; info
       ; exported_env
       ; enabled_on_platforms
+      ; build_id
       }
       t
   =
@@ -549,6 +553,7 @@ let equal
        exported_env
        t.exported_env
   && Solver_env_disjunction.equal enabled_on_platforms t.enabled_on_platforms
+  && Option.equal Dune_digest.equal build_id t.build_id
 ;;
 
 let hash
@@ -560,6 +565,7 @@ let hash
       ; info
       ; exported_env
       ; enabled_on_platforms
+      ; build_id
       }
   =
   Poly.hash
@@ -570,7 +576,8 @@ let hash
     , depexts
     , Info.hash info
     , exported_env
-    , Solver_env_disjunction.hash enabled_on_platforms )
+    , Solver_env_disjunction.hash enabled_on_platforms
+    , Option.map build_id ~f:Dune_digest.hash )
 ;;
 
 let digest_feed
@@ -583,6 +590,7 @@ let digest_feed
       ; info
       ; exported_env
       ; enabled_on_platforms
+      ; build_id = _ (* Not included: build_id is derived from this digest *)
       }
   =
   Conditional_choice.digest_feed Digest_feed.generic hasher build_command;
@@ -604,6 +612,7 @@ let to_dyn
       ; info
       ; exported_env
       ; enabled_on_platforms
+      ; build_id
       }
   =
   Dyn.record
@@ -616,6 +625,7 @@ let to_dyn
     ; ( "exported_env"
       , Dyn.list (Action.Env_update.to_dyn String_with_vars.to_dyn) exported_env )
     ; "enabled_on_platforms", Solver_env_disjunction.to_dyn enabled_on_platforms
+    ; "build_id", Dyn.option (fun d -> Dyn.string (Dune_digest.to_string d)) build_id
     ]
 ;;
 
@@ -628,6 +638,7 @@ let remove_locs
       ; info
       ; exported_env
       ; enabled_on_platforms
+      ; build_id
       }
   =
   { info = Info.remove_locs info
@@ -639,6 +650,7 @@ let remove_locs
   ; build_command = Conditional_choice.map build_command ~f:Build_command.remove_locs
   ; install_command = Conditional_choice.map install_command ~f:Action.remove_locs
   ; enabled_on_platforms
+  ; build_id
   }
 ;;
 
@@ -692,6 +704,7 @@ module Fields = struct
   let exported_env = "exported_env"
   let extra_sources = "extra_sources"
   let enabled_on_platforms = "enabled_on_platforms"
+  let build_id = "build_id"
 end
 
 let decode ~portable_lock_dir =
@@ -744,6 +757,14 @@ let decode ~portable_lock_dir =
          Fields.enabled_on_platforms
          ~default:Enabled_on_platforms.All
          Enabled_on_platforms.decode
+     and+ build_id =
+       field_o
+         Fields.build_id
+         (string
+          >>| fun s ->
+          match Dune_digest.from_hex s with
+          | Some d -> d
+          | None -> Code_error.raise "Invalid build_id hex string" [ "s", Dyn.string s ])
      in
      fun ~lock_dir ~solved_for_platforms name ->
        let install_command =
@@ -792,6 +813,7 @@ let decode ~portable_lock_dir =
        ; info
        ; exported_env
        ; enabled_on_platforms
+       ; build_id
        }
 ;;
 
@@ -811,6 +833,7 @@ let encode
       ; info = { Info.name = _; extra_sources; version; dev; avoid; source }
       ; exported_env
       ; enabled_on_platforms
+      ; build_id
       }
   =
   let open Encoder in
@@ -896,6 +919,10 @@ let encode
      ; field_b Fields.avoid avoid
      ; field_l Fields.exported_env Action.Env_update.encode exported_env
      ; field_l Fields.extra_sources encode_extra_source extra_sources
+     ; field_o
+         Fields.build_id
+         (fun d -> Dune_sexp.atom (Dune_digest.to_string d))
+         build_id
      ]
      @ enabled_on_platforms)
 ;;
@@ -956,19 +983,30 @@ let merge_conditionals a b =
       b.post_depends
   in
   let enabled_on_platforms = a.enabled_on_platforms @ b.enabled_on_platforms in
+  (* Set build_id to None for merged result - it will be recomputed after merging.
+     build_id is platform-specific (depends on deps which can vary by platform),
+     so we don't compare it when checking for non-platform-specific differences. *)
   let ret =
-    { a with build_command; install_command; depends; post_depends; enabled_on_platforms }
+    { a with
+      build_command
+    ; install_command
+    ; depends
+    ; post_depends
+    ; enabled_on_platforms
+    ; build_id = None
+    }
   in
   if
     not
       (equal
-         ret
+         { ret with build_id = None }
          { b with
            build_command
          ; install_command
          ; depends
          ; post_depends
          ; enabled_on_platforms
+         ; build_id = None
          })
   then
     Code_error.raise
@@ -1458,5 +1496,6 @@ let of_opam_file ~name ~version ~source ~opam () =
   ; info
   ; exported_env
   ; enabled_on_platforms = []
+  ; build_id = None
   }
 ;;

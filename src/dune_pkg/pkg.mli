@@ -188,6 +188,10 @@ type t =
   ; info : Info.t
   ; exported_env : String_with_vars.t Action.Env_update.t list
   ; enabled_on_platforms : Solver_env_disjunction.t
+  ; build_id : Dune_digest.t option
+    (** Recursive build-id: hash(content, deps' build_ids).
+        Computed at lock time for deterministic toolchain/dev-tool caching.
+        None for lock files created before this feature. *)
   }
 
 val equal : t -> t -> bool
@@ -211,6 +215,7 @@ module Fields : sig
   val exported_env : string
   val extra_sources : string
   val enabled_on_platforms : string
+  val build_id : string
 end
 
 val decode

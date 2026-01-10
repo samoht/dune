@@ -214,11 +214,12 @@ module Spec = struct
       (* Provide a proper location pointing to the lock directory target *)
       let loc = Loc.in_file (Path.build target) in
       User_error.raise ~loc [ diagnostic ]
-    | Ok { pinned_packages; files; lock_dir; _ } ->
-      let lock_dir_path = Path.build target in
+    | Ok { pinned_packages; files = _; lock_dir; _ } ->
+      let lock_file_path = Path.build target in
       let+ lock_dir = Dune_pkg.Lock.compute_missing_checksums ~pinned_packages lock_dir in
-      Dune_pkg.Lock.Write_disk.prepare ~portable_lock_dir ~lock_dir_path ~files lock_dir
-      |> Dune_pkg.Lock.Write_disk.commit
+      (* Write single-file format instead of directory format *)
+      let file = Dune_pkg.Lock.File.of_lock lock_dir in
+      Dune_pkg.Lock.File.write_to_disk ~lock_file_path file
   ;;
 end
 
@@ -410,11 +411,15 @@ let project_pins =
     Pin.DB.combine_exn acc pins)
 ;;
 
-(* Generate single-file lock at _build/.locks/<ctx>/dune.lock (file, not directory).
-   This is the canonical format that gets promoted to the source tree. *)
+(* Generate single-file lock at _build/.locks/<ctx>/<lock_name>/lock (file).
+   Structure: _build/.locks/<ctx>/<lock_name>/
+                 lock      <- single-file format (canonical)
+                 pkgs/     <- derived directory (for building) *)
 let setup_lock_rules ~dir ~lock_dir : Gen_rules.result =
-  (* Target is a file, not a directory *)
-  let target = Path.Build.append_local dir lock_dir in
+  (* Target directory: _build/.locks/<ctx>/<lock_name>/ *)
+  let lock_subdir = Path.Build.append_local dir lock_dir in
+  (* Target file: _build/.locks/<ctx>/<lock_name>/lock *)
+  let target = Path.Build.relative lock_subdir "lock" in
   let lock_dir_param = lock_dir in
   let rules =
     let+ workspace = Workspace.workspace () in
@@ -690,15 +695,20 @@ let lock_is_in_sync lock_dir_path =
 ;;
 
 (* Set up rules to generate lock and derive pkgs/ directory.
+   Structure: _build/.locks/<ctx>/<lock_name>/
+                 lock      <- single-file format (canonical)
+                 pkgs/     <- derived directory (for building)
    When generating a new lock:
-   1. Generate single-file at _build/.locks/<ctx>/dune.lock (file)
-   2. Derive pkgs/ directory at _build/.locks/<ctx>/pkgs/
-   3. Promote single-file to source tree dune.lock *)
+   1. Generate single-file at _build/.locks/<ctx>/<lock_name>/lock
+   2. Derive pkgs/ at _build/.locks/<ctx>/<lock_name>/pkgs/
+   3. TODO: Promote single-file to source tree *)
 let setup_generated_lock_rules ~dir ~lock_dir ~lock_dir_local =
-  (* Single-file target: _build/.locks/<ctx>/dune.lock *)
-  let lock_file_target = Path.Build.append_local dir lock_dir in
-  (* Pkgs directory target: _build/.locks/<ctx>/pkgs/ *)
-  let pkgs_dir_target = Path.Build.relative dir "pkgs" in
+  (* Lock subdirectory: _build/.locks/<ctx>/<lock_name>/ *)
+  let lock_subdir = Path.Build.append_local dir lock_dir in
+  (* Single-file target: _build/.locks/<ctx>/<lock_name>/lock *)
+  let lock_file_target = Path.Build.relative lock_subdir "lock" in
+  (* Pkgs directory target: _build/.locks/<ctx>/<lock_name>/pkgs/ *)
+  let pkgs_dir_target = Path.Build.relative lock_subdir "pkgs" in
   (* Generate single-file lock rules *)
   let single_file_rules = setup_lock_rules ~dir ~lock_dir in
   (* Derive pkgs/ from the generated single-file *)
@@ -763,8 +773,10 @@ let setup_lock_rules_with_source (workspace : Workspace.t) ~dir ~lock_dir =
     let dir = Path.Build.append_source dir lock_dir_src in
     setup_copy_rules ~dir ~lock_dir:(Path.source lock_dir_src)
   | `Single_file lock_file ->
-    (* Derive pkgs/ from the source single-file lock *)
-    let pkgs_dir_target = Path.Build.relative dir "pkgs" in
+    (* Derive pkgs/ from the source single-file lock
+       Structure: _build/.locks/<ctx>/<lock_name>/pkgs/ *)
+    let lock_subdir = Path.Build.append_local dir lock_dir in
+    let pkgs_dir_target = Path.Build.relative lock_subdir "pkgs" in
     Memo.return
       (setup_single_file_derive_rules
          ~dir:pkgs_dir_target

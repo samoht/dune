@@ -751,6 +751,10 @@ let source_path_of_lock_dir_path path =
      | [ locks_dir; _ctx_name; lock_dir ]
        when String.equal locks_dir Dpath.Build.locks_dir_basename ->
        Path.Source.of_string lock_dir
+     (* Derived pkgs dir: _build/.locks/<ctx>/<lock-name>/pkgs *)
+     | [ locks_dir; _ctx_name; lock_dir; "pkgs" ]
+       when String.equal locks_dir Dpath.Build.locks_dir_basename ->
+       Path.Source.of_string lock_dir
      (* Dev tool lock dir: _build/.locks/tools-{name}/ *)
      | [ locks_dir; ctx_name ]
        when String.equal locks_dir Dpath.Build.locks_dir_basename

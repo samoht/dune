@@ -190,16 +190,16 @@ module Paths = struct
     Path.Build.append_local t.extra_sources extra_source
   ;;
 
-  let make pkg_digest universe =
+  let make pkg_id universe =
     let root =
       let ctx =
         match (universe : Package_universe.t) with
         | Dependencies ctx -> ctx
         | Dev_tool dev_tool -> Dev_tool.context_name dev_tool
       in
-      Path.Build.relative (build_dir ctx) (Pkg_id.to_string pkg_digest)
+      Path.Build.relative (build_dir ctx) (Pkg_id.to_string pkg_id)
     in
-    of_root pkg_digest.name ~root
+    of_root pkg_id.name ~root
   ;;
 
   (* Get the root directory (parent of target_dir) *)
@@ -408,7 +408,7 @@ module Resolved_pkg = struct
     ; paths : Path.t Paths.t
     ; write_paths : Path.Build.t Paths.t
     ; files_dir : Path.Build.t option
-    ; pkg_digest : Pkg_id.t
+    ; pkg_id : Pkg_id.t
     ; mutable exported_env : string Env_update.t list
     ; all_package_versions : Package_version.t Package.Name.Map.t
       (* All packages in the lock, for looking up versions of non-dependencies *)
@@ -1476,7 +1476,7 @@ end = struct
   let resolve_entry_impl registry { Entry_input.entry; universe = package_universe } =
     let { Package_registry.name; version; source } = entry in
     let pkg_name = Package.Name.to_string name in
-    let pkg_digest = Pkg_id.create ~name ~version in
+    let pkg_id = Pkg_id.create ~name ~version in
     (* Get the Pkg.t from the source *)
     let* pkg_result =
       match source with
@@ -1533,29 +1533,33 @@ end = struct
       (* Prepare paths and commands *)
       let id = Resolved_pkg.Id.gen () in
       let write_paths =
-        Paths.make pkg_digest package_universe ~relative:Path.Build.relative
+        Paths.make pkg_id package_universe ~relative:Path.Build.relative
       in
       let install_command = choose_for_current_platform pkg.install_command in
       let install_command = Option.map install_command ~f:relocate in
       let build_command = choose_for_current_platform pkg.build_command in
       let build_command = Option.map build_command ~f:relocate_build in
-      (* Compute build_id: hash(opam_content, platform, deps' build_ids)
-         This creates a Merkle tree where any change in the dep graph propagates up.
-         Platform is included to support cross-compilation scenarios. *)
+      (* Get build_id from lock file if available, otherwise compute it.
+         The build_id is a hash(opam_content, platform, deps' build_ids).
+         This creates a Merkle tree where any change in the dep graph propagates up. *)
       let build_id =
-        (* Hash the opam file content (package definition without location info) *)
-        let opam_content_hash =
-          Dune_digest.Feed.compute_digest Pkg.digest_feed (Pkg.remove_locs pkg)
-          |> Dune_digest.to_string
-        in
-        (* Use the platform from Lock_dir.Sys_vars.solver_env bound earlier *)
-        let platform_hash = Dune_digest.generic platform |> Dune_digest.to_string in
-        let deps_hashes =
-          List.map depends ~f:(fun (dep : Resolved_pkg.t) ->
-            Dune_digest.to_string dep.build_id)
-          |> List.sort ~compare:String.compare
-        in
-        Dune_digest.generic (opam_content_hash :: platform_hash :: deps_hashes)
+        match pkg.build_id with
+        | Some build_id ->
+          (* Use pre-computed build_id from lock file *)
+          build_id
+        | None ->
+          (* Compute build_id for backward compatibility with older lock files *)
+          let opam_content_hash =
+            Dune_digest.Feed.compute_digest Pkg.digest_feed (Pkg.remove_locs pkg)
+            |> Dune_digest.to_string
+          in
+          let platform_hash = Dune_digest.generic platform |> Dune_digest.to_string in
+          let deps_hashes =
+            List.map depends ~f:(fun (dep : Resolved_pkg.t) ->
+              Dune_digest.to_string dep.build_id)
+            |> List.sort ~compare:String.compare
+          in
+          Dune_digest.generic (opam_content_hash :: platform_hash :: deps_hashes)
       in
       (* Apply toolchain caching if applicable *)
       let build_command, install_command, is_cached, toolchain_cache_dir =
@@ -1638,7 +1642,7 @@ end = struct
         ; write_paths
         ; info
         ; files_dir
-        ; pkg_digest
+        ; pkg_id
         ; exported_env = []
         ; all_package_versions
         ; build_id
@@ -2612,7 +2616,7 @@ module Vendor_build = struct
 
   let build_packages_of_context ctx_name =
     let open Action_builder.O in
-    let* pkg_digests =
+    let* pkg_ids =
       Action_builder.of_memo
         (let open Memo.O in
          let* registry = Package_registry.of_ctx ctx_name in
@@ -2623,20 +2627,20 @@ module Vendor_build = struct
              match status with
              | Vendor_status.Dune_native -> None
              | Vendor_status.Not_vendored | Vendor_status.Opam_sandboxed ->
-               let pkg_digest =
+               let pkg_id =
                  Pkg_id.create ~name:entry.Package_registry.name ~version:entry.version
                in
-               Some pkg_digest)
+               Some pkg_id)
          in
-         let pkg_digests = List.filter_map filtered ~f:Fun.id in
-         let num_pkgs = List.length pkg_digests in
+         let pkg_ids = List.filter_map filtered ~f:Fun.id in
+         let num_pkgs = List.length pkg_ids in
          Pkg_build_progress.Progress.set_total num_pkgs;
          Dune_engine.Progress.set_total num_pkgs;
-         pkg_digests)
+         pkg_ids)
     in
-    List.map pkg_digests ~f:(fun pkg_digest ->
+    List.map pkg_ids ~f:(fun pkg_id ->
       let paths =
-        Paths.make ~relative:Path.Build.relative pkg_digest (Dependencies ctx_name)
+        Paths.make ~relative:Path.Build.relative pkg_id (Dependencies ctx_name)
       in
       (* Depend on the installed marker which is produced by the copy_to_prefix rule *)
       Paths.installed_marker_build paths.target_dir |> Path.build)
@@ -2813,9 +2817,7 @@ let setup_package_rules_from_entry
     Memo.return @@ Gen_rules.rules_here Gen_rules.Rules.empty
   | Vendor_status.Not_vendored | Vendor_status.Opam_sandboxed ->
     let* pkg = Resolve.resolve_entry registry entry ~package_universe in
-    let paths =
-      Paths.make pkg.pkg_digest package_universe ~relative:Path.Build.relative
-    in
+    let paths = Paths.make pkg.pkg_id package_universe ~relative:Path.Build.relative in
     let+ directory_targets =
       (* source_dir is a directory target for packages with fetched sources (produced by source_rules).
          target_dir is a directory target containing installed files (produced by build_and_install_rule). *)

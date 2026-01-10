@@ -245,23 +245,36 @@ _build/.locks/default/pkgs/
 When building with package management enabled:
 
 ```
+project/
+  dune.lock                     # single-file lock (source of truth, committed to VCS)
+
 _build/
   .locks/
-    default/                    # context name
-      dune.lock                 # single-file lock (generated, promoted to source)
-      pkgs/                     # derived directory (expanded .pkg files)
-        lock.dune
-        foo.0.9.0.pkg
-        bar.1.2.3.pkg
-        ...
+    <ctx>/                      # context name (e.g., "default")
+      <lock_name>/              # lock directory name (e.g., "dune.lock")
+        lock                    # copy of dune.lock file from source tree
+        pkgs/                   # derived directory (platform-specific .pkg files)
+          lock.dune             # metadata
+          foo.0.9.0.pkg         # package spec (build, install, deps...)
+          bar.1.2.3.pkg
+          ...
 ```
+
+### Key Paths
+
+| Path | Type | Description |
+|------|------|-------------|
+| `dune.lock` | file | Source tree, committed to VCS |
+| `_build/.locks/<ctx>/<lock>/lock` | file | Copy of dune.lock for this context |
+| `_build/.locks/<ctx>/<lock>/pkgs/` | dir | Derived .pkg files (platform-specific) |
 
 ### Flow
 
-1. **Solver runs** → generates single-file `_build/.locks/<ctx>/dune.lock`
+1. **Solver runs** → generates single-file `_build/.locks/<ctx>/<lock>/lock`
 2. **Promote to source** → copy to `dune.lock` in project root
-3. **Derive lock directory** → expand single-file to `_build/.locks/<ctx>/pkgs/`
-4. **Build packages** → use derived directory (`pkgs/`)
+3. **Derive pkgs directory** → expand to `_build/.locks/<ctx>/<lock>/pkgs/`
+   - Variables resolved for this context's os/platform (no opam variables in .pkg files)
+4. **Build packages** → uses derived `pkgs/` directory
 
 ### Derivation
 
@@ -269,9 +282,19 @@ When deriving the `pkgs/` directory from the single-file lock, dune:
 
 1. **Fetches opam-repo at pinned hash** (cached in ~/.cache/dune)
 2. **Looks up each package** → gets source URL, checksum, build commands, deps
-3. **Classifies** → duniverse (dune-built) or opam
-4. **Applies patches** → from opam repo + user patches
-5. **Writes .pkg files** → to `_build/.locks/<ctx>/pkgs/`
+3. **Resolves opam variables** → evaluates for context's os/arch/platform
+   - `%{os}%`, `%{arch}%`, `%{os-family}%` resolved to concrete values
+   - Conditional dependencies filtered based on platform
+   - No opam variables remain in derived .pkg files
+4. **Classifies** → duniverse (dune-built) or opam
+5. **Records patches** → references to patches from opam repo + user patches
+   (patches are applied to package sources at build time, not during derivation)
+6. **Writes .pkg files** → to `_build/.locks/<ctx>/<lock>/pkgs/`
+
+The derived `pkgs/` directory is **platform-specific**: each context gets its own
+derivation with variables resolved for that context's os and platform. This means
+the same `dune.lock` can produce different `pkgs/` directories for different
+build contexts (e.g., linux vs macos, or native vs cross-compilation).
 
 This is the same as what happens with auto-lock, just with pinned repo + versions.
 
@@ -326,23 +349,23 @@ No need to store in `dune.lock.d/` - that would bring back the directory problem
                                          ↑
                                     [promote]
                                          │
-Solver  ──→  _build/.locks/<ctx>/dune.lock (single-file, canonical)
+Solver  ──→  _build/.locks/<ctx>/<lock>/lock (single-file, canonical)
                                          │
-                                    [derive]
+                                    [derive for os/platform]
                                          ↓
-             _build/.locks/<ctx>/pkgs/  (directory with .pkg files)
+             _build/.locks/<ctx>/<lock>/pkgs/  (platform-specific .pkg files)
                       │
                       ↓
                Lock_dir.t (in memory)
                       │
                       ↓
-              Package builds
+              Package builds (see pkg-rules documentation)
 ```
 
 **Key paths:**
 - `dune.lock` - source tree, promoted, committed to VCS
-- `_build/.locks/<ctx>/dune.lock` - generated single-file lock
-- `_build/.locks/<ctx>/pkgs/` - derived directory with expanded .pkg files
+- `_build/.locks/<ctx>/<lock>/lock` - copy of single-file lock
+- `_build/.locks/<ctx>/<lock>/pkgs/` - derived .pkg files (platform-specific)
 
 ### Changes Required
 

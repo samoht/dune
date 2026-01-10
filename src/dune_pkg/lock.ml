@@ -224,6 +224,69 @@ let validate_packages packages =
   else Error (`Missing_dependencies missing_dependencies)
 ;;
 
+(* Compute build_ids for all packages in topological order.
+   build_id = hash(pkg_content, deps' build_ids, platforms)
+   This creates a Merkle tree where any change in the dep graph propagates up.
+
+   For multi-platform locks, all deps from all platforms are included in the
+   hash, plus the set of platforms themselves. This ensures the build_id
+   changes when any platform's deps change or when the set of platforms changes. *)
+let compute_build_ids (pkgs_by_name : Pkg.t Package_name.Map.t) =
+  let all_deps_of (pkg : Pkg.t) =
+    List.concat_map
+      pkg.depends
+      ~f:(fun (cond : Pkg.Dependency.t list Pkg.Conditional.t) -> cond.value)
+    |> List.filter_map ~f:(fun (dep : Pkg.Dependency.t) ->
+      Package_name.Map.find pkgs_by_name dep.name)
+    |> List.map ~f:(fun p -> p.Pkg.info.name)
+    |> Package_name.Set.of_list
+    |> Package_name.Set.to_list
+  in
+  let module Top_closure = Top_closure.Make (Package_name.Set) (Monad.Id) in
+  let sorted_names =
+    match
+      Top_closure.top_closure
+        (Package_name.Map.keys pkgs_by_name)
+        ~key:Fun.id
+        ~deps:(fun name ->
+          match Package_name.Map.find pkgs_by_name name with
+          | None -> []
+          | Some pkg -> all_deps_of pkg)
+    with
+    | Ok names -> names
+    | Error cycle ->
+      Code_error.raise
+        "Cycle in package dependencies"
+        [ "cycle", Dyn.list Package_name.to_dyn cycle ]
+  in
+  let build_ids = Package_name.Table.create (Package_name.Map.cardinal pkgs_by_name) in
+  List.iter sorted_names ~f:(fun name ->
+    match Package_name.Map.find pkgs_by_name name with
+    | None -> ()
+    | Some pkg ->
+      let opam_content_hash =
+        Dune_digest.Feed.compute_digest Pkg.digest_feed (Pkg.remove_locs pkg)
+        |> Dune_digest.to_string
+      in
+      let deps_hashes =
+        all_deps_of pkg
+        |> List.filter_map ~f:(Package_name.Table.find build_ids)
+        |> List.map ~f:Dune_digest.to_string
+        |> List.sort ~compare:String.compare
+      in
+      let platforms_hash =
+        pkg.enabled_on_platforms
+        |> List.map ~f:(fun env -> Solver_env.to_dyn env |> Dyn.to_string)
+        |> List.sort ~compare:String.compare
+      in
+      let build_id =
+        Dune_digest.generic (opam_content_hash :: (deps_hashes @ platforms_hash))
+      in
+      Package_name.Table.set build_ids name build_id);
+  Package_name.Map.mapi pkgs_by_name ~f:(fun name pkg ->
+    { pkg with build_id = Package_name.Table.find build_ids name })
+;;
+
 let create_latest_version
       packages
       ~local_packages
@@ -233,6 +296,7 @@ let create_latest_version
       ~solved_for_platform
       ~portable_lock_dir
   =
+  let packages = compute_build_ids packages in
   let packages =
     Package_name.Map.map packages ~f:(fun (pkg : Pkg.t) ->
       Package_version.Map.singleton pkg.info.version pkg)
@@ -1443,6 +1507,22 @@ let merge_conditionals a b =
     Code_error.raise
       "Platform-specific lockdirs differ in a non-platform-specific way"
       [ "lockdir_1", to_dyn a; "lockdir_2", to_dyn b ];
+  (* Recompute build_ids after merging since the merged packages have different
+     content (conditional deps/commands from multiple platforms) *)
+  let pkgs_by_name =
+    Packages.to_pkg_list packages
+    |> List.fold_left ~init:Package_name.Map.empty ~f:(fun acc (pkg : Pkg.t) ->
+      Package_name.Map.set acc pkg.info.name pkg)
+  in
+  let pkgs_with_ids = compute_build_ids pkgs_by_name in
+  let packages =
+    Packages.to_pkg_list packages
+    |> List.map ~f:(fun (pkg : Pkg.t) ->
+      match Package_name.Map.find pkgs_with_ids pkg.info.name with
+      | Some pkg_with_id -> pkg_with_id
+      | None -> pkg)
+    |> Packages.of_pkg_list
+  in
   { a with packages; solved_for_platforms }
 ;;
 

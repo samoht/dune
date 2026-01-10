@@ -137,20 +137,24 @@ let default_path = Path.Build.relative path_prefix default_dir |> Path.build
 let default_source_path = Path.Source.(relative root default_dir)
 
 (* Convert source lock path to build lock path.
+   Structure: _build/.locks/<ctx>/<lock_name>/
+                 lock      <- single-file format
+                 pkgs/     <- derived directory (returned for building)
+
    - If source is a directory (old format), return _build/.locks/<ctx>/<name>/
-   - If source is a single-file (new format), return _build/.locks/<ctx>/pkgs/
-   - If source doesn't exist (generated), return _build/.locks/<ctx>/pkgs/ *)
+   - If source is a single-file or generated, return _build/.locks/<ctx>/<name>/pkgs/ *)
 let lock_dir_of_source ctx_name p =
   let* is_dir = Fs_memo.dir_exists (Path.Outside_build_dir.In_source_dir p) in
   let build_prefix = build_dir ctx_name in
+  let local = Path.Source.to_local p in
+  let lock_subdir = Path.Build.append_local build_prefix local in
   if is_dir
-  then (
+  then
     (* Directory format: copy to _build/.locks/<ctx>/<name>/ *)
-    let local = Path.Source.to_local p in
-    Memo.return (Path.Build.append_local build_prefix local |> Path.build))
+    Memo.return (lock_subdir |> Path.build)
   else
-    (* Single-file or generated: derive to _build/.locks/<ctx>/pkgs/ *)
-    Memo.return (Path.Build.relative build_prefix "pkgs" |> Path.build)
+    (* Single-file or generated: derive to _build/.locks/<ctx>/<name>/pkgs/ *)
+    Memo.return (Path.Build.relative lock_subdir "pkgs" |> Path.build)
 ;;
 
 let get_source_path_for_context ctx_name =

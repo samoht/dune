@@ -149,6 +149,7 @@ let empty_package name ~version =
       }
   ; exported_env = []
   ; enabled_on_platforms = []
+  ; build_id = None
   }
 ;;
 
@@ -201,6 +202,7 @@ let%expect_test "encode/decode round trip test for lockdir with simple deps" =
                         }
                     ; exported_env = []
                     ; enabled_on_platforms = []
+                    ; build_id = Some "ff2af40dab8fb5e5fd8fc98de7ee16bd"
                     }
                 }
           ; "foo" :
@@ -221,6 +223,7 @@ let%expect_test "encode/decode round trip test for lockdir with simple deps" =
                         }
                     ; exported_env = []
                     ; enabled_on_platforms = []
+                    ; build_id = Some "e8897de83de457f50364a3c3815a36fb"
                     }
                 }
           }
@@ -376,6 +379,7 @@ let%expect_test "encode/decode round trip test for lockdir with complex deps" =
                         }
                     ; exported_env = [ { op = "="; var = "foo"; value = "bar" } ]
                     ; enabled_on_platforms = []
+                    ; build_id = Some "d46989e7dbf559225e97f124a582a4c3"
                     }
                 }
           ; "b" :
@@ -408,6 +412,7 @@ let%expect_test "encode/decode round trip test for lockdir with complex deps" =
                         }
                     ; exported_env = []
                     ; enabled_on_platforms = []
+                    ; build_id = Some "45c8a72e988bf57a9a56f292feef392b"
                     }
                 }
           ; "c" :
@@ -439,6 +444,7 @@ let%expect_test "encode/decode round trip test for lockdir with complex deps" =
                         }
                     ; exported_env = []
                     ; enabled_on_platforms = []
+                    ; build_id = Some "cb762e35898518b977cf0eb491872b77"
                     }
                 }
           }
@@ -518,6 +524,7 @@ let%expect_test "encode/decode round trip test with locked repo revision" =
                         }
                     ; exported_env = []
                     ; enabled_on_platforms = []
+                    ; build_id = Some "7266eb6fa546eb0fbc79a63943a02020"
                     }
                 }
           ; "b" :
@@ -538,6 +545,7 @@ let%expect_test "encode/decode round trip test with locked repo revision" =
                         }
                     ; exported_env = []
                     ; enabled_on_platforms = []
+                    ; build_id = Some "fe5645d7945c224bbe1c4eee25d0e475"
                     }
                 }
           ; "c" :
@@ -558,6 +566,7 @@ let%expect_test "encode/decode round trip test with locked repo revision" =
                         }
                     ; exported_env = []
                     ; enabled_on_platforms = []
+                    ; build_id = Some "778165ba6195589d697b755889f286c4"
                     }
                 }
           }

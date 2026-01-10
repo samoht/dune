@@ -1607,6 +1607,7 @@ module Solver_result = struct
     }
 
   let merge a b =
+    (* Lock.merge_conditionals computes build_ids internally *)
     let lock_dir = Lock.merge_conditionals a.lock_dir b.lock_dir in
     let files =
       Package_name.Map.union a.files b.files ~f:(fun _ a b ->
@@ -1912,8 +1913,14 @@ let solve_lock_dir
                ~local_packages
                ~pkgs_by_name
            in
-           Package_name.Map.filteri pkgs_by_name ~f:(fun name _ ->
-             Package_name.Set.mem reachable name)
+           let pkgs_by_name =
+             Package_name.Map.filteri pkgs_by_name ~f:(fun name _ ->
+               Package_name.Set.mem reachable name)
+           in
+           (* Build IDs are computed after merging all platforms. See
+              Solver_result.merge for multi-platform and the write_disk
+              functions for single-platform locks. *)
+           pkgs_by_name
        in
        let ocaml =
          let open Result.O in
