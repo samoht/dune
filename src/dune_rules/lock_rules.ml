@@ -680,7 +680,8 @@ let setup_single_file_derive_rules ~dir:target ~lock_file ~lock_dir_local =
   Gen_rules.make ~directory_targets rules
 ;;
 
-(* Check if lock file is in sync with dune-project dependencies *)
+(* Check if lock file is in sync with dune-project dependencies.
+   Handles both directory format (dune.lock/) and single-file format (dune.lock file). *)
 let lock_is_in_sync lock_dir_path =
   let* lock_dir_exists =
     let* is_dir =
@@ -697,11 +698,12 @@ let lock_is_in_sync lock_dir_path =
     let* local_packages =
       Dune_load.packages () >>| Dune_lang.Package.Name.Map.map ~f:Local_package.of_package
     in
-    (* Try to load the lock dir to check its dependency hash *)
+    (* Try to load the lock dir to check its dependency hash.
+       Use Lock_pkg.read_disk_minimal which handles both directory and single-file formats. *)
     let path = Path.source lock_dir_path in
-    match Lock.read_disk path with
-    | Error _ -> Memo.return false (* Can't load = out of sync *)
-    | Ok lock_dir ->
+    match Lock_pkg.read_disk_minimal ~local_packages path with
+    | exception _ -> Memo.return false (* Can't load = out of sync *)
+    | lock_dir ->
       let saved_hash = Option.map ~f:snd lock_dir.dependency_hash in
       Memo.return
         (match Package_universe.up_to_date local_packages ~dependency_hash:saved_hash with
