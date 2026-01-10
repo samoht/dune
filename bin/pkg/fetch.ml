@@ -438,10 +438,10 @@ let fetch_duniverse ~lock_dir_path ~solver_env ~local_packages () =
           then
             (* Opam package - needs sandbox, include libraries if found *)
             if List.is_empty libs
-            then Some (sprintf "(vendor %s (build opam))" dirname)
+            then Some (sprintf "(vendor %s (mode opam))" dirname)
             else (
               let libs_str = String.concat ~sep:" " libs in
-              Some (sprintf "(vendor %s (build opam) (libraries %s))" dirname libs_str))
+              Some (sprintf "(vendor %s (mode opam) (libraries %s))" dirname libs_str))
           else if List.is_empty libs
           then None
           else (
@@ -577,10 +577,10 @@ let auto_fetch_missing ~lock_dir_path ~solver_env ~local_packages () =
           then
             (* Opam package - needs sandbox, include libraries if found *)
             if List.is_empty libs
-            then Some (sprintf "(vendor %s (build opam))" dirname)
+            then Some (sprintf "(vendor %s (mode opam))" dirname)
             else (
               let libs_str = String.concat ~sep:" " libs in
-              Some (sprintf "(vendor %s (build opam) (libraries %s))" dirname libs_str))
+              Some (sprintf "(vendor %s (mode opam) (libraries %s))" dirname libs_str))
           else if List.is_empty libs
           then None
           else (

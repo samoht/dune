@@ -2720,7 +2720,7 @@ module Vendor_build = struct
           | None ->
             User_error.raise
               [ Pp.textf
-                  "Vendor directory %s has (build opam) but no opam file found. Try \
+                  "Vendor directory %s has (mode opam) but no opam file found. Try \
                    running 'dune pkg fetch' to generate opam files."
                   (Path.Source.to_string subdir_path)
               ]

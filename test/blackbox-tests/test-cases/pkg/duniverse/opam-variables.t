@@ -65,7 +65,7 @@ Verify the vendor stanza was created:
   $ cat duniverse/dune
   ; This directory is managed by dune pkg
   (vendored_dirs *)
-  (vendor var-pkg.1.2.3 (build opam))
+  (vendor var-pkg.1.2.3 (mode opam))
 
 Build:
 

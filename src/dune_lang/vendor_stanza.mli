@@ -7,7 +7,7 @@ open Import
     Syntax:
     {[
       (vendor fmt.0.9.0 (libraries fmt fmt.tty))
-      (vendor make-pkg.1.0.0 (build opam))  ; Build using opam sandbox
+      (vendor make-pkg.1.0.0 (mode opam))  ; Build using opam sandbox
       (vendor yojson.1.7.0 (libraries (yojson :as yojson_v1)))
     ]}
 

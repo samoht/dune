@@ -81,9 +81,10 @@ vendor/
  (mode <build-mode>))         ; optional: dune | opam
 ```
 
-Where `<lib-spec>` is:
-- `<name>` — expose library with its original name
-- `(<name> :as <alias>)` — expose library under a different name
+Both `<lib-spec>` and `<pkg-spec>` use the standard ordered set language (like `(modules ...)`) with:
+- `:standard` — all libraries/packages found in the directory
+- `<name>` — expose with its original name
+- `(<name> :as <alias>)` — expose under a different name
 
 All fields are optional. When omitted:
 - `(libraries ...)` and `(packages ...)` should be auto-detected by scanning the directory
@@ -172,6 +173,28 @@ Patches listed in `patches:` should be applied, including conditional patches
 - Should build in `_build/.pkgs/<context>/<name>.<version>-<build-id>/`
 - Should install to `_build/install/<context>/`
 
+**Build-id computation:**
+The `build-id` is a content-addressable hash computed at lock time for deterministic caching.
+It forms a Merkle tree over the dependency graph:
+
+```
+build_id(pkg) = hash(
+  pkg_content_hash,      # hash of package definition (version, build commands, etc.)
+  sorted(deps_build_ids), # build_ids of all dependencies
+  platforms_hash         # set of platforms the package is enabled on
+)
+```
+
+Any change to a package or its transitive dependencies produces a new build-id, enabling:
+- Deterministic toolchain caching (same inputs → same build-id → cache hit)
+- Dev tool caching across projects
+- Precise cache invalidation when dependencies change
+
+**Cross-compilation:**
+When building for cross-compilation targets (`-x windows`, MirageOS, etc.), the opam
+build-mode context should set up proper `OCAMLFIND_TOOLCHAIN`, sysroot paths, and
+cross-compiler variables so that non-dune packages "just work".
+
 ## Use Cases
 
 ### Gradual Migration
@@ -212,8 +235,8 @@ Expose only public libraries:
 (vendor vendor/lwt.5.7.0
  (libraries lwt lwt.unix))
 
-(vendor vendor/async.0.16.0
- (libraries async async_kernel))
+(vendor vendor/cohttp.6.0.0
+ (libraries :standard \ cohttp-async))
 ```
 
 ## Compatibility
@@ -226,6 +249,11 @@ Expose only public libraries:
 ```
 
 No migration required.
+
+**Composition with opam:**
+Vendored libraries appear in the build graph like any other library. A project can
+mix vendored dependencies with opam-installed dependencies — this is no different
+from existing `(vendored_dirs)` behavior.
 
 ## Alternatives Considered
 
@@ -249,6 +277,23 @@ Rejected: splits configuration, requires modifying vendored sources.
  (vendor_alias yojson_v1))
 ```
 Rejected: requires modifying vendored dune files.
+
+## Non-goals
+
+The following are explicitly out of scope for this RFC:
+
+- **Source fetching**: How sources get into the vendor directory is not dune's concern
+- **Version resolution**: Dune builds what's there, it doesn't resolve dependencies
+- **Checksums/reproducibility**: Ensuring vendored sources are correct is the user's responsibility
+- **Depexts**: Dune already has a depext system (`dune show depexts`); improvements
+  should be addressed in a separate RFC
+
+## Future Work
+
+The `(vendor)` stanza provides build-time infrastructure that higher-level tools can
+target. Lock file generators, source fetchers, or dependency managers can generate
+`(vendor)` stanzas as their output format, enabling a clean separation between
+resolution and building.
 
 ## Open Questions
 

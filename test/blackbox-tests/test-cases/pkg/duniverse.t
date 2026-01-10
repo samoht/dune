@@ -135,7 +135,7 @@ Verify the dune file marks packages as vendored:
   ; This directory is managed by dune pkg
   (vendored_dirs *)
   (vendor mylib.1.0.0 (libraries mylib))
-  (vendor makelib.1.0.0 (build opam))
+  (vendor makelib.1.0.0 (mode opam))
 
 Verify the library code was fetched:
   $ cat duniverse/mylib.1.0.0/mylib.ml

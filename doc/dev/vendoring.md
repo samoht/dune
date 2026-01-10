@@ -297,7 +297,7 @@ Example:
 
 ```lisp
 (vendor dune-release.2.0.0
- (build opam))  ; needs opam environment simulation
+ (mode opam))  ; needs opam environment simulation
 ```
 
 ## Generated Vendor File
@@ -316,7 +316,7 @@ for each fetched package:
  (libraries cmdliner))
 
 (vendor opam-state.2.2.0
- (build opam))
+ (mode opam))
 ```
 
 ### Generation Logic
@@ -476,7 +476,7 @@ the generated `duniverse/dune`.
 **Status**: Implemented
 
 When `dune pkg fetch` fetches packages to duniverse, it also writes opam files
-for each package. This enables `(build opam)` packages to be built standalone
+for each package. This enables `(mode opam)` packages to be built standalone
 without needing the lock directory.
 
 ### Implementation
@@ -500,7 +500,7 @@ For directory lock format (`dune.lock/` directory):
 
 ### Build Behavior
 
-When building `(build opam)` packages, dune reads build/install commands
+When building `(mode opam)` packages, dune reads build/install commands
 directly from the local opam file in duniverse. This means:
 
 - **No lock directory needed at build time** - all information is in duniverse
@@ -520,7 +520,7 @@ stanza:
 
 ```lisp
 (vendor zarith.1.14
- (build opam)
+ (mode opam)
  (build_command (run ./configure) (run make))
  (install_command (run make install PREFIX=%{prefix}%)))
 ```

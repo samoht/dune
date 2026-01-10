@@ -7,7 +7,7 @@ open Import
     Syntax:
     {[
       (vendor fmt.0.9.0 (libraries fmt fmt.tty))
-      (vendor make-pkg.1.0.0 (build opam))  ; Build using opam sandbox
+      (vendor make-pkg.1.0.0 (mode opam))  ; Build using opam sandbox
       (vendor yojson.1.7.0 (libraries (yojson :as yojson_v1)))
     ]}
 
@@ -96,7 +96,7 @@ let decode =
   @@
   let+ libraries = field_o "libraries" (repeat Library_entry.decode)
   and+ packages = field_o "packages" (repeat Package_name.decode)
-  and+ build_method = field_o "build" Build_method.decode in
+  and+ build_method = field_o "mode" Build_method.decode in
   { loc; directory; libraries; packages; build_method }
 ;;
 

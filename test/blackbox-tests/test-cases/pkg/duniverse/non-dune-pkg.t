@@ -46,7 +46,7 @@ Note: make-pkg is classified as "opam:" (non-dune package).
 Now test with a package that has an actual source.
 
 Create source files for a non-dune package (uses make).
-Include an opam file for the build instructions (required for (build opam)):
+Include an opam file for the build instructions (required for (mode opam)):
 
   $ mkdir -p pkg-source
   $ cat >pkg-source/Makefile <<'EOF'
@@ -94,7 +94,7 @@ The duniverse directory should have the vendored_dirs stanza:
   $ cat duniverse/dune
   ; This directory is managed by dune pkg
   (vendored_dirs *)
-  (vendor make-pkg.1.0.0 (build opam))
+  (vendor make-pkg.1.0.0 (mode opam))
 
 Now test the full workflow: build a project that uses the duniverse non-dune package.
 
