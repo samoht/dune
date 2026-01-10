@@ -190,7 +190,7 @@ module Paths = struct
     Path.Build.append_local t.extra_sources extra_source
   ;;
 
-  let make pkg_id universe =
+  let make pkg_id universe ~relative =
     let root =
       let ctx =
         match (universe : Package_universe.t) with
@@ -199,7 +199,7 @@ module Paths = struct
       in
       Path.Build.relative (build_dir ctx) (Pkg_id.to_string pkg_id)
     in
-    of_root pkg_id.name ~root
+    of_root pkg_id.name ~root ~relative
   ;;
 
   (* Get the root directory (parent of target_dir) *)
@@ -421,6 +421,9 @@ module Resolved_pkg = struct
     ; context : Context_name.t
     ; is_dev_tool : bool
       (* Whether this package is the main dev tool package (installs to default context) *)
+    ; install_to_prefix : bool
+      (* Whether to install this package to the shared prefix. Defaults to true.
+         Set to false for vendor packages with library remapping. *)
     }
 
   module Top_closure = Top_closure.Make (Id.Set) (Monad.Id)
@@ -488,8 +491,14 @@ module Resolved_pkg = struct
     | Some root -> loop root Path.Local.Set.empty Path.Local.root
   ;;
 
-  (* Depend on the installed marker, which indicates files are in shared prefix *)
-  let dep t = Dep.file (Paths.installed_marker t.paths.target_dir)
+  (* Depend on the appropriate marker based on install_to_prefix.
+     - install_to_prefix=true: depend on installed marker (files in shared prefix)
+     - install_to_prefix=false: depend on cookie file (build completed, files in target_dir) *)
+  let dep t =
+    if t.install_to_prefix
+    then Dep.file (Paths.installed_marker t.paths.target_dir)
+    else Dep.file (Paths.install_cookie t.paths.target_dir)
+  ;;
 
   let package_deps t =
     deps_closure t
@@ -1477,6 +1486,13 @@ end = struct
     let { Package_registry.name; version; source } = entry in
     let pkg_name = Package.Name.to_string name in
     let pkg_id = Pkg_id.create ~name ~version in
+    (* Determine if this package should be installed to the shared prefix.
+       Vendor stanzas can set (install false) for packages with library remapping. *)
+    let install_to_prefix =
+      match source with
+      | Package_registry.Source.From_lock _ -> true
+      | Package_registry.Source.From_vendor { stanza; _ } -> stanza.Vendor_stanza.install
+    in
     (* Get the Pkg.t from the source *)
     let* pkg_result =
       match source with
@@ -1655,6 +1671,7 @@ end = struct
                (* Only the main dev tool package (not its deps) installs to default context *)
                Package.Name.equal info.name (Dune_pkg.Dev_tool.package_name dev_tool)
              | Package_universe.Dependencies _ -> false)
+        ; install_to_prefix
         }
       in
       let+ exported_env =
@@ -2567,10 +2584,15 @@ let copy_to_prefix_rule (pkg : Resolved_pkg.t) =
 let gen_rules context_name (pkg : Resolved_pkg.t) =
   let* source_deps, copy_rules = source_rules pkg in
   let* () = copy_rules
-  and* build_install_rule = build_and_install_rule context_name pkg ~source_deps
-  and* copy_rule = Memo.return (copy_to_prefix_rule pkg) in
+  and* build_install_rule = build_and_install_rule context_name pkg ~source_deps in
   let* () = rule ~loc:Loc.none build_install_rule in
-  rule ~loc:Loc.none copy_rule
+  (* Only generate copy_to_prefix rule if install_to_prefix is true.
+     Packages with (install false) stay in their target_dir and are linked directly. *)
+  if pkg.install_to_prefix
+  then (
+    let copy_rule = copy_to_prefix_rule pkg in
+    rule ~loc:Loc.none copy_rule)
+  else Memo.return ()
 ;;
 
 module Gen_rules = Build_config.Gen_rules
@@ -2648,7 +2670,7 @@ module Vendor_build = struct
 
   let build_packages_of_context ctx_name =
     let open Action_builder.O in
-    let* pkg_ids =
+    let* pkg_infos =
       Action_builder.of_memo
         (let open Memo.O in
          let* registry = Package_registry.of_ctx ctx_name in
@@ -2662,20 +2684,29 @@ module Vendor_build = struct
                let pkg_id =
                  Pkg_id.create ~name:entry.Package_registry.name ~version:entry.version
                in
-               Some pkg_id)
+               (* Check if this package should be installed to prefix *)
+               let install_to_prefix =
+                 match entry.source with
+                 | Package_registry.Source.From_lock _ -> true
+                 | Package_registry.Source.From_vendor { stanza; _ } ->
+                   stanza.Vendor_stanza.install
+               in
+               Some (pkg_id, install_to_prefix))
          in
-         let pkg_ids = List.filter_map filtered ~f:Fun.id in
-         let num_pkgs = List.length pkg_ids in
+         let pkg_infos = List.filter_map filtered ~f:Fun.id in
+         let num_pkgs = List.length pkg_infos in
          Pkg_build_progress.Progress.set_total num_pkgs;
          Dune_engine.Progress.set_total num_pkgs;
-         pkg_ids)
+         pkg_infos)
     in
-    List.map pkg_ids ~f:(fun pkg_id ->
+    List.map pkg_infos ~f:(fun (pkg_id, install_to_prefix) ->
       let paths =
         Paths.make ~relative:Path.Build.relative pkg_id (Dependencies ctx_name)
       in
-      (* Depend on the installed marker which is produced by the copy_to_prefix rule *)
-      Paths.installed_marker_build paths.target_dir |> Path.build)
+      (* Depend on the appropriate marker based on install_to_prefix *)
+      if install_to_prefix
+      then Paths.installed_marker_build paths.target_dir |> Path.build
+      else Paths.install_cookie_build paths.target_dir |> Path.build)
     |> Action_builder.paths
   ;;
 
@@ -2878,7 +2909,8 @@ let setup_package_rules_from_entry
 
 (* Set up package rules for a dev tool context.
    Dev tool contexts are not workspace contexts, so we load their lock
-   directories directly instead of using Package_registry. *)
+   directories directly instead of using Package_registry.
+   Path uses only package name (no version) - use find by name only. *)
 let setup_dev_tool_pkg_rules dev_tool ~dir pkg_id =
   let* lock_dir_opt = Dev_tool.load_lock_dir_if_exists dev_tool in
   match lock_dir_opt with
@@ -2888,19 +2920,10 @@ let setup_dev_tool_pkg_rules dev_tool ~dir pkg_id =
     let pkgs = Dune_pkg.Lock.packages_on_platform lock_dir ~platform in
     (match Package.Name.Map.find pkgs pkg_id.Pkg_id.name with
      | None -> Memo.return @@ Gen_rules.make (Memo.return Rules.empty)
-     | Some pkg
-       when not (Package_version.equal pkg.Dune_pkg.Pkg.info.version pkg_id.version) ->
-       (* Version mismatch *)
-       Memo.return @@ Gen_rules.make (Memo.return Rules.empty)
      | Some _pkg ->
        (* Create a registry from all lock packages for dependency resolution *)
        let registry = Package_registry.of_lock_packages pkgs in
-       (match
-          Package_registry.find_by_name_version
-            registry
-            ~name:pkg_id.name
-            ~version:pkg_id.version
-        with
+       (match Package_registry.find registry pkg_id.name with
         | None -> Memo.return @@ Gen_rules.make (Memo.return Rules.empty)
         | Some entry ->
           setup_package_rules_from_entry
@@ -2920,22 +2943,19 @@ let setup_pkg_context_rules ctx ~dir ~components =
       (Memo.return Rules.empty)
     |> Memo.return
   | [ pkg_dir_string ] ->
-    (* _build/.pkgs/<ctx>/<pkg_dir>/ - set up package build rules. *)
-    let pkg_id = Pkg_id.of_string pkg_dir_string in
+    (* _build/.pkgs/<ctx>/<pkg_dir>/ - set up package build rules.
+       Path uses only package name (no version) - use find by name only. *)
+    let pkg_name = Pkg_id.name_of_string pkg_dir_string in
     (* Check if this is a dev tool context *)
     (match Dev_tool.of_context_name ctx with
      | Some dev_tool ->
        (* Dev tool context - load lock directory directly *)
+       let pkg_id = Pkg_id.of_string pkg_dir_string in
        setup_dev_tool_pkg_rules dev_tool ~dir pkg_id
      | None ->
        (* Regular context - use Package_registry *)
        let* registry = Package_registry.of_ctx ctx in
-       (match
-          Package_registry.find_by_name_version
-            registry
-            ~name:pkg_id.name
-            ~version:pkg_id.version
-        with
+       (match Package_registry.find registry pkg_name with
         | None ->
           (* Package not found in registry - no rules *)
           Memo.return @@ Gen_rules.make (Memo.return Rules.empty)

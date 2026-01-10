@@ -17,6 +17,5 @@ We add the current directory to PATH. Dune will expand %{make} and should prefer
 gmake.
   $ PATH=.:$PATH
   $ build_pkg testpkg
-  Error: Don't know how to build _build/.pkgs/default/testpkg/installed
-  [1]
+  $TESTCASE_ROOT/gmake
 

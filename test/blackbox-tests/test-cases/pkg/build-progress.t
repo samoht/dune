@@ -9,18 +9,14 @@ Add a lock file for a fake library foo:
 
 Verify that the build progress is displayed correctly
   $ dune build @pkg-install --display short
-  Error: No rule found for .pkgs/foo/installed
-  -> required by alias pkg-install
-  [1]
+      Building foo.0.0.1 (1/1)
+    Installing foo.0.0.1 (1/1)
 
   $ dune clean
 
   $ dune build @pkg-install --display verbose 2>&1 | grep Building
-  [1]
+      Building foo.0.0.1 (1/1)
 
   $ dune clean
 
   $ dune build @pkg-install --display quiet
-  Error: No rule found for .pkgs/foo/installed
-  -> required by alias pkg-install
-  [1]

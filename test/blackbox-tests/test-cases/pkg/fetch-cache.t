@@ -32,7 +32,11 @@ The first build should succeed, fetching the source, populating the cache and
 disabling the download of the source a second time.
 
   $ build_pkg test
-  Error: Don't know how to build _build/.pkgs/default/test/installed
+  File "dune.lock/test.pkg", line 4, characters 7-25:
+  4 |   (url http://localhost:1)
+             ^^^^^^^^^^^^^^^^^^
+  Error: Download failed with code 404
+         
   [1]
 
 Make sure that the file that was fetched is in the cache:
@@ -48,12 +52,6 @@ cache, it will fail, as the source is 404 now:
   $ build_pkg test
   Error: No opam file found for vendored package test in duniverse/test.0.0.1
   -> required by - package test
-  -> required by lock directory environment for context "default"
-  -> required by base environment for context "default"
-  -> required by loading findlib for context "default"
-  -> required by loading the OCaml compiler for context "default"
-  Error: Vendor directory duniverse/test.0.0.1 has (mode opam) but no opam file
-  found. Try running 'dune pkg fetch' to generate opam files.
   [1]
 
 However when enabling the cache again, the file that was fetched in the first
@@ -64,10 +62,4 @@ build should be retrieved from the cache and the build succeed:
   $ build_pkg test
   Error: No opam file found for vendored package test in duniverse/test.0.0.1
   -> required by - package test
-  -> required by lock directory environment for context "default"
-  -> required by base environment for context "default"
-  -> required by loading findlib for context "default"
-  -> required by loading the OCaml compiler for context "default"
-  Error: Vendor directory duniverse/test.0.0.1 has (mode opam) but no opam file
-  found. Try running 'dune pkg fetch' to generate opam files.
   [1]

@@ -14,10 +14,6 @@ Install ocamlformat once to generate the lockdir.
   Solution for _build/.locks/tools-ocamlformat (1 package)
   dune:
   - ocamlformat.0.26.0
-  Error: No rule found for .pkgs/ocamlformat/installed (context
-  tools-ocamlformat)
-  -> required by _build/install/default/bin/ocamlformat
-  [1]
 
 Delete ocamlformat's lockfile.
   $ rm "${dev_tool_lock_dir}"/ocamlformat.pkg
@@ -31,7 +27,3 @@ Reinstall ocamlformat.
   Solution for _build/.locks/tools-ocamlformat (1 package)
   dune:
   - ocamlformat.0.26.0
-  Error: No rule found for .pkgs/ocamlformat/installed (context
-  tools-ocamlformat)
-  -> required by _build/install/default/bin/ocamlformat
-  [1]

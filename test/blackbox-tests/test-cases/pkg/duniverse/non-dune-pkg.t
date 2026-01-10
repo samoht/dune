@@ -111,9 +111,6 @@ Check source directory exists:
   opam
 
   $ dune build @pkg-install 2>&1
-  Error: No rule found for .pkgs/make-pkg/installed
-  -> required by alias pkg-install
-  [1]
 
 Check package was built (opam packages use .pkgs sandbox, not duniverse build):
 
@@ -136,9 +133,6 @@ Force rebuild by cleaning:
 
   $ dune clean
   $ dune build @pkg-install 2>&1
-  Error: No rule found for .pkgs/make-pkg/installed
-  -> required by alias pkg-install
-  [1]
 
 This confirms that non-dune packages fetched to duniverse:
 1. Are built using the .pkg sandbox (existing behavior)

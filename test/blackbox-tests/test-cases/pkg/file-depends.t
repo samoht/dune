@@ -35,14 +35,12 @@ Now we make a package depending on file-depends.
 Building dep should show both of them as being built.
 
   $ build_pkg dep
-  Error: Don't know how to build _build/.pkgs/default/dep/installed
-  [1]
+  Building file-depends
+  Building dep
 
 Building again causes no rebuild as expected.
 
   $ build_pkg dep
-  Error: Don't know how to build _build/.pkgs/default/dep/installed
-  [1]
 
 Changing foo should cause foo to be rebuilt.
 
@@ -52,8 +50,6 @@ Changing foo should cause foo to be rebuilt.
 
 CR-someday alizter: This is broken, no rebuild is done.
   $ build_pkg dep
-  Error: Don't know how to build _build/.pkgs/default/dep/installed
-  [1]
 
 Removing foo should cause an error due to the missing file.
 
@@ -61,5 +57,3 @@ Removing foo should cause an error due to the missing file.
 
 CR-someday alizter: This is broken, no rebuild is done.
   $ build_pkg dep
-  Error: Don't know how to build _build/.pkgs/default/dep/installed
-  [1]

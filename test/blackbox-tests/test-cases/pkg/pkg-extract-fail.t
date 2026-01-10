@@ -20,12 +20,12 @@ build this package and check for sufficient error handling
   Please make sure you have the correct access rights
   and the repository exists.
   File "dune-workspace", line 6, characters 6-154:
-  6 |  (url "git+file:///Users/samoht/git/dune/_build/.sandbox/0148984e4a02c1a1df69978c715e7df2/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository"))
+  6 |  (url "git+file:///Users/samoht/git/dune/_build/.sandbox/5a2a5cbb2e022ea4b665cdaba881509d/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository"))
             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   Error: Failed to run external command:
-  'git ls-remote "file:///Users/samoht/git/dune/_build/.sandbox/0148984e4a02c1a1df69978c715e7df2/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository"'
+  'git ls-remote "file:///Users/samoht/git/dune/_build/.sandbox/5a2a5cbb2e022ea4b665cdaba881509d/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository"'
   Hint: Check that this Git URL in the project configuration is correct:
-  "file:///Users/samoht/git/dune/_build/.sandbox/0148984e4a02c1a1df69978c715e7df2/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository"
+  "file:///Users/samoht/git/dune/_build/.sandbox/5a2a5cbb2e022ea4b665cdaba881509d/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository"
   [1]
   $ build_pkg foo 2>&1 | dune_cmd print-from 'Error:' | dune_cmd print-until '^Reason' | dune_cmd subst "'[0-9]*'" X
   Error: Lock directory is not active for context "default".
@@ -48,12 +48,12 @@ captured
   Please make sure you have the correct access rights
   and the repository exists.
   File "dune-workspace", line 6, characters 6-154:
-  6 |  (url "git+file:///Users/samoht/git/dune/_build/.sandbox/0148984e4a02c1a1df69978c715e7df2/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository"))
+  6 |  (url "git+file:///Users/samoht/git/dune/_build/.sandbox/5a2a5cbb2e022ea4b665cdaba881509d/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository"))
             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   Error: Failed to run external command:
-  'git ls-remote "file:///Users/samoht/git/dune/_build/.sandbox/0148984e4a02c1a1df69978c715e7df2/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository"'
+  'git ls-remote "file:///Users/samoht/git/dune/_build/.sandbox/5a2a5cbb2e022ea4b665cdaba881509d/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository"'
   Hint: Check that this Git URL in the project configuration is correct:
-  "file:///Users/samoht/git/dune/_build/.sandbox/0148984e4a02c1a1df69978c715e7df2/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository"
+  "file:///Users/samoht/git/dune/_build/.sandbox/5a2a5cbb2e022ea4b665cdaba881509d/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository"
   [1]
 
   $ build_pkg foo 2>&1 | dune_cmd print-from 'Error:' | dune_cmd print-until '^Reason' | dune_cmd subst "'[0-9]*'" X
@@ -79,12 +79,12 @@ error message a bit less clear
   Please make sure you have the correct access rights
   and the repository exists.
   File "dune-workspace", line 6, characters 6-154:
-  6 |  (url "git+file:///Users/samoht/git/dune/_build/.sandbox/0148984e4a02c1a1df69978c715e7df2/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository"))
+  6 |  (url "git+file:///Users/samoht/git/dune/_build/.sandbox/5a2a5cbb2e022ea4b665cdaba881509d/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository"))
             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   Error: Failed to run external command:
-  'git ls-remote "file:///Users/samoht/git/dune/_build/.sandbox/0148984e4a02c1a1df69978c715e7df2/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository"'
+  'git ls-remote "file:///Users/samoht/git/dune/_build/.sandbox/5a2a5cbb2e022ea4b665cdaba881509d/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository"'
   Hint: Check that this Git URL in the project configuration is correct:
-  "file:///Users/samoht/git/dune/_build/.sandbox/0148984e4a02c1a1df69978c715e7df2/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository"
+  "file:///Users/samoht/git/dune/_build/.sandbox/5a2a5cbb2e022ea4b665cdaba881509d/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository"
   [1]
 
   $ build_pkg foo 2>&1 | dune_cmd print-from 'Error:' | dune_cmd print-until '^Reason' | dune_cmd subst "'[0-9]*'" X

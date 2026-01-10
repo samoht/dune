@@ -62,8 +62,6 @@ Make lockfiles for the packages.
 
 Test that the project can be built normally.
   $ build_pkg foo
-  Error: Don't know how to build _build/.pkgs/default/foo/installed
-  [1]
 
 Make a fake dune exe:
 
@@ -92,20 +90,9 @@ Remember the digests, to not to have to call nested Dunes:
 Call Dune with an absolute PATH as argv[0]:
 
   $ PATH=$fakepath $DUNE build "$pkg_root/$foo_digest/target/"
-  Error: No opam file found for vendored package bar in duniverse/bar.0.0.1
-  -> required by - package bar
-  -> required by lock directory environment for context "default"
-  -> required by base environment for context "default"
-  -> required by loading findlib for context "default"
-  -> required by loading the OCaml compiler for context "default"
-  [1]
   $ PATH=$fakepath $DUNE build "$pkg_root/$bar_digest/target/"
   Error: No opam file found for vendored package bar in duniverse/bar.0.0.1
   -> required by - package bar
-  -> required by lock directory environment for context "default"
-  -> required by base environment for context "default"
-  -> required by loading findlib for context "default"
-  -> required by loading the OCaml compiler for context "default"
   [1]
 
 argv[0] is set by the calling program (like a shell or cram test runner) and
@@ -120,10 +107,3 @@ and the user launches `dune` in a shell.
 
   $ dune clean
   $ PATH=$fakepath dune_cmd exec-a "dune" $DUNE build "$pkg_root/$foo_digest/target/"
-  Error: No opam file found for vendored package bar in duniverse/bar.0.0.1
-  -> required by - package bar
-  -> required by lock directory environment for context "default"
-  -> required by base environment for context "default"
-  -> required by loading findlib for context "default"
-  -> required by loading the OCaml compiler for context "default"
-  [1]

@@ -22,9 +22,6 @@ same version of the ocaml compiler as the code that it's analyzing.
   > EOF
 
   $ dune build
-  Error: No rule found for .pkgs/ocaml-base-compiler/target/cookie
-  -> required by loading the OCaml compiler for context "default"
-  [1]
 
 Initially odoc will depend on ocaml-base-compiler.5.2.0 to match the project.
   $ DUNE_CONFIG__LOCK_DEV_TOOL=enabled dune ocaml doc

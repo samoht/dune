@@ -27,8 +27,7 @@ Create a fake project and lock it:
 
 As the lock file is syncronised with `dune-pkg`, the build succeeds:
   $ build_pkg foo
-  Error: Don't know how to build _build/.pkgs/default/foo/installed
-  [1]
+  foo
 
 We add the bar dependency to the test package
   $ cat > dune-project <<EOF
@@ -55,11 +54,8 @@ We fix it and the build succeeds again:
   - bar.0.0.1
   - foo.0.0.1
   $ build_pkg foo
-  Error: Don't know how to build _build/.pkgs/default/foo/installed
-  [1]
   $ build_pkg bar
-  Error: Don't know how to build _build/.pkgs/default/bar/installed
-  [1]
+  bar
 
 Now test out-of-sync detection with single-file lock format.
 Single-file locks are derived to directory format in _build/.locks/ with
@@ -87,8 +83,7 @@ dependency_hash computed from local packages, enabling out-of-sync detection.
 
 Build works with single-file lock:
   $ build_pkg foo
-  Error: Don't know how to build _build/.pkgs/default/foo/installed
-  [1]
+  foo
 
 Add a new dependency without re-locking:
   $ cat > dune-project <<EOF
@@ -120,8 +115,5 @@ Re-lock to fix it:
 
 
   $ build_pkg foo
-  Error: Don't know how to build _build/.pkgs/default/foo/installed
-  [1]
   $ build_pkg bar
-  Error: Don't know how to build _build/.pkgs/default/bar/installed
-  [1]
+  bar

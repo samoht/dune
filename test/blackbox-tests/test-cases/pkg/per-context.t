@@ -26,5 +26,4 @@ TODO: versioning will be added once this feature is stable
   $ ln -s foo.lock bar.lock
 
   $ build_pkg test
-  Error: Don't know how to build _build/.pkgs/default/test/installed
-  [1]
+  building from default

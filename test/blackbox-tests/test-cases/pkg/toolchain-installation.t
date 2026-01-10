@@ -81,20 +81,20 @@ Also test that XDG_CACHE_HOME is respected.
 Disable auto-fetch to prevent creating duniverse/ which would interfere
 with the second run's package detection.
   $ XDG_CACHE_HOME=$PWD/fake-cache DUNE_CONFIG__TOOLCHAINS=enabled DUNE_CONFIG__AUTO_FETCH=disabled build_pkg ocaml-base-compiler
-  Error: Don't know how to build
-  _build/.pkgs/default/ocaml-base-compiler/installed
-  [1]
 
 Enumerate the contents of the fake toolchains directory:
   $ find fake-cache/dune/toolchains | sort | remove_hash
   fake-cache/dune/toolchains
+  fake-cache/dune/toolchains/ocaml-base-compiler.1-HASH
+  fake-cache/dune/toolchains/ocaml-base-compiler.1-HASH/target
+  fake-cache/dune/toolchains/ocaml-base-compiler.1-HASH/target/cookie
 
 Also test that DUNE_CACHE_ROOT is respected.
   $ DUNE_CACHE_ROOT=$PWD/other-fake-cache DUNE_CONFIG__TOOLCHAINS=enabled DUNE_CONFIG__AUTO_FETCH=disabled build_pkg ocaml-base-compiler
-  Error: Don't know how to build
-  _build/.pkgs/default/ocaml-base-compiler/installed
-  [1]
 
 Enumerate the contents of the fake toolchains directory:
   $ find other-fake-cache/toolchains/ | sort | remove_hash
   other-fake-cache/toolchains/
+  other-fake-cache/toolchains/ocaml-base-compiler.1-HASH
+  other-fake-cache/toolchains/ocaml-base-compiler.1-HASH/target
+  other-fake-cache/toolchains/ocaml-base-compiler.1-HASH/target/cookie

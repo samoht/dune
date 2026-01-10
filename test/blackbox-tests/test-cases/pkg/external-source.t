@@ -14,8 +14,6 @@ Test that can fetch the sources from an external dir
   > EOF
 
   $ build_pkg test
-  Error: Don't know how to build _build/.pkgs/default/test/installed
-  [1]
 
   $ show_pkg test
   File ".", line 1, characters 0-0:
@@ -23,5 +21,22 @@ Test that can fetch the sources from an external dir
   is assumed but the project might break when dune is upgraded. Please create a
   dune-project file.
   Hint: generate the project file with: $ dune init project <name>
-  find: _build/.pkgs/default/test: No such file or directory
   
+  /installed
+  /source
+  /source/x
+  /target
+  /target/bin
+  /target/cookie
+  /target/doc
+  /target/doc/test
+  /target/etc
+  /target/etc/test
+  /target/lib
+  /target/lib/stublibs
+  /target/lib/test
+  /target/lib/toplevel
+  /target/man
+  /target/sbin
+  /target/share
+  /target/share/test

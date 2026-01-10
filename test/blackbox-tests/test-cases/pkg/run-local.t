@@ -13,5 +13,4 @@ they could have been created or modified by previous build commands (such as
   > EOF
 
   $ build_pkg test
-  Error: Don't know how to build _build/.pkgs/default/test/installed
-  [1]
+  Package configured

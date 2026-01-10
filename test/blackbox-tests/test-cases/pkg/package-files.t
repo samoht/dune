@@ -21,5 +21,7 @@ Additional files overlaid on top of the source can be found in the
   > EOF
 
   $ build_pkg test
-  Error: Don't know how to build _build/.pkgs/default/test/installed
-  [1]
+  foo:
+  foo from test.files
+  bar:
+  bar from test.files

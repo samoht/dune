@@ -33,16 +33,12 @@ Lock and build the project to make OCamlFormat from the project dependencies ava
 Run "dune fmt" without the dev-tools feature enabled. This should invoke the ocamlformat
 executable from the package dependencies (ie., 'ocamlformat.0.26.2').
   $ dune fmt --preview
-  Error: No rule found for .pkgs/ocamlformat/target/cookie
-  -> required by Loading all binaries in the lock directory for "default"
-  -> required by looking up binary "ocamlformat" in context "default"
-  -> required by _build/default/.formatted/foo.ml
-  -> required by alias .formatted/fmt
-  -> required by alias fmt
+  File "foo.ml", line 1, characters 0-0:
+  Error: Files _build/default/foo.ml and _build/default/.formatted/foo.ml
+  differ.
   [1]
   $ cat _build/default/.formatted/foo.ml
-  cat: _build/default/.formatted/foo.ml: No such file or directory
-  [1]
+  formatted with version 0.26.2
 
 Format using the dev-tools feature, it does not invoke the OCamlFormat binary from
 the project dependencies (0.26.2) but instead builds and runs the OCamlFormat binary as a

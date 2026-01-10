@@ -24,5 +24,7 @@ Packages can export environment variables
   > EOF
 
   $ build_pkg usetest
-  Error: Don't know how to build _build/.pkgs/default/usetest/installed
-  [1]
+  FOO=bar
+  BAR=zzz:yyy:xxx
+  OPAM_PACKAGE_NAME=usetest
+  OPAM_PACKAGE_VERSION=1.2.3

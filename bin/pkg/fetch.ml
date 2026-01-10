@@ -400,15 +400,29 @@ let fetch_duniverse ~lock_dir_path ~solver_env ~local_packages () =
         match Package_name.Map.find opam_files_by_name name with
         | None -> ()
         | Some opam_content ->
-          (* Write opam file to the package directory *)
+          (* Write opam file to the package directory.
+             If opam/ is a directory, write inside it as opam/opam or opam/<pkg>.opam *)
+          let pkg_dir = Path.source (Path.Source.relative Vendor.default_dir dirname) in
+          let pkg_name = Package_name.to_string name in
+          let base_opam_path = Path.relative pkg_dir "opam" in
           let opam_path =
-            Path.source
-              (Path.Source.relative
-                 (Path.Source.relative Vendor.default_dir dirname)
-                 "opam")
+            match Path.stat base_opam_path with
+            | Ok { st_kind = S_DIR; _ } ->
+              (* opam/ is a directory - write inside it *)
+              let inside_path = Path.relative base_opam_path "opam" in
+              if Path.exists inside_path
+              then inside_path
+              else Path.relative base_opam_path (pkg_name ^ ".opam")
+            | _ -> base_opam_path
           in
           (* Only write if content changed or file doesn't exist *)
-          if (not (Path.exists opam_path)) || Io.read_file opam_path <> opam_content
+          let should_write =
+            match Path.stat opam_path with
+            | Error _ -> true (* doesn't exist *)
+            | Ok { st_kind = S_REG; _ } -> Io.read_file opam_path <> opam_content
+            | Ok _ -> false (* unexpected kind, don't overwrite *)
+          in
+          if should_write
           then (
             verbose (sprintf "  writing %s" (Path.to_string opam_path));
             Io.write_file opam_path opam_content)));

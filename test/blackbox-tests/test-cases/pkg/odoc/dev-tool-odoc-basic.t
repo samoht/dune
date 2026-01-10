@@ -18,9 +18,6 @@ a lockdir containing an "ocaml" lockfile.
   > EOF
 
   $ dune build
-  Error: No rule found for .pkgs/ocaml-base-compiler/target/cookie
-  -> required by loading the OCaml compiler for context "default"
-  [1]
 
   $ DUNE_CONFIG__LOCK_DEV_TOOL=enabled dune ocaml doc
   Error: dune.lock/lock.dune: Not a directory

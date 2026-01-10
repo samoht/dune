@@ -48,4 +48,5 @@ The value for "jobs" should always be 1.
 
   $ GROUP="$(id -gn)"
   > build_pkg testpkg 2>&1 | dune_cmd subst "$GROUP" 'GROUP'
-  Error: Don't know how to build _build/.pkgs/default/testpkg/installed
+  1
+  GROUP

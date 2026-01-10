@@ -15,10 +15,11 @@ It fails during the build because of missing OCamlFormat module.
   Solution for _build/.locks/tools-ocamlformat (1 package)
   dune:
   - ocamlformat.0.26.4
-  Error: No rule found for .pkgs/ocamlformat/installed (context
-  tools-ocamlformat)
-  -> required by _build/install/default/bin/ocamlformat
-  -> required by _build/default/.formatted/foo.ml
-  -> required by alias .formatted/fmt
-  -> required by alias fmt
+  File "ocamlformat.pkg", line 4, characters 6-10:
+  Error: Logs for package ocamlformat
+  File "dune", line 2, characters 14-25:
+  2 |  (public_name ocamlformat))
+                    ^^^^^^^^^^^
+  Error: Module "Ocamlformat" doesn't exist.
+  
   [1]

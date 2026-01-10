@@ -30,7 +30,7 @@ file in the package's source.
   Description:
     ("fetch_local: unpack is not set",
      { url =
-         "file:///Users/samoht/git/dune/_build/.sandbox/c3aba80f13ab5a4580eeade0b540341b/default/test/blackbox-tests/test-cases/pkg/foo.txt"
+         "file:///Users/samoht/git/dune/_build/.sandbox/50393909113907ce3a1bca70650d15d3/default/test/blackbox-tests/test-cases/pkg/foo.txt"
      })
   Raised at Stdune__Code_error.raise in file
     "otherlibs/stdune/src/code_error.ml", line 10, characters 30-62

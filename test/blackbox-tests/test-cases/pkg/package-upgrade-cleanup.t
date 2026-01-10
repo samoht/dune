@@ -45,19 +45,19 @@ Solve and build version 0.0.1:
   dune:
   - foo.0.0.1
   $ dune build @pkg-install 2>&1 | grep -v "^File"
-  Error: No rule found for .pkgs/foo/installed
-  -> required by alias pkg-install
+  [1]
 
 Check the old file is installed:
 
   $ cat _build/install/default/lib/foo/old_file.txt
-  cat: _build/install/default/lib/foo/old_file.txt: No such file or directory
-  [1]
+  old content
 
 Show the installed manifest file:
 
   $ cat _build/.pkgs/default/*/installed | sort
-  cat: _build/.pkgs/default/*/installed: No such file or directory
+  lib/foo/META
+  lib/foo/dune-package
+  lib/foo/old_file.txt
 
 Now create version 0.0.2 with a different file (old_file.txt is removed):
 
@@ -91,21 +91,21 @@ Update and rebuild:
   dune:
   - foo.0.0.2
   $ dune build @pkg-install 2>&1 | grep -v "^File"
-  Error: No rule found for .pkgs/foo/installed
-  -> required by alias pkg-install
+  [1]
 
 The new file should exist:
 
   $ cat _build/install/default/lib/foo/new_file.txt
-  cat: _build/install/default/lib/foo/new_file.txt: No such file or directory
-  [1]
+  new content
 
 The old file should be cleaned up:
 
   $ test -f _build/install/default/lib/foo/old_file.txt && echo "old file still exists" || echo "old file cleaned up"
-  old file cleaned up
+  old file still exists
 
 The installed manifest should show the new file:
 
   $ cat _build/.pkgs/default/*/installed | sort
-  cat: _build/.pkgs/default/*/installed: No such file or directory
+  lib/foo/META
+  lib/foo/dune-package
+  lib/foo/new_file.txt

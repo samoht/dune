@@ -19,4 +19,5 @@ Test that section pforms are substituted with absolute paths.
 Note that currently dune incorrectly substitutes relative paths for pforms that
 appear in string interpolations.
   $ build_pkg test 2>&1 | strip_sandbox
-  Error: Don't know how to build _build/.pkgs/default/test/installed
+  --prefix $SANDBOX/.pkgs/default/test/target
+  $SANDBOX/.pkgs/default/test/target

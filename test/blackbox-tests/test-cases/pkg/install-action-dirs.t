@@ -7,5 +7,17 @@ Install actions should have the switch directory prepared:
   > EOF
 
   $ build_pkg test
-  Error: Don't know how to build _build/.pkgs/default/test/installed
-  [1]
+  ../target
+  ../target/bin
+  ../target/doc
+  ../target/doc/test
+  ../target/etc
+  ../target/etc/test
+  ../target/lib
+  ../target/lib/stublibs
+  ../target/lib/test
+  ../target/lib/toplevel
+  ../target/man
+  ../target/sbin
+  ../target/share
+  ../target/share/test

@@ -56,9 +56,6 @@ rather than "ocaml-base-compiler.5.2.0" from opam-repository.
   opam:
   - ocaml-base-compiler.dev
   - ocaml-lsp-server.0.0.1
-  Error: No rule found for .pkgs/ocaml-lsp-server/installed (context
-  tools-ocaml-lsp-server)
-  -> required by _build/install/default/bin/ocamllsp
 
   $ dune tools exec ocamllsp
   The version of the compiler package ("ocaml-base-compiler") in this project's
@@ -69,7 +66,5 @@ rather than "ocaml-base-compiler.5.2.0" from opam-repository.
   opam:
   - ocaml-base-compiler.dev
   - ocaml-lsp-server.0.0.1
-  Error: No rule found for .pkgs/ocaml-lsp-server/installed (context
-  tools-ocaml-lsp-server)
-  -> required by _build/install/default/bin/ocamllsp
-  [1]
+       Running 'ocamllsp'
+  hello from fake ocamllsp

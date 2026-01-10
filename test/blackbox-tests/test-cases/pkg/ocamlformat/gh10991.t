@@ -21,17 +21,16 @@ Initial file:
   Solution for _build/.locks/tools-ocamlformat (1 package)
   opam:
   - ocamlformat.0.0.1
-  Error: No rule found for .pkgs/ocamlformat/installed (context
-  tools-ocamlformat)
-  -> required by _build/install/default/bin/ocamlformat
-  -> required by _build/default/.formatted/foo.ml
-  -> required by alias .formatted/fmt
-  -> required by alias fmt
+  File "foo.ml", line 1, characters 0-0:
+  Error: Files _build/default/foo.ml and _build/default/.formatted/foo.ml
+  differ.
+  Promoting _build/default/.formatted/foo.ml to foo.ml.
   [1]
 
 After formatting the fake ocamlformat has added a suffix:
   $ cat foo.ml
   let () = print_endline "Hello, world"
+  (* formatted with fake ocamlformat *)
 
 Update the file:
   $ cat > foo.ml <<EOF
@@ -39,14 +38,13 @@ Update the file:
   > EOF
 
   $ DUNE_CONFIG__LOCK_DEV_TOOL=enabled dune fmt
-  Error: No rule found for .pkgs/ocamlformat/installed (context
-  tools-ocamlformat)
-  -> required by _build/install/default/bin/ocamlformat
-  -> required by _build/default/.formatted/foo.ml
-  -> required by alias .formatted/fmt
-  -> required by alias fmt
+  File "foo.ml", line 1, characters 0-0:
+  Error: Files _build/default/foo.ml and _build/default/.formatted/foo.ml
+  differ.
+  Promoting _build/default/.formatted/foo.ml to foo.ml.
   [1]
 
 The update to the file persists after formatting it a second time:
   $ cat foo.ml
   let () = print_endline "Hello, ocaml!"
+  (* formatted with fake ocamlformat *)

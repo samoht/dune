@@ -78,7 +78,8 @@ vendor/
 (vendor <directory>
  (libraries <lib-spec>...)    ; optional
  (packages <pkg-spec>...)     ; optional
- (mode <build-mode>))         ; optional: dune | opam
+ (mode <build-mode>)          ; optional: dune | opam
+ (install <bool>))            ; optional: promote artifacts to shared install path
 ```
 
 Both `<lib-spec>` and `<pkg-spec>` use the standard ordered set language (like `(modules ...)`) with:
@@ -89,6 +90,7 @@ Both `<lib-spec>` and `<pkg-spec>` use the standard ordered set language (like `
 All fields are optional. When omitted:
 - `(libraries ...)` and `(packages ...)` should be auto-detected by scanning the directory
 - `(mode ...)` should be auto-detected: `dune` if dune files exist, `opam` otherwise
+- `(install ...)` defaults to `true`
 
 ### Examples
 
@@ -134,6 +136,17 @@ Dune detects the opam file and runs its build commands.
 **Library aliasing:**
 - `(<name> :as <alias>)` should change the public name used in `(libraries ...)` stanzas
 - OCaml module names inside the library should remain unchanged
+
+**Install promotion:**
+- When `(install true)` (default), artifacts are promoted to `_build/install/<context>/`
+- When `(install false)`, artifacts remain in the vendor build directory only (but are
+  still available within the workspace)
+
+Opam semantics require that only one package with a given name can be installed per context.
+This only becomes an issue when a vendored opam package depends on a package that has
+multiple versions in the workspace. In this case, dune should error if two packages with
+the same name both have `(install true)` in the same context, with a message suggesting
+to set `(install false)` on one of them.
 
 **Error handling:**
 - If `(libraries foo)` lists a library not found in the directory → should error at parse time

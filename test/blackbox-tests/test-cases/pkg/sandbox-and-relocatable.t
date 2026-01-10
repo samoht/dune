@@ -19,6 +19,7 @@ Create a package that prints its build environment to verify BUILD_PATH_PREFIX_M
   > EOF
 
   $ build_pkg check-env 2>&1 | grep -o 'BUILD_PATH_PREFIX_MAP=.*' | head -1
+  BUILD_PATH_PREFIX_MAP=/workspace_root=/Users/samoht/git/dune/_build/.sandbox/ebbe831417c9a8d9b1e15b46bc5c897f/default:$TESTCASE_ROOT=/Users/samoht/git/dune/_build/.sandbox/ebbe831417c9a8d9b1e15b46bc5c
 
 Test 2: Package with absolute paths (relocatability check TODO)
 ===============================================================
@@ -34,10 +35,8 @@ Create a package that embeds absolute paths in its output:
 Building this package currently succeeds (relocatability checks not yet implemented):
 
   $ build_pkg bad-pkg
-  Error: Don't know how to build _build/.pkgs/default/bad-pkg/installed
-  [1]
   $ show_pkg_targets bad-pkg | grep '\.pc'
-  [1]
+  /lib/bad-pkg/bad.pc
 
 Test 3: Package using relative paths should succeed
 ==================================================
@@ -51,10 +50,9 @@ Create a package that uses relative paths:
   > EOF
 
   $ build_pkg good-pkg
-  Error: Don't know how to build _build/.pkgs/default/good-pkg/installed
-  [1]
   $ show_pkg_targets good-pkg | grep '\.pc'
-  [1]
+  /lib/bad-pkg/bad.pc
+  /lib/good-pkg/good.pc
 
 Test 4: Sandbox isolation (TODO - currently not isolating /tmp)
 ==============================================================
@@ -77,7 +75,7 @@ Create a package that tries to read the file:
 Currently sandboxing does not isolate /tmp (this may be improved in the future):
 
   $ build_pkg sandbox-test 2>&1 | grep -E '(LEAK|ISOLATED)'
-  [1]
+  LEAK: can see outside file
 
 Cleanup:
 
@@ -95,11 +93,8 @@ Create a package with an install command that writes to the shared prefix:
   > EOF
 
   $ build_pkg install-to-prefix
-  Error: Don't know how to build
-  _build/.pkgs/default/install-to-prefix/installed
-  [1]
   $ show_pkg_targets install-to-prefix | grep installed
-  [1]
+  /lib/install-to-prefix/installed-file
 
 Test 6: Package with META file containing absolute paths (TODO)
 ===============================================================
@@ -115,11 +110,8 @@ META files are commonly checked for relocatability:
 Currently builds succeed (relocatability checks not yet implemented):
 
   $ build_pkg meta-with-abs-path
-  Error: Don't know how to build
-  _build/.pkgs/default/meta-with-abs-path/installed
-  [1]
   $ show_pkg_targets meta-with-abs-path | grep META
-  [1]
+  /lib/meta-with-abs-path/META
 
 Test 7: dune-package file with absolute paths (TODO)
 ====================================================
@@ -133,8 +125,5 @@ Test 7: dune-package file with absolute paths (TODO)
 Currently builds succeed (relocatability checks not yet implemented):
 
   $ build_pkg dune-pkg-with-abs-path
-  Error: Don't know how to build
-  _build/.pkgs/default/dune-pkg-with-abs-path/installed
-  [1]
   $ show_pkg_targets dune-pkg-with-abs-path | grep dune-package
-  [1]
+  /lib/dune-pkg-with-abs-path/dune-package

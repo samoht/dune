@@ -9,7 +9,12 @@ open Import
       (vendor fmt.0.9.0 (libraries fmt fmt.tty))
       (vendor make-pkg.1.0.0 (mode opam))  ; Build using opam sandbox
       (vendor yojson.1.7.0 (libraries (yojson :as yojson_v1)))
+      (vendor foo.2.0.0 (libraries (foo :as bar)) (install false))
     ]}
+
+    The [(install false)] option prevents the package from being installed
+    to the shared prefix. Use this for packages with library remapping that
+    should coexist with other versions of the same package.
 
     The directory is relative to the location of the dune file containing
     the stanza. This stanza works alongside [vendored_dirs] - directories
@@ -55,6 +60,10 @@ type t =
   ; build_method : Build_method.t option
     (** How to build this vendored package. None means use default
         (Dune_native for dune packages, Opam_sandboxed for non-dune). *)
+  ; install : bool
+    (** Whether to install this package to the shared prefix.
+        Defaults to true. Set to false for packages with library remapping
+        that should coexist with other versions of the same package. *)
   }
 
 val decode : t Decoder.t

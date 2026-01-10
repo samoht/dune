@@ -9,7 +9,12 @@ open Import
       (vendor fmt.0.9.0 (libraries fmt fmt.tty))
       (vendor make-pkg.1.0.0 (mode opam))  ; Build using opam sandbox
       (vendor yojson.1.7.0 (libraries (yojson :as yojson_v1)))
+      (vendor foo.2.0.0 (libraries (foo :as bar)) (install false))
     ]}
+
+    The [(install false)] option prevents the package from being installed
+    to the shared prefix. Use this for packages with library remapping that
+    should coexist with other versions of the same package.
 
     The directory is relative to the location of the dune file containing
     the stanza. *)
@@ -86,6 +91,9 @@ type t =
     (* None = all packages, Some [] = none, Some pkgs = only these *)
   ; build_method : Build_method.t option
     (* None = default (Dune_native for dune packages, auto-detect otherwise) *)
+  ; install : bool
+    (* Whether to install to shared prefix. Defaults to true.
+       Set to false for packages with library remapping. *)
   }
 
 let decode =
@@ -96,16 +104,18 @@ let decode =
   @@
   let+ libraries = field_o "libraries" (repeat Library_entry.decode)
   and+ packages = field_o "packages" (repeat Package_name.decode)
-  and+ build_method = field_o "mode" Build_method.decode in
-  { loc; directory; libraries; packages; build_method }
+  and+ build_method = field_o "mode" Build_method.decode
+  and+ install = field "install" bool ~default:true in
+  { loc; directory; libraries; packages; build_method; install }
 ;;
 
-let to_dyn { loc = _; directory; libraries; packages; build_method } =
+let to_dyn { loc = _; directory; libraries; packages; build_method; install } =
   Dyn.record
     [ "directory", Dyn.string directory
     ; "libraries", Dyn.option (Dyn.list Library_entry.to_dyn) libraries
     ; "packages", Dyn.option (Dyn.list Package_name.to_dyn) packages
     ; "build_method", Dyn.option Build_method.to_dyn build_method
+    ; "install", Dyn.bool install
     ]
 ;;
 

@@ -58,20 +58,10 @@ unset them all.
 We write all the dune values to a file and then diff them with the output of opam var.
 
   $ build_pkg testpkg 2> dune-vars
-  [1]
 
 The two files should be identical.
 
   $ diff --label="opam-vars"  opam-vars --label="dune-vars" dune-vars
-  1,5c1
-  < arm64
-  < macos
-  < homebrew
-  < homebrew
-  < 15.6
-  ---
-  > Error: Don't know how to build _build/.pkgs/default/testpkg/installed
-  [1]
 
 Getting the sys-ocaml-version variable consistent is rather annoying because it
 depends on whether we have a system installed OCaml. So we just test it
@@ -89,4 +79,4 @@ separately here:
 
   $ ocaml_version="$(ocaml -vnum)"
   $ build_pkg testpkg 2>&1 | dune_cmd subst "$ocaml_version" 'OCAML_VERSION'
-  Error: Don't know how to build _build/.pkgs/default/testpkg/installed
+  OCAML_VERSION

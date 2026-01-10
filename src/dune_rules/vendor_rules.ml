@@ -92,14 +92,17 @@ let scan_opam_libraries dir =
       else None)
 ;;
 
-(* Find opam file in a directory. Checks both "opam" and "<name>.opam". *)
+(* Find opam file in a directory. Checks both "opam" and "<name>.opam".
+   We check that it exists and is not a directory to avoid matching opam/ directories. *)
 let find_opam_file ~pkg_name ~pkg_dir =
   let candidates =
     [ Path.Source.relative pkg_dir "opam"
     ; Path.Source.relative pkg_dir (pkg_name ^ ".opam")
     ]
   in
-  List.find candidates ~f:(fun p -> Path.Untracked.exists (Path.source p))
+  List.find candidates ~f:(fun p ->
+    let full_path = Path.source p in
+    Path.Untracked.exists full_path && not (Path.Untracked.is_directory full_path))
 ;;
 
 let scan_libraries dir ~pkg_name =

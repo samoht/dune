@@ -112,5 +112,36 @@ corresponding Dune version.
 The values here are not important, but Dune should be able to interpret the variables.
 
   $ build_pkg testpkg
-  Error: Don't know how to build _build/.pkgs/default/testpkg/installed
+  File "dune.lock/testpkg.0.0.1.pkg", line 41, characters 18-39:
+  41 |      (run echo 35 %{pkg-self:with-test})
+                         ^^^^^^^^^^^^^^^^^^^^^
+  Error: Undefined package variable "with-test"
+  File "dune.lock/testpkg.0.0.1.pkg", line 42, characters 18-39:
+  42 |      (run echo 36 %{pkg-self:with-test})
+                         ^^^^^^^^^^^^^^^^^^^^^
+  Error: Undefined package variable "with-test"
+  File "dune.lock/testpkg.0.0.1.pkg", line 43, characters 18-38:
+  43 |      (run echo 37 %{pkg:foo:with-test})
+                         ^^^^^^^^^^^^^^^^^^^^
+  Error: Undefined package variable "with-test"
+  File "dune.lock/testpkg.0.0.1.pkg", line 44, characters 18-38:
+  44 |      (run echo 38 %{pkg-self:with-doc})
+                         ^^^^^^^^^^^^^^^^^^^^
+  Error: Undefined package variable "with-doc"
+  File "dune.lock/testpkg.0.0.1.pkg", line 45, characters 18-38:
+  45 |      (run echo 39 %{pkg-self:with-doc})
+                         ^^^^^^^^^^^^^^^^^^^^
+  Error: Undefined package variable "with-doc"
+  File "dune.lock/testpkg.0.0.1.pkg", line 46, characters 18-37:
+  46 |      (run echo 40 %{pkg:foo:with-doc})
+                         ^^^^^^^^^^^^^^^^^^^
+  Error: Undefined package variable "with-doc"
+  File "dune.lock/testpkg.0.0.1.pkg", line 47, characters 18-44:
+  47 |      (run echo 41 %{pkg-self:with-dev-setup})
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  Error: Undefined package variable "with-dev-setup"
+  File "dune.lock/testpkg.0.0.1.pkg", line 48, characters 18-43:
+  48 |      (run echo 42 %{pkg:foo:with-dev-setup}))))))
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^
+  Error: Undefined package variable "with-dev-setup"
   [1]

@@ -24,10 +24,6 @@ Install ocamlformat. 0.26.0 should be installed because that's the version in .o
   Solution for _build/.locks/tools-ocamlformat (1 package)
   dune:
   - ocamlformat.0.27.0
-  Error: No rule found for .pkgs/ocamlformat/installed (context
-  tools-ocamlformat)
-  -> required by _build/install/default/bin/ocamlformat
-  [1]
 
 Change the version in .ocamlformat.
   $ cat > .ocamlformat <<EOF
@@ -36,7 +32,3 @@ Change the version in .ocamlformat.
 
 Install ocamlformat again. Dune should detect that the version has changed and relock:
   $ dune tools install ocamlformat
-  Error: No rule found for .pkgs/ocamlformat/installed (context
-  tools-ocamlformat)
-  -> required by _build/install/default/bin/ocamlformat
-  [1]

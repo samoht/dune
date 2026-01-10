@@ -31,15 +31,14 @@ This should choose the 0.24+foo version:
   Solution for _build/.locks/tools-ocamlformat (1 package)
   opam:
   - ocamlformat.0.24+foo
-  Error: No rule found for .pkgs/ocamlformat/installed (context
-  tools-ocamlformat)
-  -> required by _build/install/default/bin/ocamlformat
-  -> required by _build/default/.formatted/foo.ml
-  -> required by alias .formatted/fmt
-  -> required by alias fmt
+  File "foo.ml", line 1, characters 0-0:
+  Error: Files _build/default/foo.ml and _build/default/.formatted/foo.ml
+  differ.
+  Promoting _build/default/.formatted/foo.ml to foo.ml.
   [1]
   $ cat foo.ml
   let () = print_endline "Hello, world"
+  (* formatted with fake ocamlformat 0.24+foo *)
 
 This should choose the 0.24+bar version:
   $ echo "version=0.25" > .ocamlformat
@@ -48,15 +47,15 @@ This should choose the 0.24+bar version:
   Solution for _build/.locks/tools-ocamlformat (1 package)
   opam:
   - ocamlformat.0.25+bar
-  Error: No rule found for .pkgs/ocamlformat/installed (context
-  tools-ocamlformat)
-  -> required by _build/install/default/bin/ocamlformat
-  -> required by _build/default/.formatted/foo.ml
-  -> required by alias .formatted/fmt
-  -> required by alias fmt
+  File "foo.ml", line 1, characters 0-0:
+  Error: Files _build/default/foo.ml and _build/default/.formatted/foo.ml
+  differ.
+  Promoting _build/default/.formatted/foo.ml to foo.ml.
   [1]
   $ cat foo.ml
   let () = print_endline "Hello, world"
+  (* formatted with fake ocamlformat 0.24+foo *)
+  (* formatted with fake ocamlformat 0.25+bar *)
 
 This should fail as there is no version matching 0.24.1:
   $ echo "version=0.24.1" > .ocamlformat

@@ -21,5 +21,8 @@ Some environment variables are automatically exported by packages:
   $ ln -s $(which sh) .bin/sh
   $ dune=$(which dune)
   $ MANPATH="" OCAMLPATH="" CAML_LD_LIBRARY_PATH="" OCAMLTOP_INCLUDE_PATH="" PATH="$PWD/.bin" build_pkg usetest
-  Error: Don't know how to build _build/.pkgs/default/usetest/installed
-  [1]
+  MANPATH=$TESTCASE_ROOT/_build/install/default/man
+  OCAMLPATH=$TESTCASE_ROOT/_build/install/default/lib
+  CAML_LD_LIBRARY_PATH=$TESTCASE_ROOT/_build/install/default/lib/stublibs
+  OCAMLTOP_INCLUDE_PATH=$TESTCASE_ROOT/_build/install/default/lib/toplevel
+  PATH=$TESTCASE_ROOT/_build/install/default/bin:$TESTCASE_ROOT/.bin

@@ -42,7 +42,14 @@ Solve to create a proper lock directory with dependency hash:
 Build the packages, when it fails building 'foo' package, it shows the depexts
 error message.
   $ dune build @pkg-install
-  Error: No rule found for .pkgs/foo/installed
-  -> required by alias pkg-install
+  File "dune.lock/foo.0.0.1.pkg", line 4, characters 30-34:
+  4 |  (all_platforms ((action (run dune build)))))
+                                    ^^^^
+  Error: Logs for package foo
+  File "dune-project", line 1, characters 0-0:
+  Error: Invalid first line, expected: (lang <lang> <version>)
+  
+  Hint: Missing system dependencies: gnupg, unzipTo install:
+    brew install gnupg unzip
   [1]
 

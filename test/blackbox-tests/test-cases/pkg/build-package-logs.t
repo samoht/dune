@@ -21,7 +21,12 @@ Create a package with a failing command that throws an error:
 Building the package should fail and print an error:
 
   $ build_pkg x 2>&1 | dune_cmd subst '/.*/cat' cat
-  Error: Don't know how to build _build/.pkgs/default/x/installed
+  File "dune.lock/x.pkg", line 4, characters 11-14:
+  4 |       (run cat i_dont_exist)))
+                 ^^^
+  Error: Logs for package x
+  cat: i_dont_exist: No such file or directory
+  
 
 Create a package with a succeeding command that displays some text:
 
@@ -35,13 +40,8 @@ Create a package with a succeeding command that displays some text:
 Building the package should succeed and print no output:
 
   $ build_pkg y
-  Error: Don't know how to build _build/.pkgs/default/y/installed
-  [1]
 
 Checks the package is installed:
 
   $ show_pkg_cookie y
-  Error:
-  $TESTCASE_ROOT/_build/.pkgs/default/y/target/cookie:
-  No such file or directory
-  [1]
+  { files = []; variables = [] }

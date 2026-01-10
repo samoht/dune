@@ -10,7 +10,5 @@ Exercise running the ocamlformat wrapper command.
   Solution for _build/.locks/tools-ocamlformat (1 package)
   dune:
   - ocamlformat.0.26.2
-  Error: No rule found for .pkgs/ocamlformat/installed (context
-  tools-ocamlformat)
-  -> required by _build/install/default/bin/ocamlformat
-  [1]
+       Running 'ocamlformat'
+  formatted with version 0.26.2

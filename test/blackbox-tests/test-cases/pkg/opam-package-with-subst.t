@@ -38,5 +38,4 @@ The lockfile should contain the substitute action.
 The file foo.ml should have been built:
 
   $ build_pkg with-substs
-  Error: Don't know how to build _build/.pkgs/default/with-substs/installed
-  [1]
+  I have been substituted.

@@ -48,7 +48,7 @@ Create a package that writes a different value to some files depending on the os
    (complete true)
    (used
     ((source
-      file:///Users/samoht/git/dune/_build/.sandbox/2ebdddef966c8faa49b81f2af2ce2a5e/default/test/blackbox-tests/test-cases/pkg/portable-lockdirs/mock-opam-repository#e6f13a8eebf8c50085234bac4f942806cd2c715f))))
+      file:///Users/samoht/git/dune/_build/.sandbox/bf059f20117192d201d3602f9ec6568d/default/test/blackbox-tests/test-cases/pkg/portable-lockdirs/mock-opam-repository#b1377c291a62015e711d4906668b1204c9634991))))
   
   (solved_for_platforms
    ((arch x86_64)

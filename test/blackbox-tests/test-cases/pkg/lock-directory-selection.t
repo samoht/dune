@@ -86,14 +86,12 @@ are only dependent on on certain systems.
 Build macos package on macos arm64:
   $ dune clean
   $ DUNE_CONFIG__OS=macos DUNE_CONFIG__ARCH=arm64 build_pkg macos-only
-  Error: Don't know how to build _build/.pkgs/default/macos-only/installed
-  [1]
+  macos-only
 
 Build macos package on macos amd64:
   $ dune clean
   $ DUNE_CONFIG__OS=macos DUNE_CONFIG__ARCH=amd64 build_pkg macos-only
-  Error: Don't know how to build _build/.pkgs/default/macos-only/installed
-  [1]
+  macos-only
 
 Build linux package on macos (will fail):
   $ dune clean
@@ -110,8 +108,7 @@ Build macos package on linux (will fail):
 Build linux package on linux:
   $ dune clean
   $ DUNE_CONFIG__OS=linux DUNE_CONFIG__ARCH=amd64 build_pkg linux-only
-  Error: Don't know how to build _build/.pkgs/default/linux-only/installed
-  [1]
+  linux-only
 
 Try setting the os to one which doesn't have a corresponding lockdir:
   $ dune clean
@@ -150,5 +147,4 @@ Test that cond statements can have a default value:
   - linux-only.0.0.1
   $ dune clean
   $ build_pkg linux-only
-  Error: Don't know how to build _build/.pkgs/default/linux-only/installed
-  [1]
+  linux-only

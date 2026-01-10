@@ -54,7 +54,7 @@ Test conversion of opam sources into lock dir package specifications
   
   (dev)
   
-  (build_id 1af41672d4be4b743cea530c234cc58e)
+  (build_id d2939bab3d71b9628706922944458a79)
 
 Unsupported backends:
 

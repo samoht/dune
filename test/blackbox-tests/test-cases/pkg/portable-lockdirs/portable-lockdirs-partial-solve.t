@@ -96,7 +96,7 @@ The lockdir will contain a list of the platforms where solving succeeded.
    (complete true)
    (used
     ((source
-      file:///Users/samoht/git/dune/_build/.sandbox/d796faee844210d9b857f7017f9c883e/default/test/blackbox-tests/test-cases/pkg/portable-lockdirs/mock-opam-repository#b6bb49d69c4c10901051d56f002d0214cecae5b5))))
+      file:///Users/samoht/git/dune/_build/.sandbox/c618d82185fc664f9bc44f6be2047e88/default/test/blackbox-tests/test-cases/pkg/portable-lockdirs/mock-opam-repository#c77cf144f641d2d4031abb93704fa267d15b7b0f))))
   
   (solved_for_platforms
    ((arch x86_64)

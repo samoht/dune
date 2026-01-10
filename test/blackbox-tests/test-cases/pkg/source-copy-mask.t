@@ -21,5 +21,7 @@ We include an empty file because of a bug that prevents us from copying empty di
   > EOF
 
   $ build_pkg foo
-  Error: Don't know how to build _build/.pkgs/default/foo/installed
-  [1]
+  .
+  ./file
+  ./node_modules
+  ./node_modules/file

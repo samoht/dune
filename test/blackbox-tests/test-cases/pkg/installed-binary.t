@@ -26,16 +26,30 @@ Test that installed binaries are visible in dependent packages
   > EOF
 
   $ build_pkg usetest
-  Error: Don't know how to build _build/.pkgs/default/usetest/installed
+  Error: execve(../../test/target/bin/foo): No such file or directory
+  -> required by _build/.pkgs/default/usetest/target/cookie
+  -> required by _build/.pkgs/default/usetest/installed
   [1]
 
   $ show_pkg_targets test
-  [1]
+  /bin
+  /bin/foo
+  /lib
+  /lib/lib_rootxxx
+  /lib/test
+  /lib/test/libxxx
+  /share
+  /share/lib_rootxxx
   $ show_pkg_cookie test
-  Error:
-  $TESTCASE_ROOT/_build/.pkgs/default/test/target/cookie:
-  No such file or directory
-  [1]
+  { files =
+      [ (LIB, [ In_build_dir ".pkgs/default/test/target/lib/test/libxxx" ])
+      ; (LIB_ROOT, [ In_build_dir ".pkgs/default/test/target/lib/lib_rootxxx" ])
+      ; (BIN, [ In_build_dir ".pkgs/default/test/target/bin/foo" ])
+      ; (SHARE_ROOT,
+         [ In_build_dir ".pkgs/default/test/target/share/lib_rootxxx" ])
+      ]
+  ; variables = []
+  }
 
 It should also be visible in the workspace:
 
@@ -49,12 +63,10 @@ It should also be visible in the workspace:
   > EOF
 
   $ dune build ./testout && cat _build/default/testout
-  File "dune", lines 1-2, characters 0-49:
-  1 | (rule
-  2 |  (with-stdout-to testout (run %{bin:foo})))
-  Error: No rule found for .pkgs/test/target/cookie
-  File "dune", lines 1-2, characters 0-49:
-  1 | (rule
-  2 |  (with-stdout-to testout (run %{bin:foo})))
-  Error: No rule found for .pkgs/usetest/target/cookie
+  Error: execve(../../test/target/bin/foo): No such file or directory
+  -> required by _build/.pkgs/default/usetest/target/cookie
+  -> required by Loading all binaries in the lock directory for "default"
+  -> required by looking up binary "foo" in context "default"
+  -> required by %{bin:foo} at dune:2
+  -> required by _build/default/testout
   [1]

@@ -9,5 +9,8 @@ file copying step rather than the build step.
 
 The foo.install file in files/ should have been copied over.
   $ build_pkg foo
-  Error: Don't know how to build _build/.pkgs/default/foo/installed
+  Error:
+  symlink(_build/.sandbox/ddf19bf2399f20d1194608d91a92c4b3/.locks/default/dune.lock/foo.files): File exists
+  -> required by _build/.pkgs/default/foo/target/cookie
+  -> required by _build/.pkgs/default/foo/installed
   [1]

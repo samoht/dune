@@ -37,10 +37,6 @@ Install ocamlformat. The binary should be cached globally.
   Solution for _build/.locks/tools-ocamlformat (1 package)
   dune:
   - ocamlformat.0.26.2
-  Error: No rule found for .pkgs/ocamlformat/installed (context
-  tools-ocamlformat)
-  -> required by _build/install/default/bin/ocamlformat
-  [1]
 
 Check that the global cache directory was created with the expected structure.
 Cache key for compiler-independent tools: {package_name}.{version}
@@ -52,17 +48,15 @@ Cache key for compiler-independent tools: {package_name}.{version}
 A symlink should be created in _build/install/default/bin/ pointing to the cache.
 
   $ readlink _build/install/default/bin/ocamlformat
-  [1]
+  ../../../.pkgs/tools-ocamlformat/ocamlformat/target/bin/ocamlformat
 
 === Test 3: Running tool from cache ===
 
 After using the tool, it should run from the cache.
 
   $ dune tools exec ocamlformat
-  Error: No rule found for .pkgs/ocamlformat/installed (context
-  tools-ocamlformat)
-  -> required by _build/install/default/bin/ocamlformat
-  [1]
+       Running 'ocamlformat'
+  formatted with version 0.26.2
 
 === Test 4: Fast reinstall after dune clean ===
 
@@ -82,15 +76,12 @@ No "Solution for" message should appear.
   Solution for _build/.locks/tools-ocamlformat (1 package)
   dune:
   - ocamlformat.0.26.2
-  Error: No rule found for .pkgs/ocamlformat/installed (context
-  tools-ocamlformat)
-  -> required by _build/install/default/bin/ocamlformat
+  formatted with version 0.26.2
 
 === Test 5: dune tools which shows cache path ===
 
   $ dune tools which ocamlformat
-  Error: ocamlformat is not installed as a dev tool
-  [1]
+  _build/install/default/bin/ocamlformat
 
 === Test 6: No lock files written outside _build ===
 
@@ -119,10 +110,6 @@ Install a specific version using the tool.version syntax.
   Solution for _build/.locks/tools-ocamlformat (1 package)
   dune:
   - ocamlformat.0.27.0
-  Error: No rule found for .pkgs/ocamlformat/installed (context
-  tools-ocamlformat)
-  -> required by _build/install/default/bin/ocamlformat
-  [1]
 
 Both versions should now be in the cache.
 

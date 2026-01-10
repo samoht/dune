@@ -23,7 +23,7 @@ Fetch from more than one source
   Description:
     ("fetch_local: unpack is not set",
      { url =
-         "file:///Users/samoht/git/dune/_build/.sandbox/1e957e0abd506a30840989ef5a59fea1/default/test/blackbox-tests/test-cases/pkg/baz"
+         "file:///Users/samoht/git/dune/_build/.sandbox/aa35b52457bcc294800249d6d3389d96/default/test/blackbox-tests/test-cases/pkg/baz"
      })
   Raised at Stdune__Code_error.raise in file
     "otherlibs/stdune/src/code_error.ml", line 10, characters 30-62
@@ -161,7 +161,7 @@ url and the extra source.
      (url http://localhost:2)
      (checksum md5=$HASH))))
   
-  (build_id 3e243261134b5f4b4509f3bda8b1f82a)
+  (build_id 0e0a71c5c0022802054d92aa5f85f701)
 
 Running the binary should download the tarball & patch, build them and show the
 correct, patched, message:

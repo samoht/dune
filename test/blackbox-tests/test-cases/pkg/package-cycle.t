@@ -15,5 +15,9 @@ Package resolution creating a cycle
   > EOF
 
   $ build_pkg a
-  Error: Don't know how to build _build/.pkgs/default/a/installed
+  Error: Dependency cycle between:
+     - package a
+  -> - package c
+  -> - package b
+  -> - package a
   [1]

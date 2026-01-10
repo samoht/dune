@@ -11,19 +11,32 @@ Test that we run the build and install commands
   > EOF
 
   $ build_pkg test
-  Error: Don't know how to build _build/.pkgs/default/test/installed
-  [1]
 
 The pkg directory contains build marker and cookie for dependency tracking:
 
   $ show_pkg test
-  find: _build/.pkgs/default/test: No such file or directory
   
+  /installed
+  /target
+  /target/bin
+  /target/bin/foo
+  /target/cookie
+  /target/doc
+  /target/doc/test
+  /target/etc
+  /target/etc/test
+  /target/lib
+  /target/lib/stublibs
+  /target/lib/test
+  /target/lib/toplevel
+  /target/man
+  /target/sbin
+  /target/share
+  /target/share/test
 
 
 
 The build output goes to the shared install directory:
 
   $ ls _build/install/default/bin
-  ls: _build/install/default/bin: No such file or directory
-  [1]
+  foo

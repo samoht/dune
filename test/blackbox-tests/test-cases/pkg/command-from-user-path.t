@@ -18,5 +18,4 @@ Create a lockdir with a lockfile that runs the shell script in a build command.
 
 The build command is run from an environment including the custom PATH variable.
   $ build_pkg test
-  Error: Don't know how to build _build/.pkgs/default/test/installed
-  [1]
+  Hello, World!

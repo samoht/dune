@@ -27,7 +27,7 @@ Printing out PATH without setting it:
   > EOF
   $ dune clean
   $ PATH=$DUNE_PATH:/bin build_pkg test 2>&1 | $DUNE_CMD subst "$DUNE_PATH" 'DUNE_PATH'
-  Error: Don't know how to build _build/.pkgs/default/test/installed
+  PATH=DUNE_PATH:/bin
 
 Setting PATH to a specific value:
   $ make_lockpkg test <<'EOF'
@@ -39,8 +39,7 @@ Setting PATH to a specific value:
   > EOF
   $ dune clean
   $ PATH=$DUNE_PATH:/bin build_pkg test
-  Error: Don't know how to build _build/.pkgs/default/test/installed
-  [1]
+  PATH=/tmp/bin
 
 Attempting to add a path to PATH replaces the entire PATH:
   $ make_lockpkg test <<'EOF'
@@ -52,7 +51,7 @@ Attempting to add a path to PATH replaces the entire PATH:
   > EOF
   $ dune clean
   $ PATH=$DUNE_PATH:/bin build_pkg test 2>&1 | $DUNE_CMD subst "$DUNE_PATH" 'DUNE_PATH'
-  Error: Don't know how to build _build/.pkgs/default/test/installed
+  PATH=/tmp/bin:DUNE_PATH:/bin
 
 Try adding multiple paths to PATH:
   $ make_lockpkg test <<'EOF'
@@ -66,7 +65,7 @@ Try adding multiple paths to PATH:
   > EOF
   $ dune clean
   $ PATH=$DUNE_PATH:/bin build_pkg test 2>&1 | $DUNE_CMD subst "$DUNE_PATH" 'DUNE_PATH'
-  Error: Don't know how to build _build/.pkgs/default/test/installed
+  PATH=/bar/bin:/foo/bin:/tmp/bin:DUNE_PATH:/bin
 
 Printing out PATH without setting it when the package has a dependency:
   $ make_lockpkg test <<'EOF'
@@ -77,7 +76,7 @@ Printing out PATH without setting it when the package has a dependency:
   > EOF
   $ dune clean
   $ OCAMLRUNPARAM=b PATH=$DUNE_PATH:/bin build_pkg test 2>&1 | $DUNE_CMD subst "$DUNE_PATH" 'DUNE_PATH'
-  Error: Don't know how to build _build/.pkgs/default/test/installed
+  PATH=$TESTCASE_ROOT/_build/install/default/bin:$TESTCASE_ROOT/_build/install/default/bin:DUNE_PATH:/bin
 
 Setting PATH to a specific value:
   $ make_lockpkg test <<'EOF'
@@ -90,8 +89,7 @@ Setting PATH to a specific value:
   > EOF
   $ dune clean
   $ PATH=$DUNE_PATH:/bin build_pkg test
-  Error: Don't know how to build _build/.pkgs/default/test/installed
-  [1]
+  PATH=/tmp/bin
 
 Attempting to add a path to PATH replaces the entire PATH:
   $ make_lockpkg test <<'EOF'
@@ -104,7 +102,7 @@ Attempting to add a path to PATH replaces the entire PATH:
   > EOF
   $ dune clean
   $ PATH=$DUNE_PATH:/bin build_pkg test 2>&1 | $DUNE_CMD subst "$DUNE_PATH" 'DUNE_PATH'
-  Error: Don't know how to build _build/.pkgs/default/test/installed
+  PATH=/tmp/bin:$TESTCASE_ROOT/_build/install/default/bin:$TESTCASE_ROOT/_build/install/default/bin:DUNE_PATH:/bin
 
 Try adding multiple paths to PATH:
   $ make_lockpkg test <<'EOF'
@@ -119,4 +117,4 @@ Try adding multiple paths to PATH:
   > EOF
   $ dune clean
   $ PATH=$DUNE_PATH:/bin build_pkg test 2>&1 | $DUNE_CMD subst "$DUNE_PATH" 'DUNE_PATH'
-  Error: Don't know how to build _build/.pkgs/default/test/installed
+  PATH=/bar/bin:/foo/bin:/tmp/bin:$TESTCASE_ROOT/_build/install/default/bin:$TESTCASE_ROOT/_build/install/default/bin:DUNE_PATH:/bin
