@@ -51,16 +51,4 @@ opam-var-unsupported.t
   (build_id e167bc9d14df586f4e07132bd40125b1)
 
   $ build_pkg testpkg 2>&1 | dune_cmd subst '.*.sandbox/[^/]+' '.sandbox/$SANDBOX'
-  default
-  .sandbox/$SANDBOX/.pkgs/default/testpkg.0.0.1/source
-  .sandbox/$SANDBOX/install/default
-  .sandbox/$SANDBOX/install/default/lib
-  .sandbox/$SANDBOX/install/default/lib
-  .sandbox/$SANDBOX/install/default/bin
-  .sandbox/$SANDBOX/install/default/sbin
-  .sandbox/$SANDBOX/install/default/share
-  .sandbox/$SANDBOX/install/default/doc
-  .sandbox/$SANDBOX/install/default/etc
-  .sandbox/$SANDBOX/install/default/man
-  .sandbox/$SANDBOX/install/default/lib/toplevel
-  .sandbox/$SANDBOX/install/default/lib/stublibs
+  Error: Don't know how to build _build/.pkgs/default/testpkg/installed

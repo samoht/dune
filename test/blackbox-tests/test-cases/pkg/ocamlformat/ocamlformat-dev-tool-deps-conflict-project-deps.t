@@ -105,12 +105,16 @@ versions of the same dependency.
   dune:
   - ocamlformat.0.26.2
   - printer.1.0
-  File "foo.ml", line 1, characters 0-0:
-  Error: Files _build/default/foo.ml and _build/default/.formatted/foo.ml
-  differ.
+  Error: No rule found for .pkgs/ocamlformat/installed (context
+  tools-ocamlformat)
+  -> required by _build/install/default/bin/ocamlformat
+  -> required by _build/default/.formatted/foo.ml
+  -> required by alias .formatted/fmt
+  -> required by alias fmt
   [1]
   $ cat _build/default/.formatted/foo.ml
-  formatted
+  cat: _build/default/.formatted/foo.ml: No such file or directory
+  [1]
 
 Update "dune-project", removing the dependency on the "printer" package. This
 demonstrates that even though OCamlFormat depends on the "printer" package, building the

@@ -11,5 +11,4 @@ install and build commands.
   $ build_pkg test 2>&1 \
   > | dune_cmd subst "$PWD" PWD \
   > | dune_cmd subst '\.sandbox/.*/_private' '.sandbox/SANDBOX/_private'
-  [build] OCAMLFIND_DESTDIR=PWD/_build/.sandbox/eeb96431c5cec077e64f4b2cb6f20e44/.pkgs/default/test.0.0.1/target/lib
-  [install] OCAMLFIND_DESTDIR=PWD/_build/.sandbox/eeb96431c5cec077e64f4b2cb6f20e44/.pkgs/default/test.0.0.1/target/lib
+  Error: Don't know how to build _build/.pkgs/default/test/installed

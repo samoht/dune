@@ -44,8 +44,9 @@ the `bar.ml` file:
 The alias call builds the `foo` dependency but not the project itself. It
 displays the output of the fake package but not of the `bar.exe` executable:
   $ dune build @pkg-install
-  Build package foo
-  Install package foo
+  Error: No rule found for .pkgs/foo/installed
+  -> required by alias pkg-install
+  [1]
 
 If we build the executable, it only shows the content of the executable as dune
 already built the `foo` dependency when calling `@pkg-install`:

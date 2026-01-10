@@ -60,6 +60,8 @@ Helper function that creates a workspace file with a given solver env.
 
 When the workspace and lockdir is consistent we can build packages in the lockdir.
   $ build_pkg bar
+  Error: Don't know how to build _build/.pkgs/default/bar/installed
+  [1]
 
 Now change the workspace so that the "os" solver variable is changed, but don't
 regenerate the lockdir, leaving the project in an inconsistent state.

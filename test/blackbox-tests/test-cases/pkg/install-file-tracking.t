@@ -66,14 +66,14 @@ Lock and build.
 Check that the package was built and .install file exists in target/.
 
   $ show_pkg test-pkg
-  find: _build/.pkgs/default/test-pkg.0.0.1: No such file or directory
+  find: _build/.pkgs/default/test-pkg: No such file or directory
   
 
 
 The .install file in target/ lists what this package installed.
 
   $ cat "$(get_build_pkg_dir test-pkg)/target/test-pkg.install"
-  cat: _build/.pkgs/default/test-pkg.0.0.1/target/test-pkg.install: No such file or directory
+  cat: _build/.pkgs/default/test-pkg/target/test-pkg.install: No such file or directory
   [1]
 
 The binary was installed to the shared install prefix.

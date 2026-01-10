@@ -62,11 +62,8 @@ First run of 'dune fmt' is supposed to format the fail.
   Solution for _build/.locks/tools-ocamlformat (1 package)
   dune:
   - ocamlformat.0.26.2
-  Error:
-  open(_build/.sandbox/6fd370dc3d3c2cf55a6b58333d0b77dc/.pkgs/tools-ocamlformat/ocamlformat.0.26.2/source/patch-for-ocamlformat.patch): No such file or directory
-  -> required by
-     _build/.pkgs/tools-ocamlformat/ocamlformat.0.26.2/target/cookie
-  -> required by _build/.pkgs/tools-ocamlformat/ocamlformat.0.26.2/installed
+  Error: No rule found for .pkgs/ocamlformat/installed (context
+  tools-ocamlformat)
   -> required by _build/install/default/bin/ocamlformat
   -> required by _build/default/.formatted/foo.ml
   -> required by alias .formatted/fmt

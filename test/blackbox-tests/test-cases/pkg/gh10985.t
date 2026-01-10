@@ -55,6 +55,8 @@ Now we set up a lock file with this package and then attempt to use it:
   $ export PATH="$PWD/.bin:$PATH"
 
   $ dune build --fetch=disabled @ocaml-index
+  File ".foo.objs/_unknown_", line 1, characters 0-0:
+  Error: No rule found for .pkgs/mypkg/target/cookie
   File "dune", line 3, characters 12-21:
   3 |  (libraries mypkg.lib))
                   ^^^^^^^^^

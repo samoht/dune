@@ -159,9 +159,9 @@ When building non-dune packages (opam), each context builds separately:
 ```
 # Building zarith (non-dune) for multiple contexts:
 
-_build/.pkgs/default/zarith.1.14-<digest>/source/          # built with ocaml.5.2.0
-_build/.pkgs/ocaml414/zarith.1.14-<digest>/source/         # built with ocaml.4.14.2
-_build/.pkgs/default.windows/zarith.1.14-<digest>/source/  # built with ocaml-windows
+_build/.pkgs/default/zarith/source/          # built with ocaml.5.2.0
+_build/.pkgs/ocaml414/zarith/source/         # built with ocaml.4.14.2
+_build/.pkgs/default.windows/zarith/source/  # built with ocaml-windows
 ```
 
 ### Implementation: pkg_rules.ml Changes

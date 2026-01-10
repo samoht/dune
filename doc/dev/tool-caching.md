@@ -41,16 +41,18 @@ isolated context. The only difference is a promotion step at the end.
 ```
 _build/
 ├── .pkgs/tools-ocamlformat/          # Package builds (context = tools-ocamlformat)
-│   ├── ocamlformat.0.26.2-<digest>/  # <name>.<version>-<lockfile+deps digest>
+│   ├── ocamlformat/                  # One directory per package (no version in path)
 │   │   ├── source/                   # Fetched & extracted source
-│   │   └── target/
-│   │       ├── cookie                # Dune rule tracking
-│   │       └── ocamlformat.install   # Copied from source (file tracking)
-│   └── base.0.16.0-<digest>/
+│   │   ├── target/
+│   │   │   ├── cookie                # Build output tracking
+│   │   │   └── ocamlformat.install   # Copied from source
+│   │   └── installed                 # Files copied to shared prefix
+│   └── base/
 │       ├── source/
-│       └── target/
-│           ├── cookie
-│           └── base.install
+│       ├── target/
+│       │   ├── cookie
+│       │   └── base.install
+│       └── installed
 ├── .locks/tools-ocamlformat/         # Lock directory (auto-generated)
 └── install/
     ├── tools-ocamlformat/            # Shared install prefix (OPAM_SWITCH_PREFIX)
@@ -60,8 +62,9 @@ _build/
         └── bin/ocamlformat           # Promoted from tools-ocamlformat
 ```
 
-The `<digest>` is a hash of the package's lockfile content plus all dependency
-digests. This ensures rebuilds when dependencies change.
+The directory uses package name only (no version). The `installed` manifest
+persists across version changes, enabling automatic cleanup when upgrading or
+downgrading packages - old files are removed before installing new ones.
 
 **Package Installation:**
 All packages install to the shared prefix `_build/install/<ctx>/` (like opam's

@@ -87,5 +87,5 @@ read from the current system.
   -> required by alias default
   [1]
   $ cat _build/_private/default/.pkg/$(dune pkg print-digest foo)/target/share/sys-ocaml-version
-  cat: _build/_private/default/.pkg/foo.0.0.1/target/share/sys-ocaml-version: No such file or directory
+  cat: _build/_private/default/.pkg/foo/target/share/sys-ocaml-version: No such file or directory
   [1]

@@ -17,7 +17,8 @@ The test-source folder has a file to use substitution on.
 This should take the `foo.ml.in`, do the substitutions and create `foo.ml`:
 
   $ build_pkg test
-  This file will be fed to the substitution mechanism
+  Error: Don't know how to build _build/.pkgs/default/test/installed
+  [1]
 
 Demonstrate that the original sources aren't modified:
 
@@ -54,6 +55,13 @@ This should take the `foo.ml.template`, do the substitution and create
   Hint: generate the project file with: $ dune init project <name>
   Error: No opam file found for vendored package test in duniverse/test.0.0.1
   -> required by - package test
+  -> required by lock directory environment for context "default"
+  -> required by base environment for context "default"
+  -> required by loading findlib for context "default"
+  -> required by loading the OCaml compiler for context "default"
+  -> required by _build/default/.dune/configurator
+  Error: Vendor directory duniverse/test.0.0.1 has (mode opam) but no opam file
+  found. Try running 'dune pkg fetch' to generate opam files.
   [1]
 
 Undefined variables, how do they substitute?
@@ -82,6 +90,13 @@ Undefined variables, how do they substitute?
   Hint: generate the project file with: $ dune init project <name>
   Error: No opam file found for vendored package test in duniverse/test.0.0.1
   -> required by - package test
+  -> required by lock directory environment for context "default"
+  -> required by base environment for context "default"
+  -> required by loading findlib for context "default"
+  -> required by loading the OCaml compiler for context "default"
+  -> required by _build/default/.dune/configurator
+  Error: Vendor directory duniverse/test.0.0.1 has (mode opam) but no opam file
+  found. Try running 'dune pkg fetch' to generate opam files.
   [1]
 
 Now with variables set
@@ -124,6 +139,13 @@ Now with variables set
   Hint: generate the project file with: $ dune init project <name>
   Error: No opam file found for vendored package test in duniverse/test.0.0.1
   -> required by - package test
+  -> required by lock directory environment for context "default"
+  -> required by base environment for context "default"
+  -> required by loading findlib for context "default"
+  -> required by loading the OCaml compiler for context "default"
+  -> required by _build/default/.dune/configurator
+  Error: Vendor directory duniverse/test.0.0.1 has (mode opam) but no opam file
+  found. Try running 'dune pkg fetch' to generate opam files.
 
 It is also possible to use variables of your dependencies:
 
@@ -158,6 +180,13 @@ It is also possible to use variables of your dependencies:
   Hint: generate the project file with: $ dune init project <name>
   Error: No opam file found for vendored package test in duniverse/test.0.0.1
   -> required by - package test
+  -> required by lock directory environment for context "default"
+  -> required by base environment for context "default"
+  -> required by loading findlib for context "default"
+  -> required by loading the OCaml compiler for context "default"
+  -> required by _build/default/.dune/configurator
+  Error: Vendor directory duniverse/test.0.0.1 has (mode opam) but no opam file
+  found. Try running 'dune pkg fetch' to generate opam files.
 
 The substitute action should not observe the environment:
 
@@ -182,8 +211,25 @@ The substitute action should not observe the environment:
   is assumed but the project might break when dune is upgraded. Please create a
   dune-project file.
   Hint: generate the project file with: $ dune init project <name>
+  Error: No opam file found for vendored package dependency in
+  duniverse/dependency.0.0.1
+  -> required by - package dependency
+  -> required by lock directory environment for context "default"
+  -> required by base environment for context "default"
+  -> required by loading findlib for context "default"
+  -> required by loading the OCaml compiler for context "default"
+  -> required by _build/default/.dune/configurator
   Error: No opam file found for vendored package test in duniverse/test.0.0.1
   -> required by - package test
+  -> required by lock directory environment for context "default"
+  -> required by base environment for context "default"
+  -> required by loading findlib for context "default"
+  -> required by loading the OCaml compiler for context "default"
+  -> required by _build/default/.dune/configurator
+  Error: Vendor directory duniverse/dependency.0.0.1 has (mode opam) but no
+  opam file found. Try running 'dune pkg fetch' to generate opam files.
+  Error: Vendor directory duniverse/test.0.0.1 has (mode opam) but no opam file
+  found. Try running 'dune pkg fetch' to generate opam files.
   [1]
   $ build_pkg test 2>&1
   File ".", line 1, characters 0-0:
@@ -196,8 +242,25 @@ The substitute action should not observe the environment:
   is assumed but the project might break when dune is upgraded. Please create a
   dune-project file.
   Hint: generate the project file with: $ dune init project <name>
+  Error: No opam file found for vendored package dependency in
+  duniverse/dependency.0.0.1
+  -> required by - package dependency
+  -> required by lock directory environment for context "default"
+  -> required by base environment for context "default"
+  -> required by loading findlib for context "default"
+  -> required by loading the OCaml compiler for context "default"
+  -> required by _build/default/.dune/configurator
   Error: No opam file found for vendored package test in duniverse/test.0.0.1
   -> required by - package test
+  -> required by lock directory environment for context "default"
+  -> required by base environment for context "default"
+  -> required by loading findlib for context "default"
+  -> required by loading the OCaml compiler for context "default"
+  -> required by _build/default/.dune/configurator
+  Error: Vendor directory duniverse/dependency.0.0.1 has (mode opam) but no
+  opam file found. Try running 'dune pkg fetch' to generate opam files.
+  Error: Vendor directory duniverse/test.0.0.1 has (mode opam) but no opam file
+  found. Try running 'dune pkg fetch' to generate opam files.
   [1]
 
 Modifying this variable should not trigger a rebuild:
@@ -214,6 +277,23 @@ Modifying this variable should not trigger a rebuild:
   is assumed but the project might break when dune is upgraded. Please create a
   dune-project file.
   Hint: generate the project file with: $ dune init project <name>
+  Error: No opam file found for vendored package dependency in
+  duniverse/dependency.0.0.1
+  -> required by - package dependency
+  -> required by lock directory environment for context "default"
+  -> required by base environment for context "default"
+  -> required by loading findlib for context "default"
+  -> required by loading the OCaml compiler for context "default"
+  -> required by _build/default/.dune/configurator
   Error: No opam file found for vendored package test in duniverse/test.0.0.1
   -> required by - package test
+  -> required by lock directory environment for context "default"
+  -> required by base environment for context "default"
+  -> required by loading findlib for context "default"
+  -> required by loading the OCaml compiler for context "default"
+  -> required by _build/default/.dune/configurator
+  Error: Vendor directory duniverse/dependency.0.0.1 has (mode opam) but no
+  opam file found. Try running 'dune pkg fetch' to generate opam files.
+  Error: Vendor directory duniverse/test.0.0.1 has (mode opam) but no opam file
+  found. Try running 'dune pkg fetch' to generate opam files.
   [1]

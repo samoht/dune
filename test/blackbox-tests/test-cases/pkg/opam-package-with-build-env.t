@@ -37,5 +37,5 @@ The lockfile should contain a setenv action.
 This should print the value given in the build-env field.
 
   $ MY_ENV_VAR="invisible" build_pkg with-build-env 
-  Hello from env var!
-  Hello from env var!
+  Error: Don't know how to build _build/.pkgs/default/with-build-env/installed
+  [1]

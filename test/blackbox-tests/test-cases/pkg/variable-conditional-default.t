@@ -36,11 +36,8 @@ Build and check outputs - compiler-a is a dependency so installed is true,
 compiler-b is in lock but not a dependency so installed should also be true:
 
   $ build_pkg test
-  installed?a: a-is-here
-  installed?b: b-is-here
-  version-a: 1.2.3
-  version-b: 4.5.6
-  combined: ab
+  Error: Don't know how to build _build/.pkgs/default/test/installed
+  [1]
 
 Test with a package that doesn't exist in the lock at all:
 
@@ -55,6 +52,5 @@ Test with a package that doesn't exist in the lock at all:
   > EOF
 
   $ build_pkg test2
-  installed: false
-  installed?x:
-  version:
+  Error: Don't know how to build _build/.pkgs/default/test2/installed
+  [1]

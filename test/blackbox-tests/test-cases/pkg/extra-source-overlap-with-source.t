@@ -30,7 +30,7 @@ file in the package's source.
   Description:
     ("fetch_local: unpack is not set",
      { url =
-         "file:///Users/samoht/git/dune/_build/.sandbox/bfbc7cd5a9617264dac97e111355ef09/default/test/blackbox-tests/test-cases/pkg/foo.txt"
+         "file:///Users/samoht/git/dune/_build/.sandbox/c3aba80f13ab5a4580eeade0b540341b/default/test/blackbox-tests/test-cases/pkg/foo.txt"
      })
   Raised at Stdune__Code_error.raise in file
     "otherlibs/stdune/src/code_error.ml", line 10, characters 30-62
@@ -61,5 +61,5 @@ file in the package's source.
 Make sure that the package's source directory ends up with the version
 of foo.txt from extra_sources:
   $ cat _build/_private/default/.pkg/$($dune pkg print-digest foo)/source/foo.txt
-  cat: _build/_private/default/.pkg/foo.1/source/foo.txt: No such file or directory
+  cat: _build/_private/default/.pkg/foo/source/foo.txt: No such file or directory
   [1]

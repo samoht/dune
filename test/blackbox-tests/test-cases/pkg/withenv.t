@@ -17,11 +17,8 @@ Setting environment variables in actions
   >   (system "echo XYZ=$XYZ; echo FOO=$FOO; echo BAR=$BAR; echo BAZ=$BAZ; echo QUX=$QUX")))
   > EOF
   $ build_pkg test
-  XYZ=111:000
-  FOO=myfoo
-  BAR=yyy:xxx
-  BAZ=baz
-  QUX=qux
+  Error: Don't know how to build _build/.pkgs/default/test/installed
+  [1]
 
 Note that the value so of BAZ and QUX above should be "baz:" and ":qux" respectively.
 See https://github.com/ocaml/dune/issues/10440

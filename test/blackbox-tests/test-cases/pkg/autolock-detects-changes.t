@@ -58,9 +58,7 @@ Build with auto-locking:
   [1]
 
   $ dune exec bar
-  Error:
-  stat($TESTCASE_ROOT/foo.tar/foo.opam): Not a directory
-  -> required by _build/.locks/default/dune.lock/pkgs
+  Error: dune.lock/lock.dune: Not a directory
   -> required by lock directory environment for context "default"
   -> required by base environment for context "default"
   -> required by loading findlib for context "default"
@@ -77,9 +75,7 @@ Build again - adding unrelated package should NOT trigger rebuild:
   no rebuilds
 
   $ dune exec bar
-  Error:
-  stat($TESTCASE_ROOT/foo.tar/foo.opam): Not a directory
-  -> required by _build/.locks/default/dune.lock/pkgs
+  Error: dune.lock/lock.dune: Not a directory
   -> required by lock directory environment for context "default"
   -> required by base environment for context "default"
   -> required by loading findlib for context "default"
@@ -120,9 +116,7 @@ Build again - auto-locking should detect the new version and rebuild:
   [1]
 
   $ dune exec bar
-  Error:
-  stat($TESTCASE_ROOT/foo-0.0.2.tar/foo.opam): Not a directory
-  -> required by _build/.locks/default/dune.lock/pkgs
+  Error: dune.lock/lock.dune: Not a directory
   -> required by lock directory environment for context "default"
   -> required by base environment for context "default"
   -> required by loading findlib for context "default"

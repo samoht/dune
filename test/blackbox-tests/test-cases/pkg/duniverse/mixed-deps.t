@@ -473,6 +473,11 @@ Create project that uses dune-top:
 Build all pkg dependencies first:
 
   $ dune build @pkg-install 2>&1
+  Error: No rule found for .pkgs/opam-leaf/installed
+  -> required by alias pkg-install
+  Error: No rule found for .pkgs/opam-mid1/installed
+  -> required by alias pkg-install
+  [1]
 
 Build the project:
 

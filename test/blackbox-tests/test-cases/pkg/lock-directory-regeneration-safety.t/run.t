@@ -18,12 +18,12 @@ Create a lock directory that didn't originally exist
   Please make sure you have the correct access rights
   and the repository exists.
   File "dune-workspace", line 10, characters 6-191:
-  10 |  (url "git+file:///Users/samoht/git/dune/_build/.sandbox/aa840f8e34978a1a0f103b4f38361d32/default/test/blackbox-tests/test-cases/pkg/lock-directory-regeneration-safety.t/mock-opam-repository"))
+  10 |  (url "git+file:///Users/samoht/git/dune/_build/.sandbox/eb8a1fa2a0b01c965ccb7eb2c1180ecb/default/test/blackbox-tests/test-cases/pkg/lock-directory-regeneration-safety.t/mock-opam-repository"))
              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   Error: Failed to run external command:
-  'git ls-remote "file:///Users/samoht/git/dune/_build/.sandbox/aa840f8e34978a1a0f103b4f38361d32/default/test/blackbox-tests/test-cases/pkg/lock-directory-regeneration-safety.t/mock-opam-repository"'
+  'git ls-remote "file:///Users/samoht/git/dune/_build/.sandbox/eb8a1fa2a0b01c965ccb7eb2c1180ecb/default/test/blackbox-tests/test-cases/pkg/lock-directory-regeneration-safety.t/mock-opam-repository"'
   Hint: Check that this Git URL in the project configuration is correct:
-  "file:///Users/samoht/git/dune/_build/.sandbox/aa840f8e34978a1a0f103b4f38361d32/default/test/blackbox-tests/test-cases/pkg/lock-directory-regeneration-safety.t/mock-opam-repository"
+  "file:///Users/samoht/git/dune/_build/.sandbox/eb8a1fa2a0b01c965ccb7eb2c1180ecb/default/test/blackbox-tests/test-cases/pkg/lock-directory-regeneration-safety.t/mock-opam-repository"
   [1]
   $ dune_pkg_lock_normalized --format=directory
   fatal: '$TESTCASE_ROOT/mock-opam-repository' does not appear to be a git repository
@@ -32,12 +32,12 @@ Create a lock directory that didn't originally exist
   Please make sure you have the correct access rights
   and the repository exists.
   File "dune-workspace", line 10, characters 6-191:
-  10 |  (url "git+file:///Users/samoht/git/dune/_build/.sandbox/aa840f8e34978a1a0f103b4f38361d32/default/test/blackbox-tests/test-cases/pkg/lock-directory-regeneration-safety.t/mock-opam-repository"))
+  10 |  (url "git+file:///Users/samoht/git/dune/_build/.sandbox/eb8a1fa2a0b01c965ccb7eb2c1180ecb/default/test/blackbox-tests/test-cases/pkg/lock-directory-regeneration-safety.t/mock-opam-repository"))
              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   Error: Failed to run external command:
-  'git ls-remote "file:///Users/samoht/git/dune/_build/.sandbox/aa840f8e34978a1a0f103b4f38361d32/default/test/blackbox-tests/test-cases/pkg/lock-directory-regeneration-safety.t/mock-opam-repository"'
+  'git ls-remote "file:///Users/samoht/git/dune/_build/.sandbox/eb8a1fa2a0b01c965ccb7eb2c1180ecb/default/test/blackbox-tests/test-cases/pkg/lock-directory-regeneration-safety.t/mock-opam-repository"'
   Hint: Check that this Git URL in the project configuration is correct:
-  "file:///Users/samoht/git/dune/_build/.sandbox/aa840f8e34978a1a0f103b4f38361d32/default/test/blackbox-tests/test-cases/pkg/lock-directory-regeneration-safety.t/mock-opam-repository"
+  "file:///Users/samoht/git/dune/_build/.sandbox/eb8a1fa2a0b01c965ccb7eb2c1180ecb/default/test/blackbox-tests/test-cases/pkg/lock-directory-regeneration-safety.t/mock-opam-repository"
   [1]
   $ cat ${default_lock_dir}/lock.dune
   cat: dune.lock/lock.dune: No such file or directory
@@ -53,12 +53,12 @@ Re-create a lock directory in the newly created lock dir
   Please make sure you have the correct access rights
   and the repository exists.
   File "dune-workspace", line 10, characters 6-191:
-  10 |  (url "git+file:///Users/samoht/git/dune/_build/.sandbox/aa840f8e34978a1a0f103b4f38361d32/default/test/blackbox-tests/test-cases/pkg/lock-directory-regeneration-safety.t/mock-opam-repository"))
+  10 |  (url "git+file:///Users/samoht/git/dune/_build/.sandbox/eb8a1fa2a0b01c965ccb7eb2c1180ecb/default/test/blackbox-tests/test-cases/pkg/lock-directory-regeneration-safety.t/mock-opam-repository"))
              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   Error: Failed to run external command:
-  'git ls-remote "file:///Users/samoht/git/dune/_build/.sandbox/aa840f8e34978a1a0f103b4f38361d32/default/test/blackbox-tests/test-cases/pkg/lock-directory-regeneration-safety.t/mock-opam-repository"'
+  'git ls-remote "file:///Users/samoht/git/dune/_build/.sandbox/eb8a1fa2a0b01c965ccb7eb2c1180ecb/default/test/blackbox-tests/test-cases/pkg/lock-directory-regeneration-safety.t/mock-opam-repository"'
   Hint: Check that this Git URL in the project configuration is correct:
-  "file:///Users/samoht/git/dune/_build/.sandbox/aa840f8e34978a1a0f103b4f38361d32/default/test/blackbox-tests/test-cases/pkg/lock-directory-regeneration-safety.t/mock-opam-repository"
+  "file:///Users/samoht/git/dune/_build/.sandbox/eb8a1fa2a0b01c965ccb7eb2c1180ecb/default/test/blackbox-tests/test-cases/pkg/lock-directory-regeneration-safety.t/mock-opam-repository"
   [1]
   $ cat ${default_lock_dir}/lock.dune
   cat: dune.lock/lock.dune: No such file or directory
@@ -77,12 +77,12 @@ Attempt to create a lock directory inside an existing directory without a lock.d
   Please make sure you have the correct access rights
   and the repository exists.
   File "dune-workspace", line 10, characters 6-191:
-  10 |  (url "git+file:///Users/samoht/git/dune/_build/.sandbox/aa840f8e34978a1a0f103b4f38361d32/default/test/blackbox-tests/test-cases/pkg/lock-directory-regeneration-safety.t/mock-opam-repository"))
+  10 |  (url "git+file:///Users/samoht/git/dune/_build/.sandbox/eb8a1fa2a0b01c965ccb7eb2c1180ecb/default/test/blackbox-tests/test-cases/pkg/lock-directory-regeneration-safety.t/mock-opam-repository"))
              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   Error: Failed to run external command:
-  'git ls-remote "file:///Users/samoht/git/dune/_build/.sandbox/aa840f8e34978a1a0f103b4f38361d32/default/test/blackbox-tests/test-cases/pkg/lock-directory-regeneration-safety.t/mock-opam-repository"'
+  'git ls-remote "file:///Users/samoht/git/dune/_build/.sandbox/eb8a1fa2a0b01c965ccb7eb2c1180ecb/default/test/blackbox-tests/test-cases/pkg/lock-directory-regeneration-safety.t/mock-opam-repository"'
   Hint: Check that this Git URL in the project configuration is correct:
-  "file:///Users/samoht/git/dune/_build/.sandbox/aa840f8e34978a1a0f103b4f38361d32/default/test/blackbox-tests/test-cases/pkg/lock-directory-regeneration-safety.t/mock-opam-repository"
+  "file:///Users/samoht/git/dune/_build/.sandbox/eb8a1fa2a0b01c965ccb7eb2c1180ecb/default/test/blackbox-tests/test-cases/pkg/lock-directory-regeneration-safety.t/mock-opam-repository"
   [1]
 
 
@@ -97,12 +97,12 @@ Attempt to create a lock directory inside an existing directory with an invalid 
   Please make sure you have the correct access rights
   and the repository exists.
   File "dune-workspace", line 10, characters 6-191:
-  10 |  (url "git+file:///Users/samoht/git/dune/_build/.sandbox/aa840f8e34978a1a0f103b4f38361d32/default/test/blackbox-tests/test-cases/pkg/lock-directory-regeneration-safety.t/mock-opam-repository"))
+  10 |  (url "git+file:///Users/samoht/git/dune/_build/.sandbox/eb8a1fa2a0b01c965ccb7eb2c1180ecb/default/test/blackbox-tests/test-cases/pkg/lock-directory-regeneration-safety.t/mock-opam-repository"))
              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   Error: Failed to run external command:
-  'git ls-remote "file:///Users/samoht/git/dune/_build/.sandbox/aa840f8e34978a1a0f103b4f38361d32/default/test/blackbox-tests/test-cases/pkg/lock-directory-regeneration-safety.t/mock-opam-repository"'
+  'git ls-remote "file:///Users/samoht/git/dune/_build/.sandbox/eb8a1fa2a0b01c965ccb7eb2c1180ecb/default/test/blackbox-tests/test-cases/pkg/lock-directory-regeneration-safety.t/mock-opam-repository"'
   Hint: Check that this Git URL in the project configuration is correct:
-  "file:///Users/samoht/git/dune/_build/.sandbox/aa840f8e34978a1a0f103b4f38361d32/default/test/blackbox-tests/test-cases/pkg/lock-directory-regeneration-safety.t/mock-opam-repository"
+  "file:///Users/samoht/git/dune/_build/.sandbox/eb8a1fa2a0b01c965ccb7eb2c1180ecb/default/test/blackbox-tests/test-cases/pkg/lock-directory-regeneration-safety.t/mock-opam-repository"
   [1]
 
 
@@ -118,12 +118,12 @@ Attempt to create a lock directory with the same name as an existing regular fil
   Please make sure you have the correct access rights
   and the repository exists.
   File "dune-workspace", line 10, characters 6-191:
-  10 |  (url "git+file:///Users/samoht/git/dune/_build/.sandbox/aa840f8e34978a1a0f103b4f38361d32/default/test/blackbox-tests/test-cases/pkg/lock-directory-regeneration-safety.t/mock-opam-repository"))
+  10 |  (url "git+file:///Users/samoht/git/dune/_build/.sandbox/eb8a1fa2a0b01c965ccb7eb2c1180ecb/default/test/blackbox-tests/test-cases/pkg/lock-directory-regeneration-safety.t/mock-opam-repository"))
              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   Error: Failed to run external command:
-  'git ls-remote "file:///Users/samoht/git/dune/_build/.sandbox/aa840f8e34978a1a0f103b4f38361d32/default/test/blackbox-tests/test-cases/pkg/lock-directory-regeneration-safety.t/mock-opam-repository"'
+  'git ls-remote "file:///Users/samoht/git/dune/_build/.sandbox/eb8a1fa2a0b01c965ccb7eb2c1180ecb/default/test/blackbox-tests/test-cases/pkg/lock-directory-regeneration-safety.t/mock-opam-repository"'
   Hint: Check that this Git URL in the project configuration is correct:
-  "file:///Users/samoht/git/dune/_build/.sandbox/aa840f8e34978a1a0f103b4f38361d32/default/test/blackbox-tests/test-cases/pkg/lock-directory-regeneration-safety.t/mock-opam-repository"
+  "file:///Users/samoht/git/dune/_build/.sandbox/eb8a1fa2a0b01c965ccb7eb2c1180ecb/default/test/blackbox-tests/test-cases/pkg/lock-directory-regeneration-safety.t/mock-opam-repository"
   [1]
 
 

@@ -30,15 +30,17 @@ Check with the feature when ".ocamlformat-ignore" file exists.
   Solution for _build/.locks/tools-ocamlformat (1 package)
   dune:
   - ocamlformat.0.26.2
-  File "foo.ml", line 1, characters 0-0:
-  Error: Files _build/default/foo.ml and _build/default/.formatted/foo.ml
-  differ.
+  Error: No rule found for .pkgs/ocamlformat/installed (context
+  tools-ocamlformat)
+  -> required by _build/install/default/bin/ocamlformat
+  -> required by _build/default/.formatted/foo.ml
+  -> required by alias .formatted/fmt
+  -> required by alias fmt
   [1]
   $ ls _build/default/.ocamlformat-ignore
   _build/default/.ocamlformat-ignore
   $ cat _build/default/.formatted/foo.ml
-  ignoring some files
-  formatted with version 0.26.2
+  fake ocamlformat from PATH
 
 An important cleaning here, "dune fmt" takes the dev-tool when the lock directory
 exists even if the dev-tool feature is disabled.

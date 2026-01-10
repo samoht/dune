@@ -28,7 +28,7 @@ project/
     install/default/          # Shared install prefix
 ```
 
-Sources are always in `_build/.pkgs/<ctx>/<digest>/source/` for proper rule
+Sources are always in `_build/.pkgs/<ctx>/<name>/source/` for proper rule
 input/output tracking. For vendored packages, this is linked from `duniverse/`.
 
 This enables:

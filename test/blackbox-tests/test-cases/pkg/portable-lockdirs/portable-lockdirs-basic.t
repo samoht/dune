@@ -48,7 +48,7 @@ Create a package that writes a different value to some files depending on the os
    (complete true)
    (used
     ((source
-      file:///Users/samoht/git/dune/_build/.sandbox/ff2136352adcf132c093015f7b12ba27/default/test/blackbox-tests/test-cases/pkg/portable-lockdirs/mock-opam-repository#c21438f3053d809fcc21c365d726c9be2af58cc5))))
+      file:///Users/samoht/git/dune/_build/.sandbox/2ebdddef966c8faa49b81f2af2ce2a5e/default/test/blackbox-tests/test-cases/pkg/portable-lockdirs/mock-opam-repository#e6f13a8eebf8c50085234bac4f942806cd2c715f))))
   
   (solved_for_platforms
    ((arch x86_64)
@@ -107,10 +107,10 @@ Create a package that writes a different value to some files depending on the os
   -> required by alias default
   [1]
   $ cat $pkg_root/$(dune pkg print-digest foo)/target/share/kernel
-  cat: _build/.pkgs/default/foo.0.0.1/target/share/kernel: No such file or directory
+  cat: _build/.pkgs/default/foo/target/share/kernel: No such file or directory
   [1]
   $ cat $pkg_root/$(dune pkg print-digest foo)/target/share/machine
-  cat: _build/.pkgs/default/foo.0.0.1/target/share/machine: No such file or directory
+  cat: _build/.pkgs/default/foo/target/share/machine: No such file or directory
   [1]
 
   $ DUNE_CONFIG__OS=macos DUNE_CONFIG__ARCH=x86_64 DUNE_CONFIG__OS_FAMILY=homebrew DUNE_CONFIG__OS_DISTRIBUTION=homebrew DUNE_CONFIG__OS_VERSION=15.3.1 dune build
@@ -124,8 +124,8 @@ Create a package that writes a different value to some files depending on the os
   -> required by alias default
   [1]
   $ cat $pkg_root/$(dune pkg print-digest foo)/target/share/kernel
-  cat: _build/.pkgs/default/foo.0.0.1/target/share/kernel: No such file or directory
+  cat: _build/.pkgs/default/foo/target/share/kernel: No such file or directory
   [1]
   $ cat $pkg_root/$(dune pkg print-digest foo)/target/share/machine
-  cat: _build/.pkgs/default/foo.0.0.1/target/share/machine: No such file or directory
+  cat: _build/.pkgs/default/foo/target/share/machine: No such file or directory
   [1]

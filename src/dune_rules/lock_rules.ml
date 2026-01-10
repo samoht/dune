@@ -27,6 +27,7 @@ module Spec = struct
   type ('path, 'target) t =
     { target : 'target
     ; lock_dir : 'path
+    ; promote_to : 'path (* Source path to promote the lock file to *)
     ; packages : Local_package.t Package.Name.Map.t
     ; repos : Opam_repo.t list
     ; solver_env_from_context : Solver_env.t
@@ -38,13 +39,18 @@ module Spec = struct
     }
 
   let name = "lock"
-  let version = 1
-  let bimap t f g = { t with lock_dir = f t.lock_dir; target = g t.target }
+  let version = 2 (* Bumped: added promote_to field *)
+
+  let bimap t f g =
+    { t with lock_dir = f t.lock_dir; promote_to = f t.promote_to; target = g t.target }
+  ;;
+
   let is_useful_to ~memoize = memoize
 
   let encode
         { target
         ; lock_dir
+        ; promote_to
         ; packages
         ; repos
         ; solver_env_from_context
@@ -60,6 +66,7 @@ module Spec = struct
     Sexp.record
       [ "target", encode_target target
       ; "lock_dir", encode_path lock_dir
+      ; "promote_to", encode_path promote_to
       ; ( "packages"
         , match Package_universe.dependency_digest packages with
           | None -> Atom "no packages"
@@ -122,6 +129,7 @@ module Spec = struct
   let action
         { target
         ; lock_dir = _
+        ; promote_to
         ; packages
         ; repos
         ; solver_env_from_context
@@ -217,9 +225,11 @@ module Spec = struct
     | Ok { pinned_packages; files = _; lock_dir; _ } ->
       let lock_file_path = Path.build target in
       let+ lock_dir = Dune_pkg.Lock.compute_missing_checksums ~pinned_packages lock_dir in
-      (* Write single-file format instead of directory format *)
+      (* Write single-file format to build directory *)
       let file = Dune_pkg.Lock.File.of_lock lock_dir in
-      Dune_pkg.Lock.File.write_to_disk ~lock_file_path file
+      Dune_pkg.Lock.File.write_to_disk ~lock_file_path file;
+      (* Promote to source tree *)
+      Dune_pkg.Lock.File.write_to_disk ~lock_file_path:promote_to file
   ;;
 end
 
@@ -352,6 +362,7 @@ let derive_lock_action
 let lock_action
       ~target
       ~lock_dir
+      ~promote_to
       ~packages
       ~repos
       ~solver_env_from_context
@@ -364,6 +375,7 @@ let lock_action
   A.action
     { Spec.target
     ; lock_dir
+    ; promote_to
     ; packages
     ; repos
     ; solver_env_from_context
@@ -513,9 +525,16 @@ let setup_lock_rules ~dir ~lock_dir : Gen_rules.result =
          | Some { unset_solver_vars = None; _ } -> Package_variable_name.Set.empty
          | Some { unset_solver_vars = Some vars; _ } -> vars
        in
+       (* Source path to promote lock file to *)
+       let promote_to =
+         Path.append_source
+           (Path.source workspace.dir)
+           (Path.Source.of_local lock_dir_param)
+       in
        lock_action
          ~target
          ~lock_dir:lock_dir_path
+         ~promote_to
          ~packages
          ~repos
          ~solver_env_from_context
@@ -531,10 +550,6 @@ let setup_lock_rules ~dir ~lock_dir : Gen_rules.result =
       (* File target instead of directory target *)
       |> Action_builder.With_targets.add ~file_targets:[ target ]
     in
-    (* TODO: Add promotion to source tree.
-       The built-in promotion mechanism doesn't work for .locks/ directory
-       because it doesn't have an associated context. We need to handle
-       promotion separately, either via a post-build hook or a separate rule. *)
     let rule = Rule.make ~targets build in
     Rules.of_rules [ rule ]
   in

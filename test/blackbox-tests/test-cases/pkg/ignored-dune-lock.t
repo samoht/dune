@@ -32,6 +32,8 @@ Test that shows what happens when dune.lock is ignored.
 Building test works when the dune.lock is visible to dune.
 
   $ build_pkg test
+  Error: Don't know how to build _build/.pkgs/default/test/installed
+  [1]
 
 Now the project is changed to only include src (which effectively ignores
 dune.lock):

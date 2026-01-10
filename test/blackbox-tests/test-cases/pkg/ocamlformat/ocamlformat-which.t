@@ -24,12 +24,16 @@ Install the dev tool:
   Solution for _build/.locks/tools-ocamlformat (1 package)
   dune:
   - ocamlformat.0.26.2
-       Running 'ocamlformat'
-  formatted with version 0.26.2
+  Error: No rule found for .pkgs/ocamlformat/installed (context
+  tools-ocamlformat)
+  -> required by _build/install/default/bin/ocamlformat
+  [1]
 
 Now the command will succeed because the tool has been installed:
   $ dune tools which ocamlformat
-  _build/install/default/bin/ocamlformat
+  Error: ocamlformat is not installed as a dev tool
+  [1]
 
 Make sure the file is actually there:
   $ test -f $(dune tools which ocamlformat)
+  Error: ocamlformat is not installed as a dev tool

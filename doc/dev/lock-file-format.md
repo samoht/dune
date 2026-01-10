@@ -322,7 +322,7 @@ Two modes:
 ### Default: Minimal Lock (Approach 2)
 - Lock file pins repo hash + versions
 - Opam-repo cached in `~/.cache/dune/` (works offline after first fetch)
-- Sources fetched on demand to `_build/.pkgs/<context>/<name>.<version>-<digest>/source/`
+- Sources fetched on demand to `_build/.pkgs/<context>/<name>/source/`
 
 ### Optional: Full Vendor (Approach 3)
 - Run `dune pkg fetch` to download sources to `duniverse/`

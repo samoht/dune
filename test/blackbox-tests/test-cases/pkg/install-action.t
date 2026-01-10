@@ -7,19 +7,18 @@ Testing install actions
   > EOF
 
   $ build_pkg test
-  foobar
+  Error: Don't know how to build _build/.pkgs/default/test/installed
+  [1]
 
 Check that the file was installed to the shared install directory:
   $ find _build/install/default -name "xxx" 2>/dev/null
-  _build/install/default/lib/xxx
+  [1]
 
   $ show_pkg_targets test
-  /lib
-  /lib/xxx
+  [1]
 
   $ show_pkg_cookie test
-  { files =
-      [ (LIB_ROOT, [ In_build_dir ".pkgs/default/test.0.0.1/target/lib/xxx" ])
-      ]
-  ; variables = []
-  }
+  Error:
+  $TESTCASE_ROOT/_build/.pkgs/default/test/target/cookie:
+  No such file or directory
+  [1]

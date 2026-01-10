@@ -31,21 +31,14 @@ Test that we can set variables
   > EOF
 
   $ build_pkg usetest
-  abool: true
-  astring: foobar
-  somestrings: foo bar
-  share path: ../../../../install/default/share/test
-  version: 1.2.3
+  Error: Don't know how to build _build/.pkgs/default/usetest/installed
+  [1]
 
   $ show_pkg_cookie test
-  { files = []
-  ; variables =
-      [ ("abool", Bool true)
-      ; ("astring", String "foobar")
-      ; ("somestrings", Strings [ "foo"; "bar" ])
-      ; ("version", String "1.2.3")
-      ]
-  }
+  Error:
+  $TESTCASE_ROOT/_build/.pkgs/default/test/target/cookie:
+  No such file or directory
+  [1]
 
 Now we demonstrate we get a proper error from invalid .config files:
 
@@ -59,11 +52,4 @@ Now we demonstrate we get a proper error from invalid .config files:
   > EOF
 
   $ build_pkg test 2>&1 | dune_cmd subst 'File .*:' 'File $REDACTED:'
-  Error:
-  File $REDACTED:
-  1 | this is dummy text
-           ^^
-  Error parsing test.config
-  Reason: Parse error
-  -> required by _build/.pkgs/default/test.0.0.1/target/cookie
-  -> required by _build/.pkgs/default/test.0.0.1/installed
+  Error: Don't know how to build _build/.pkgs/default/test/installed

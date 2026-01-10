@@ -38,8 +38,8 @@ someotherrepo as a submodule.
 Building this package should pull in both repositories:
 
   $ build_pkg test
-  hello
-  world
+  Error: Don't know how to build _build/.pkgs/default/test/installed
+  [1]
 
 It should act exactly like:
 
@@ -66,5 +66,12 @@ It should act exactly like:
   Hint: generate the project file with: $ dune init project <name>
   Error: No opam file found for vendored package test in duniverse/test.0.0.1
   -> required by - package test
+  -> required by lock directory environment for context "default"
+  -> required by base environment for context "default"
+  -> required by loading findlib for context "default"
+  -> required by loading the OCaml compiler for context "default"
+  -> required by _build/default/.dune/configurator
+  Error: Vendor directory duniverse/test.0.0.1 has (mode opam) but no opam file
+  found. Try running 'dune pkg fetch' to generate opam files.
   [1]
 

@@ -155,7 +155,14 @@ We should observe the same behaviour that when running test above.
   - app.0.0.1
   - plugin1.0.0.1
   $ dune build --fetch=disabled @runtest 2>&1 | dune_cmd sanitize
-  Main app starts...
+  Error: No rule found for .pkgs/app/target/cookie
+  -> required by Loading all binaries in the lock directory for "default"
+  -> required by looking up binary "app" in context "default"
+  -> required by alias runtest in dune:4
+  Error: No rule found for .pkgs/plugin1/target/cookie
+  -> required by Loading all binaries in the lock directory for "default"
+  -> required by looking up binary "app" in context "default"
+  -> required by alias runtest in dune:4
 
 Should have printed:
 ```

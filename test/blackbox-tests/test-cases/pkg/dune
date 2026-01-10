@@ -58,6 +58,7 @@
   dev-tool-conflict-test
   broken-symlink-in-dependency
   install-file-tracking
+  package-upgrade-cleanup
   duniverse
   duniverse/non-dune-pkg))
 
@@ -71,6 +72,7 @@
   pkg-extract-fail
   broken-symlink-in-dependency
   install-file-tracking
+  package-upgrade-cleanup
   duniverse
   duniverse/non-dune-pkg))
 

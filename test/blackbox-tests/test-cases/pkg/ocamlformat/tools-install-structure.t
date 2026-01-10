@@ -5,7 +5,7 @@ Test that verifies the directory structure for `dune tools install`:
 - Promotion copies tool's files to _build/install/default/
 
   $ . ../helpers.sh
-  /var/folders/7g/4yr0hhnx5ml4kvvxfjszdqf00000gn/T/dune_cram_9caeb8_.cram.sh/1.sh: line 1: ../helpers.sh: No such file or directory
+  /var/folders/7g/4yr0hhnx5ml4kvvxfjszdqf00000gn/T/dune_cram_c5f048_.cram.sh/1.sh: line 1: ../helpers.sh: No such file or directory
   ***** UNREACHABLE *****
 
 Set up a mock ocamlformat package:

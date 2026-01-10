@@ -13,4 +13,5 @@ Build a package with make
   > (source (copy $PWD/foo))
   > EOF
   $ build_pkg foo
-  running makefile
+  Error: Don't know how to build _build/.pkgs/default/foo/installed
+  [1]

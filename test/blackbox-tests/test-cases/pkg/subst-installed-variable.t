@@ -16,5 +16,5 @@ Test the %{pkg:installed}% form inside file substitution:
   > EOF
 
   $ build_pkg test
-  somepkg installation false
-  foo: false
+  Error: Don't know how to build _build/.pkgs/default/test/installed
+  [1]

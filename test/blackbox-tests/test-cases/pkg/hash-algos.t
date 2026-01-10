@@ -69,7 +69,7 @@ first checksum to the lockfile for this package.
    (complete true)
    (used
     ((source
-      file:///Users/samoht/git/dune/_build/.sandbox/3a0913c4ea589ef51f3a8e65750405bf/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository#fe175526a9edb7d70068021dbc8ca84d590104b3))))
+      file:///Users/samoht/git/dune/_build/.sandbox/06e7858285c6334872b8b52505659ce6/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository#d4b90019e093cdfece1f8560dbdaf954c363c67c))))
   
   (solved_for_platforms
    ((arch x86_64)

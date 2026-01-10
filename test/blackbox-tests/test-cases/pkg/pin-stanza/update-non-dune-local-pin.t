@@ -58,6 +58,6 @@ The change to the package is picked up:
   aaa
   Error: Logs for package foo
   
-  -> required by _build/.pkgs/default/foo.dev/target/cookie
-  -> required by _build/.pkgs/default/foo.dev/installed
+  -> required by _build/.pkgs/default/foo/target/cookie
+  -> required by _build/.pkgs/default/foo/installed
   [1]

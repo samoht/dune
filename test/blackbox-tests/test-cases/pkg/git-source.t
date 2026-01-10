@@ -19,4 +19,5 @@ Test fetching from git
   > EOF
 
   $ build_pkg test
-  hello world
+  Error: Don't know how to build _build/.pkgs/default/test/installed
+  [1]

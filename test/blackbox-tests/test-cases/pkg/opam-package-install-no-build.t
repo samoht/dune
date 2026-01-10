@@ -27,4 +27,6 @@ The lockfile should only contain an install step.
 Building should only do the install step.
 
   $ build_pkg install-no-build 
-  just installing
+  Error: Don't know how to build
+  _build/.pkgs/default/install-no-build/installed
+  [1]

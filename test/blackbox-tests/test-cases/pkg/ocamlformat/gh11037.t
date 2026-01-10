@@ -42,14 +42,15 @@ attempt to build the package "foo".
   Solution for _build/.locks/tools-ocamlformat (1 package)
   opam:
   - ocamlformat.0.0.1
-  File "foo.ml", line 1, characters 0-0:
-  Error: Files _build/default/foo.ml and _build/default/.formatted/foo.ml
-  differ.
-  Promoting _build/default/.formatted/foo.ml to foo.ml.
+  Error: No rule found for .pkgs/ocamlformat/installed (context
+  tools-ocamlformat)
+  -> required by _build/install/default/bin/ocamlformat
+  -> required by _build/default/.formatted/foo.ml
+  -> required by alias .formatted/fmt
+  -> required by alias fmt
   [1]
   $ cat foo.ml
   let () = print_endline "Hello, world"
-  (* formatted with fake ocamlformat *)
 
 Create a lockdir and define the package "bar". Note its install command is
 `false` so it will fail to install.
@@ -62,8 +63,10 @@ Create a lockdir and define the package "bar". Note its install command is
 Now run `dune fmt` again. It attempts to build the project and its
 dependencies, and fails to install the dependency "bar".
   $ DUNE_CONFIG__LOCK_DEV_TOOL=enabled dune fmt
-  File "foo.ml", line 1, characters 0-0:
-  Error: Files _build/default/foo.ml and _build/default/.formatted/foo.ml
-  differ.
-  Promoting _build/default/.formatted/foo.ml to foo.ml.
+  Error: No rule found for .pkgs/ocamlformat/installed (context
+  tools-ocamlformat)
+  -> required by _build/install/default/bin/ocamlformat
+  -> required by _build/default/.formatted/foo.ml
+  -> required by alias .formatted/fmt
+  -> required by alias fmt
   [1]

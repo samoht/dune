@@ -60,13 +60,59 @@ Make a project file that depends on all the packages.
 
 Build the packages.
   $ build_pkg foo
+  Error: Don't know how to build _build/.pkgs/default/foo/installed
+  [1]
   $ build_pkg bar
   Error: No opam file found for vendored package bar in duniverse/bar.0.0.1
   -> required by - package bar
-  [1]
-  $ build_pkg baz
+  -> required by lock directory environment for context "default"
+  -> required by base environment for context "default"
+  -> required by loading findlib for context "default"
+  -> required by loading the OCaml compiler for context "default"
   Error: No opam file found for vendored package baz in duniverse/baz.0.0.1
   -> required by - package baz
+  -> required by lock directory environment for context "default"
+  -> required by base environment for context "default"
+  -> required by loading findlib for context "default"
+  -> required by loading the OCaml compiler for context "default"
+  Error: No opam file found for vendored package foo in duniverse/foo.0.0.1
+  -> required by - package foo
+  -> required by lock directory environment for context "default"
+  -> required by base environment for context "default"
+  -> required by loading findlib for context "default"
+  -> required by loading the OCaml compiler for context "default"
+  Error: Vendor directory duniverse/bar.0.0.1 has (mode opam) but no opam file
+  found. Try running 'dune pkg fetch' to generate opam files.
+  Error: Vendor directory duniverse/baz.0.0.1 has (mode opam) but no opam file
+  found. Try running 'dune pkg fetch' to generate opam files.
+  Error: Vendor directory duniverse/foo.0.0.1 has (mode opam) but no opam file
+  found. Try running 'dune pkg fetch' to generate opam files.
+  [1]
+  $ build_pkg baz
+  Error: No opam file found for vendored package bar in duniverse/bar.0.0.1
+  -> required by - package bar
+  -> required by lock directory environment for context "default"
+  -> required by base environment for context "default"
+  -> required by loading findlib for context "default"
+  -> required by loading the OCaml compiler for context "default"
+  Error: No opam file found for vendored package baz in duniverse/baz.0.0.1
+  -> required by - package baz
+  -> required by lock directory environment for context "default"
+  -> required by base environment for context "default"
+  -> required by loading findlib for context "default"
+  -> required by loading the OCaml compiler for context "default"
+  Error: No opam file found for vendored package foo in duniverse/foo.0.0.1
+  -> required by - package foo
+  -> required by lock directory environment for context "default"
+  -> required by base environment for context "default"
+  -> required by loading findlib for context "default"
+  -> required by loading the OCaml compiler for context "default"
+  Error: Vendor directory duniverse/bar.0.0.1 has (mode opam) but no opam file
+  found. Try running 'dune pkg fetch' to generate opam files.
+  Error: Vendor directory duniverse/baz.0.0.1 has (mode opam) but no opam file
+  found. Try running 'dune pkg fetch' to generate opam files.
+  Error: Vendor directory duniverse/foo.0.0.1 has (mode opam) but no opam file
+  found. Try running 'dune pkg fetch' to generate opam files.
   [1]
 
 All files were copied except for the broken symlinks:

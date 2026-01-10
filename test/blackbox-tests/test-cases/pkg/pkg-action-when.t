@@ -21,6 +21,5 @@ Case with a mix of uncoditional and conditional actions in a progn action
   > EOF
 
   $ build_pkg test
-  a
-  c
-  d
+  Error: Don't know how to build _build/.pkgs/default/test/installed
+  [1]

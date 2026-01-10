@@ -21,6 +21,9 @@ building packages:
 There should only be one execution here:
 
   $ makeProject true
-  foo
+  Error: Don't know how to build _build/.pkgs/default/test/installed
+  [1]
 
   $ makeProject false
+  Error: Don't know how to build _build/.pkgs/default/test/installed
+  [1]

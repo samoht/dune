@@ -137,7 +137,9 @@ module Package_universe = struct
 end
 
 (* Package identifier: a (name, version) pair used to uniquely identify packages
-   and construct directory paths like "_build/.pkgs/<ctx>/pkg-name.1.0.0/" *)
+   and construct directory paths like "_build/.pkgs/<ctx>/pkg-name/".
+   Note: version is NOT in the path - this allows the 'installed' manifest
+   to persist across version changes for automatic upgrade cleanup. *)
 module Pkg_id = struct
   module T = struct
     type t =
@@ -160,24 +162,22 @@ module Pkg_id = struct
   include T
   include Comparable.Make (T)
 
-  let to_string { name; version } =
-    sprintf "%s.%s" (Package.Name.to_string name) (Package_version.to_string version)
+  (* Path uses only package name, not version.
+     This allows the 'installed' manifest to persist across version changes,
+     enabling automatic cleanup when upgrading/downgrading packages. *)
+  let to_string { name; version = _ } = Package.Name.to_string name
+
+  (* Parse package name from directory name. Version is not in path. *)
+  let of_string s =
+    { name = Package.Name.of_string s; version = Package_version.of_string "dev" }
   ;;
 
   let of_string_opt s =
-    Vendor_rules.parse_name_version s
-    |> Option.map ~f:(fun (name, version) ->
-      { name = Package.Name.of_string name; version = Package_version.of_string version })
+    try Some (of_string s) with
+    | _ -> None
   ;;
 
-  let of_string s =
-    match of_string_opt s with
-    | Some t -> t
-    | None ->
-      { name = Package.Name.of_string s; version = Package_version.of_string "dev" }
-  ;;
-
-  let name_of_string s = Package.Name.of_string (Vendor_rules.parse_pkg_name_from_dir s)
+  let name_of_string s = Package.Name.of_string s
   let create ~name ~version = { name; version }
 end
 
@@ -2385,27 +2385,32 @@ module Copy_to_prefix_action = struct
       ; target_dir : 'path
       ; prefix : 'target (* shared install prefix *)
       ; package : Package.Name.t
+      ; installed_file : 'target (* file listing all installed files *)
       }
 
     let name = "copy-to-prefix"
     let version = 1
 
-    let bimap { cookie_file; target_dir; prefix; package } f g =
+    let bimap { cookie_file; target_dir; prefix; package; installed_file } f g =
       { cookie_file = f cookie_file
       ; target_dir = f target_dir
       ; prefix = g prefix
       ; package
+      ; installed_file = g installed_file
       }
     ;;
 
     let is_useful_to ~memoize:_ = false (* Don't cache this action *)
 
-    let encode { cookie_file; target_dir; prefix; package } path target : Sexp.t =
+    let encode { cookie_file; target_dir; prefix; package; installed_file } path target
+      : Sexp.t
+      =
       List
         [ path cookie_file
         ; path target_dir
         ; target prefix
         ; Atom (Package.Name.to_string package)
+        ; target installed_file
         ]
     ;;
 
@@ -2419,54 +2424,39 @@ module Copy_to_prefix_action = struct
         Io.copy_file ~src ~dst ()
     ;;
 
-    (* Find and remove files from old versions of this package.
-       This handles package upgrades/downgrades by cleaning up stale files. *)
-    let cleanup_old_versions ~package ~current_target_dir ~prefix_path =
-      (* Derive pkgs_dir from target_dir:
-         target_dir = _build/.pkgs/<ctx>/<name>.<version>/target
-         pkgs_dir = _build/.pkgs/<ctx>/ *)
-      let pkg_root = Path.parent_exn current_target_dir in
-      let pkgs_dir = Path.parent_exn pkg_root in
-      let package_prefix = Package.Name.to_string package ^ "." in
-      (* List all directories in pkgs_dir that start with this package name *)
-      match Path.Untracked.readdir_unsorted pkgs_dir with
-      | Error _ -> () (* pkgs_dir doesn't exist yet, nothing to clean *)
-      | Ok entries ->
-        List.iter entries ~f:(fun entry ->
-          if String.is_prefix entry ~prefix:package_prefix
-          then (
-            let entry_path = Path.relative pkgs_dir entry in
-            (* Skip the current package version *)
-            if not (Path.equal entry_path pkg_root)
-            then (
-              (* Look for cookie in <entry>/target/cookie *)
-              let old_cookie_path =
-                Path.relative (Path.relative entry_path "target") "cookie"
-              in
-              match Install_cookie.Persistent.load old_cookie_path with
-              | None -> () (* No cookie, nothing to clean *)
-              | Some old_cookie ->
-                (* Delete files listed in old cookie from prefix *)
-                let old_target_dir = Path.relative entry_path "target" in
-                List.iter old_cookie.files ~f:(fun (_section, files) ->
-                  List.iter files ~f:(fun file_in_old_target ->
-                    match Path.drop_prefix file_in_old_target ~prefix:old_target_dir with
-                    | None -> ()
-                    | Some relative ->
-                      let dst = Path.append_local prefix_path relative in
-                      if Path.Untracked.exists dst
-                      then Fpath.unlink_no_err (Path.to_string dst))))))
+    (* Read a list of relative file paths from the installed file.
+       Returns empty list if file doesn't exist. *)
+    let read_installed_file installed_path =
+      if Path.Untracked.exists installed_path
+      then (
+        let contents = Io.read_file installed_path in
+        String.split_lines contents
+        |> List.filter_map ~f:(fun line ->
+          let line = String.trim line in
+          if String.is_empty line then None else Some (Path.Local.of_string line)))
+      else []
     ;;
 
-    let action { cookie_file; target_dir; prefix; package } ~ectx:_ ~eenv:_ =
+    (* Remove previously installed files from prefix.
+       Reads the list of files from the installed manifest. *)
+    let cleanup_old_files ~installed_path ~prefix_path =
+      let old_files = read_installed_file installed_path in
+      List.iter old_files ~f:(fun relative ->
+        let dst = Path.append_local prefix_path relative in
+        if Path.Untracked.exists dst then Fpath.unlink_no_err (Path.to_string dst))
+    ;;
+
+    let action
+          { cookie_file; target_dir; prefix; package; installed_file }
+          ~ectx:_
+          ~eenv:_
+      =
       let open Fiber.O in
       let* () = Fiber.return () in
       let prefix_path = Path.build prefix in
-      (* First, clean up files from old versions of this package *)
-      let* () =
-        Async.async (fun () ->
-          cleanup_old_versions ~package ~current_target_dir:target_dir ~prefix_path)
-      in
+      let installed_path = Path.build installed_file in
+      (* First, clean up files from the previous installation of this package *)
+      let* () = Async.async (fun () -> cleanup_old_files ~installed_path ~prefix_path) in
       (* Read the cookie to get the list of files.
          Provide a clear error message including the package name if loading fails. *)
       let* cookie =
@@ -2484,32 +2474,44 @@ module Copy_to_prefix_action = struct
               ; Pp.textf "Cookie file: %s" (Path.to_string cookie_file)
               ])
       in
-      (* Copy each file from target_dir to prefix *)
-      let+ () =
+      (* Copy each file from target_dir to prefix, collecting relative paths *)
+      let all_files =
         Section.Map.to_list cookie.files
         |> List.concat_map ~f:(fun (_section, files) -> files)
-        |> Fiber.parallel_iter ~f:(fun src_in_target ->
+      in
+      let installed_files = ref [] in
+      let+ () =
+        Fiber.parallel_iter all_files ~f:(fun src_in_target ->
           Async.async (fun () ->
             (* src_in_target is the file path in target_dir.
                Compute the relative path and apply it to prefix. *)
-            let target_dir_path = target_dir in
-            match Path.drop_prefix src_in_target ~prefix:target_dir_path with
+            match Path.drop_prefix src_in_target ~prefix:target_dir with
             | None ->
               (* File is not under target_dir - might be from external source *)
               ()
             | Some relative ->
               let dst = Path.append_local prefix_path relative in
               if Path.Untracked.exists src_in_target
-              then copy_file ~src:src_in_target ~dst))
+              then (
+                copy_file ~src:src_in_target ~dst;
+                installed_files := relative :: !installed_files)))
       in
-      ()
+      (* Write the list of installed files to the manifest *)
+      let manifest_contents =
+        !installed_files
+        |> List.map ~f:Path.Local.to_string
+        |> List.sort ~compare:String.compare
+        |> String.concat ~sep:"\n"
+      in
+      Path.mkdir_p (Path.parent_exn installed_path);
+      Io.write_file installed_path manifest_contents
     ;;
   end
 
   module A = Action_ext.Make (Spec)
 
-  let action ~cookie_file ~target_dir ~prefix ~package =
-    A.action { Spec.cookie_file; target_dir; prefix; package }
+  let action ~cookie_file ~target_dir ~prefix ~package ~installed_file =
+    A.action { Spec.cookie_file; target_dir; prefix; package; installed_file }
   ;;
 end
 
@@ -2522,28 +2524,16 @@ let installed_marker_path (pkg : Resolved_pkg.t) =
    - Depends on cookie file (which means build+install completed)
    - Reads cookie to get list of installed files
    - Copies each file from target_dir to shared prefix
-   - Produces installed marker file
+   - Writes installed file with list of files (serves as both marker and manifest)
 
    This rule modifies the shared install directory and should not be cached. *)
 let copy_to_prefix_rule (pkg : Resolved_pkg.t) =
   let cookie_path = install_cookie_path pkg in
+  let installed_path = installed_marker_path pkg in
   (* Dev tools install to the default context so their binaries are available in PATH *)
   let shared_prefix =
     let context = if pkg.is_dev_tool then Context_name.default else pkg.context in
     Pkg_opam.Pkg_install.dir ~context
-  in
-  (* The copy action *)
-  let copy_action =
-    Copy_to_prefix_action.action
-      ~cookie_file:(Path.build cookie_path)
-      ~target_dir:(Path.build pkg.write_paths.target_dir)
-      ~prefix:shared_prefix
-      ~package:pkg.info.name
-    |> Action.Full.make
-         ~sandbox:Sandbox_config.no_special_requirements
-         ~can_go_in_shared_cache:false
-    |> Action_builder.return
-    |> Action_builder.with_no_targets
   in
   let progress_action =
     Pkg_build_progress.progress_action pkg.info.name pkg.info.version `Installing
@@ -2553,27 +2543,25 @@ let copy_to_prefix_rule (pkg : Resolved_pkg.t) =
     |> Action_builder.return
     |> Action_builder.with_no_targets
   in
-  (* Create installed marker file with metadata for debugging *)
-  let marker_action =
-    let marker_contents =
-      sprintf
-        "package: %s\nversion: %s\nprefix: %s\n"
-        (Package.Name.to_string pkg.info.name)
-        (Package_version.to_string pkg.info.version)
-        (Path.Build.to_string shared_prefix)
-    in
-    Action.write_file (installed_marker_path pkg) marker_contents
+  (* The copy action writes files to prefix and writes the installed manifest *)
+  let copy_action =
+    Copy_to_prefix_action.action
+      ~cookie_file:(Path.build cookie_path)
+      ~target_dir:(Path.build pkg.write_paths.target_dir)
+      ~prefix:shared_prefix
+      ~package:pkg.info.name
+      ~installed_file:installed_path
     |> Action.Full.make
          ~sandbox:Sandbox_config.no_special_requirements
          ~can_go_in_shared_cache:false
     |> Action_builder.return
-    |> Action_builder.with_file_targets ~file_targets:[ installed_marker_path pkg ]
+    |> Action_builder.with_file_targets ~file_targets:[ installed_path ]
   in
   let open Action_builder.With_targets.O in
   (* Depend on cookie file *)
   Action_builder.path (Path.build cookie_path)
   |> Action_builder.with_no_targets
-  >>> Action_builder.progn [ progress_action; copy_action; marker_action ]
+  >>> Action_builder.progn [ progress_action; copy_action ]
 ;;
 
 let gen_rules context_name (pkg : Resolved_pkg.t) =
@@ -2711,7 +2699,7 @@ module Vendor_build = struct
       | Some v -> Package_version.of_string (OpamPackage.Version.to_string v)
       | None -> Package_version.of_string "dev"
     in
-    (* Marker is at _build/.pkgs/<ctx>/<name>.<version>/installed (root level, sibling of target/) *)
+    (* Marker is at _build/.pkgs/<ctx>/<name>/installed (root level, sibling of target/) *)
     Vendor_rules.marker_for_package ~context:ctx_name pkg_name
     >>| function
     | Some marker -> marker

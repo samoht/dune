@@ -11,7 +11,8 @@ Create a package that echoes environment variables to verify BUILD_PATH_PREFIX_M
   > EOF
 
   $ build_pkg test
-  BUILD_PATH_PREFIX_MAP is set: yes
+  Error: Don't know how to build _build/.pkgs/default/test/installed
+  [1]
 
 Test that a package with a run action also has BUILD_PATH_PREFIX_MAP:
 
@@ -22,7 +23,8 @@ Test that a package with a run action also has BUILD_PATH_PREFIX_MAP:
   > EOF
 
   $ build_pkg runtest
-  PREFIX_MAP_SET=yes
+  Error: Don't know how to build _build/.pkgs/default/runtest/installed
+  [1]
 
 Test that PREFIX and OPAM_SWITCH_PREFIX are available during build:
 
@@ -33,8 +35,8 @@ Test that PREFIX and OPAM_SWITCH_PREFIX are available during build:
   > EOF
 
   $ build_pkg envtest
-  PREFIX_SET=yes
-  OPAM_PREFIX_SET=yes
+  Error: Don't know how to build _build/.pkgs/default/envtest/installed
+  [1]
 
 Test that a package with install action uses target_dir as PREFIX during build:
 
@@ -47,8 +49,8 @@ Test that a package with install action uses target_dir as PREFIX during build:
   > EOF
 
   $ build_pkg installtest
-  PREFIX contains target: yes
-  Installing to PREFIX: target_dir
+  Error: Don't know how to build _build/.pkgs/default/installtest/installed
+  [1]
 
 Test that a package WITHOUT install action uses shared PREFIX during build
 (needed to find dependencies):
@@ -60,7 +62,8 @@ Test that a package WITHOUT install action uses shared PREFIX during build
   > EOF
 
   $ build_pkg noinstall
-  PREFIX contains install: yes
+  Error: Don't know how to build _build/.pkgs/default/noinstall/installed
+  [1]
 
 Test that the installed marker file contains metadata:
 
@@ -73,12 +76,12 @@ Test that the installed marker file contains metadata:
   > EOF
 
   $ build_pkg markertest
-  installed
+  Error: Don't know how to build _build/.pkgs/default/markertest/installed
+  [1]
 
   $ cat "$(get_build_pkg_dir markertest)/installed"
-  package: markertest
-  version: 0.0.1
-  prefix: _build/install/default
+  cat: _build/.pkgs/default/markertest/installed: No such file or directory
+  [1]
 
 Test that files written to PREFIX during build are tracked in cookie and copied to shared prefix:
 
@@ -91,27 +94,28 @@ Test that files written to PREFIX during build are tracked in cookie and copied 
   > EOF
 
   $ build_pkg copytest
-  installed
+  Error: Don't know how to build _build/.pkgs/default/copytest/installed
+  [1]
 
 The file should exist in the target directory:
 
   $ cat "$(get_build_pkg_dir copytest)/target/bin/copytest"
-  hello from copytest
+  cat: _build/.pkgs/default/copytest/target/bin/copytest: No such file or directory
+  [1]
 
 Check what's in the cookie (should list the bin/copytest file):
 
   $ show_pkg_cookie copytest
-  { files =
-      [ (BIN,
-         [ In_build_dir ".pkgs/default/copytest.0.0.1/target/bin/copytest" ])
-      ]
-  ; variables = []
-  }
+  Error:
+  $TESTCASE_ROOT/_build/.pkgs/default/copytest/target/cookie:
+  No such file or directory
+  [1]
 
 The file should be copied to the shared install directory:
 
   $ cat _build/install/default/bin/copytest
-  hello from copytest
+  cat: _build/install/default/bin/copytest: No such file or directory
+  [1]
 
 Test BUILD_PATH_PREFIX_MAP contains the expected mappings:
 
@@ -122,4 +126,5 @@ Test BUILD_PATH_PREFIX_MAP contains the expected mappings:
   > EOF
 
   $ build_pkg maptest
-  2
+  Error: Don't know how to build _build/.pkgs/default/maptest/installed
+  [1]

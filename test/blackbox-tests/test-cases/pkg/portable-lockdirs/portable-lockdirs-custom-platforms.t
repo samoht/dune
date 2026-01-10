@@ -77,7 +77,7 @@ Build as though we were on openbsd.
   -> required by alias default
   [1]
   $ cat $pkg_root/$(dune pkg print-digest foo)/target/share/kernel
-  cat: _build/.pkgs/default/foo.0.0.1/target/share/kernel: No such file or directory
+  cat: _build/.pkgs/default/foo/target/share/kernel: No such file or directory
   [1]
   $ unset DUNE_CONFIG__OS DUNE_CONFIG__ARCH
 

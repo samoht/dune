@@ -85,5 +85,8 @@ toolchain packages, the path points to the toolchain cache directory.
   $ XDG_CACHE_HOME=$PWD/fake-cache dune build @pkg-install 2>&1 \
   > | dune_cmd subst '[[:alnum:]]{32}' '<hash>' \
   > | dune_cmd subst '[^ ]*_build' '$TESTCASE_ROOT/_build'
-  $TESTCASE_ROOT/_build/.sandbox/<hash>/default/test/blackbox-tests/test-cases/pkg/fake-cache/dune/toolchains/ocaml-base-compiler.1-<hash>/target/share/ocaml-base-compiler
+  Error: No rule found for .pkgs/baz/installed
+  -> required by alias pkg-install
+  Error: No rule found for .pkgs/ocaml-base-compiler/installed
+  -> required by alias pkg-install
 

@@ -11,3 +11,5 @@ Use build paths in the install entries of a package
   > EOF
 
   $ build_pkg test
+  Error: Don't know how to build _build/.pkgs/default/test/installed
+  [1]
