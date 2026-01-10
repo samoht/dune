@@ -37,6 +37,54 @@ Build paths depend on the `(install ...)` setting:
 
 For vendored packages, source is linked from `duniverse/`.
 
+### Library Cache
+
+The `_build/.pkgs/lib-cache` file maps library names to their source directories
+in `duniverse/`. This is the key mechanism for triggering automatic package fetching:
+
+```
+# _build/.pkgs/lib-cache (auto-generated)
+fmt:fmt.0.9.0
+fmt.tty:fmt.0.9.0
+cmdliner:cmdliner.1.3.0
+zarith:zarith.1.14
+```
+
+**Purpose:**
+- Triggers eager fetching: all locked packages are fetched when lib-cache is generated
+- Enables lazy building: packages are only built when their libraries are actually needed
+- Provides fast library→directory lookup without scanning duniverse/ on every build
+- Acts as the dependency edge between lock file and library resolution
+
+**Implementation:**
+
+The lib-cache rule depends on `dune.lock` and produces `_build/.pkgs/lib-cache`:
+
+```
+Rule: _build/.pkgs/lib-cache
+  Depends: dune.lock
+  Action:
+    1. Read package list from dune.lock
+    2. For each package, fetch source to duniverse/<name>.<version>/
+    3. Scan each directory for libraries (dune files, META, opam files)
+    4. Write library:directory mappings to lib-cache
+```
+
+Library resolution (findlib paths, library lookup) depends on lib-cache:
+
+```
+dune exec ./main.exe
+  → needs library "fmt"
+  → library resolution depends on lib-cache
+  → lib-cache rule runs (fetches packages, scans libraries)
+  → library resolution finds fmt in duniverse/fmt.0.9.0/
+  → build proceeds
+```
+
+**Cache invalidation:**
+- lib-cache is regenerated when `dune.lock` changes (via dune's dependency tracking)
+- Manual deletion triggers regeneration on next build
+
 This enables:
 
 - **Editable dependencies**: All sources in duniverse/, edit and rebuild
@@ -218,6 +266,10 @@ let new_result = Yojson.Basic.from_string json
 
 Aliasing only affects the public library name used in `(libraries ...)` stanzas.
 The OCaml module names inside the library remain unchanged.
+
+Using `:as` aliasing implies `(install false)` — aliased names are workspace-local
+and external packages cannot reference them. This can be overridden with an explicit
+`(install true)` if needed.
 
 ### Use Cases
 
