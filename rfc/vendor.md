@@ -21,6 +21,41 @@ my-project/
 Dune doesn't care where the source came from or how it got there. It just builds
 what's in the directory.
 
+## Design Principles
+
+### The Vendoring Model
+
+Vendored code is external source you import into your workspace to:
+
+1. Modify: fix bugs, add features, adapt to your needs
+2. Upstream: eventually contribute those changes back
+3. Rebase: easily reapply your patches when upstream releases a new version
+
+This model requires that build system configuration (library visibility, naming) stays
+outside the vendored sources. Otherwise your patches are more difficult to upstream,
+and rebasing becomes tedious.
+
+### Why These Features Need Dune Support
+
+**Library aliasing** cannot be accomplished by external tools without modifying vendored
+`dune` files. To rename `yojson` to `yojson_v1`, you would need to edit the library's
+`(public_name ...)` field, which breaks updates.
+
+**Selective library exposure** could theoretically be done by deleting unwanted source
+files, but this is destructive and error-prone. Dune can simply ignore libraries at
+the dependency resolution level without touching sources.
+
+**Non-dune package building** leverages existing package management infrastructure
+([dune#8652](https://github.com/ocaml/dune/issues/8652)). The `(mode opam)` functionality
+is not new—it extends what dune already does for locked packages to manually vendored
+sources.
+
+### Composable Features
+
+Each capability (aliasing, filtering, opam build mode) is independent. Users can adopt
+only what they need. The `(vendor ...)` stanza bundles these for convenience, but they
+solve orthogonal problems.
+
 ## Background
 
 ### Current State
@@ -276,6 +311,12 @@ from existing `(vendored_dirs)` behavior.
 
 ## Alternatives Considered
 
+**External tool modifies sources:**
+A source management tool could rename libraries by editing `dune` files, or hide
+libraries by deleting source files.
+Rejected: violates the unmodified sources principle. Updates become complex merge
+operations instead of simple directory replacements.
+
 **Extend `(vendored_dirs)` syntax:**
 ```dune
 (vendored_dirs
@@ -314,17 +355,9 @@ target. Lock file generators, source fetchers, or dependency managers can genera
 `(vendor)` stanzas as their output format, enabling a clean separation between
 resolution and building.
 
-## Open Questions
-
-1. **Should `(vendor)` imply `(vendored_dirs)`?**
-   Proposed: yes.
-
-2. **Aliasing syntax?**
-   Current: `(libraries (yojson :as yojson_v1))`
-   Alternative: `(libraries (yojson -> yojson_v1))`
-
 ## References
 
+- [dune#8652](https://github.com/ocaml/dune/issues/8652) — Package management: build non-dune packages
 - [opam-monorepo](https://github.com/tarides/opam-monorepo)
 - [opam-monorepo #145](https://github.com/tarides/opam-monorepo/issues/145)
 - [dune-universe/opam-overlays](https://github.com/dune-universe/opam-overlays)
