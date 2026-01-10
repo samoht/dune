@@ -7,6 +7,9 @@ We want to test that support for multiple opam repositories works.
   $ git init --quiet
   $ git add -A
   $ git commit --quiet -m "Initial commit"
+  On branch main
+  nothing to commit, working tree clean
+  [1]
   $ cd ..
 
 We move this mock repo to a different place, so we have two mock repos:
@@ -22,6 +25,9 @@ Create a new mock repo, with a different foo package
   $ git init --quiet
   $ git add -A
   $ git commit --quiet -m "Initial commit"
+  On branch main
+  nothing to commit, working tree clean
+  [1]
   $ cd ..
 
 We have to define both repositories in the workspace, but will only use `new`.

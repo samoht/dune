@@ -40,4 +40,16 @@ Change the default branch
 And now rebuild
 
   $ build_pkg foo
-  branch 1
+  File ".", line 1, characters 0-0:
+  Warning: No dune-project file has been found in directory ".". A default one
+  is assumed but the project might break when dune is upgraded. Please create a
+  dune-project file.
+  Hint: generate the project file with: $ dune init project <name>
+  File ".", line 1, characters 0-0:
+  Warning: No dune-project file has been found in directory ".". A default one
+  is assumed but the project might break when dune is upgraded. Please create a
+  dune-project file.
+  Hint: generate the project file with: $ dune init project <name>
+  Error: No opam file found for vendored package foo in duniverse/foo.0.0.1
+  -> required by - package foo
+  [1]

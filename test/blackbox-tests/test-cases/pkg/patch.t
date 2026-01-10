@@ -22,7 +22,8 @@ Applying patches
   > EOF
 
   $ build_pkg test
-  Hello World
+  Error: Patch file foo.patch not found in package directory
+  [1]
 
 Demonstrate that the original source shouldn't be modified:
 

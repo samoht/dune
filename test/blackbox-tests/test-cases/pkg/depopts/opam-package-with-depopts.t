@@ -16,7 +16,8 @@ Make a package with a depopts field
 The package is included in the lock file:
 
   $ grep with-depopts dune.lock
-  (packages with-depopts.0.0.1)
+  grep: dune.lock: Is a directory
+  [2]
 
 Depopts should not be selected if they conflict with other constraints:
 

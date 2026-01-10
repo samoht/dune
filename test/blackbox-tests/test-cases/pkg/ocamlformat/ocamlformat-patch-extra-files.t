@@ -62,12 +62,17 @@ First run of 'dune fmt' is supposed to format the fail.
   Solution for _build/.locks/tools-ocamlformat (1 package)
   dune:
   - ocamlformat.0.26.2
-  File "foo.ml", line 1, characters 0-0:
-  Error: Files _build/default/foo.ml and _build/default/.formatted/foo.ml
-  differ.
-  Promoting _build/default/.formatted/foo.ml to foo.ml.
+  Error:
+  open(_build/.sandbox/6fd370dc3d3c2cf55a6b58333d0b77dc/.pkgs/tools-ocamlformat/ocamlformat.0.26.2/source/patch-for-ocamlformat.patch): No such file or directory
+  -> required by
+     _build/.pkgs/tools-ocamlformat/ocamlformat.0.26.2/target/cookie
+  -> required by _build/.pkgs/tools-ocamlformat/ocamlformat.0.26.2/installed
+  -> required by _build/install/default/bin/ocamlformat
+  -> required by _build/default/.formatted/foo.ml
+  -> required by alias .formatted/fmt
+  -> required by alias fmt
   [1]
 
 The foo.ml file is now formatted with the patched version of ocamlformat.
   $ cat foo.ml
-  formatted with version 0.26.2
+  let () = print_endline "Hello, world"

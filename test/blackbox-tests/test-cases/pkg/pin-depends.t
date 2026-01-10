@@ -204,9 +204,7 @@ Pin to an HTTP archive detects wrong hash
   $ dune_cmd subst "$MD5_CHECKSUM" '92449184682b45b5f07e811fdd61d35f' ${default_lock_dir}/bar.1.0.0.pkg
   $ rm -rf already-served
   $ dune build 2>&1 | grep -v "md5"
-  File "dune.lock/bar.1.0.0.pkg", line 6, characters 12-48:
-                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  Error: Invalid checksum, got
+  Error: Checksum mismatch for bar.1.0.0 (got
 
 Pin to an HTTP archive needs `dune_pkg_lock_normalized` to download and compute the hash
 of the target again

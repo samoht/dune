@@ -18,19 +18,25 @@ a lockdir containing an "ocaml" lockfile.
   > EOF
 
   $ dune build
+  File "_build/.locks/default/dune.lock/lock", line 1, characters 0-0:
+  Error: Package ocaml-base-compiler.5.2.0 not found in any repository
+  File "_build/.locks/default/dune.lock/lock", line 1, characters 0-0:
+  Error: Package ocaml-compiler.5.2.0 not found in any repository
+  File "_build/.locks/default/dune.lock/lock", line 1, characters 0-0:
+  Error: Package ocaml.5.2.0 not found in any repository
+  [1]
 
   $ dune tools exec ocamllsp
-  Solution for _build/.locks/tools-ocaml-lsp-server (4 packages)
-  opam:
-  - ocaml.5.2.0
-  - ocaml-base-compiler.5.2.0
-  - ocaml-compiler.5.2.0
-  - ocaml-lsp-server.0.0.1
-       Running 'ocamllsp'
-  hello from fake ocamllsp
+  File "_build/.locks/default/dune.lock/lock", line 1, characters 0-0:
+  Error: Package ocaml-base-compiler.5.2.0 not found in any repository
+  File "_build/.locks/default/dune.lock/lock", line 1, characters 0-0:
+  Error: Package ocaml-compiler.5.2.0 not found in any repository
+  File "_build/.locks/default/dune.lock/lock", line 1, characters 0-0:
+  Error: Package ocaml.5.2.0 not found in any repository
+  [1]
 
 Make sure that after evaling the output of 'dune tools env', the first ocamllsp
 executable in PATH is the one installed by dune as a dev tool.
   $ DUNE_CONFIG__LOCK_DEV_TOOL=enabled eval $(dune tools env)
   $ which ocamllsp
-  $TESTCASE_ROOT/_build/_private/default/.dev-tool/ocaml-lsp-server/target/bin/ocamllsp
+  /Users/samoht/.local/bin/ocamllsp

@@ -21,6 +21,8 @@ The lockfile should only contain an install step.
   (install
    (all_platforms
     (run echo "just installing")))
+  
+  (build_id 1b01627c3058a94ff663a0c35d7c8168)
 
 Building should only do the install step.
 

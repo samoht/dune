@@ -15,9 +15,7 @@ It fails during the build because of missing OCamlFormat module.
   Solution for _build/.locks/tools-ocamlformat (1 package)
   dune:
   - ocamlformat.0.26.4
-  File "_build/.locks/tools-ocamlformat/ocamlformat.pkg", line 4, characters 6-10:
-  4 |  (run dune build -p %{pkg-self:name} @install))
-            ^^^^
+  File "ocamlformat.pkg", line 4, characters 6-10:
   Error: Logs for package ocamlformat
   File "dune", line 2, characters 14-25:
   2 |  (public_name ocamlformat))

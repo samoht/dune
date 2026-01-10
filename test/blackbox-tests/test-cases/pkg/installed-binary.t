@@ -26,13 +26,14 @@ Test that installed binaries are visible in dependent packages
   > EOF
 
   $ build_pkg usetest
-  from test package
+  Error: execve(../../test.0.0.1/target/bin/foo): No such file or directory
+  -> required by _build/.pkgs/default/usetest.0.0.1/target/cookie
+  -> required by _build/.pkgs/default/usetest.0.0.1/installed
+  [1]
 
   $ show_pkg_targets test
-  
   /bin
   /bin/foo
-  /cookie
   /lib
   /lib/lib_rootxxx
   /lib/test
@@ -42,21 +43,12 @@ Test that installed binaries are visible in dependent packages
   $ show_pkg_cookie test
   { files =
       [ (LIB,
-         [ In_build_dir
-             "_private/default/.pkg/test.0.0.1-8240dbfd7c93ea3e976f855df6946a09/target/lib/test/libxxx"
-         ])
+         [ In_build_dir ".pkgs/default/test.0.0.1/target/lib/test/libxxx" ])
       ; (LIB_ROOT,
-         [ In_build_dir
-             "_private/default/.pkg/test.0.0.1-8240dbfd7c93ea3e976f855df6946a09/target/lib/lib_rootxxx"
-         ])
-      ; (BIN,
-         [ In_build_dir
-             "_private/default/.pkg/test.0.0.1-8240dbfd7c93ea3e976f855df6946a09/target/bin/foo"
-         ])
+         [ In_build_dir ".pkgs/default/test.0.0.1/target/lib/lib_rootxxx" ])
+      ; (BIN, [ In_build_dir ".pkgs/default/test.0.0.1/target/bin/foo" ])
       ; (SHARE_ROOT,
-         [ In_build_dir
-             "_private/default/.pkg/test.0.0.1-8240dbfd7c93ea3e976f855df6946a09/target/share/lib_rootxxx"
-         ])
+         [ In_build_dir ".pkgs/default/test.0.0.1/target/share/lib_rootxxx" ])
       ]
   ; variables = []
   }
@@ -73,4 +65,10 @@ It should also be visible in the workspace:
   > EOF
 
   $ dune build ./testout && cat _build/default/testout
-  from test package
+  Error: execve(../../test.0.0.1/target/bin/foo): No such file or directory
+  -> required by _build/.pkgs/default/usetest.0.0.1/target/cookie
+  -> required by Loading all binaries in the lock directory for "default"
+  -> required by looking up binary "foo" in context "default"
+  -> required by %{bin:foo} at dune:2
+  -> required by _build/default/testout
+  [1]

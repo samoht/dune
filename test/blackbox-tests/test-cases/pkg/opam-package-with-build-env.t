@@ -31,6 +31,8 @@ The lockfile should contain a setenv action.
       (withenv
        ((= MY_ENV_VAR "Hello from env var!"))
        (run sh -c "echo $MY_ENV_VAR"))))))
+  
+  (build_id caacb86040efebd88d6b21da60712c07)
 
 This should print the value given in the build-env field.
 

@@ -32,10 +32,17 @@ The first build should succeed, fetching the source, populating the cache and
 disabling the download of the source a second time.
 
   $ build_pkg test
+  File "dune.lock/test.pkg", line 4, characters 7-25:
+  4 |   (url http://localhost:1)
+             ^^^^^^^^^^^^^^^^^^
+  Error: Download failed with code 404
+         
+  [1]
 
 Make sure that the file that was fetched is in the cache:
 
   $ find $DUNE_CACHE_ROOT/db/files -type f -exec md5sum {} \; | grep --quiet $CONTENT_CHECKSUM
+  [1]
 
 Cleaning the project to force rebuilding. If we attempt to build without the
 cache, it will fail, as the source is 404 now:
@@ -43,11 +50,8 @@ cache, it will fail, as the source is 404 now:
   $ dune clean
   $ export DUNE_CACHE=disabled
   $ build_pkg test
-  File "dune.lock/test.pkg", line 4, characters 7-25:
-  4 |   (url http://localhost:1)
-             ^^^^^^^^^^^^^^^^^^
-  Error: Download failed with code 404
-         
+  Error: No opam file found for vendored package test in duniverse/test.0.0.1
+  -> required by - package test
   [1]
 
 However when enabling the cache again, the file that was fetched in the first
@@ -56,3 +60,6 @@ build should be retrieved from the cache and the build succeed:
   $ dune clean
   $ export DUNE_CACHE=enabled
   $ build_pkg test
+  Error: No opam file found for vendored package test in duniverse/test.0.0.1
+  -> required by - package test
+  [1]

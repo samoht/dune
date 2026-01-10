@@ -76,67 +76,107 @@ Generate a mock opam repository
   > }
 
   $ build_single_package foo
-  Solution for dune.lock (1 package):
-  opam:
-  - foo.0.0.1
-  package: foo.0.0.1
-  enable: enable
-  installed: true
-  string selection: foo
-  package conjunction: false
-  package conjunction string selection: bar
-  $ build_single_package bar
-  Solution for dune.lock (1 package):
-  opam:
-  - bar.0.0.1
-  installed
-  installed or pinned
-  version greater than 0 (version is 0.0.1)
-  disjunction with some undefined vars
-  conjunction with some undefined vars
-  $ build_single_package baz
-  Solution for dune.lock (1 package):
-  opam:
-  - baz.0.0.1
-  installed
-  not madeup:installed
-  hello
+  fatal: '$TESTCASE_ROOT/mock-opam-repository' does not appear to be a git repository
+  fatal: Could not read from remote repository.
   
+  Please make sure you have the correct access rights
+  and the repository exists.
+  File "dune-workspace", line 6, characters 6-154:
+  6 |  (url "git+file:///Users/samoht/git/dune/_build/.sandbox/a42697ca28111347be632d29a01199de/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository"))
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  Error: Failed to run external command:
+  'git ls-remote "file:///Users/samoht/git/dune/_build/.sandbox/a42697ca28111347be632d29a01199de/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository"'
+  Hint: Check that this Git URL in the project configuration is correct:
+  "file:///Users/samoht/git/dune/_build/.sandbox/a42697ca28111347be632d29a01199de/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository"
+  Error: Lock directory is not active for context "default".
+  [1]
+  $ build_single_package bar
+  fatal: '$TESTCASE_ROOT/mock-opam-repository' does not appear to be a git repository
+  fatal: Could not read from remote repository.
+  
+  Please make sure you have the correct access rights
+  and the repository exists.
+  File "dune-workspace", line 6, characters 6-154:
+  6 |  (url "git+file:///Users/samoht/git/dune/_build/.sandbox/a42697ca28111347be632d29a01199de/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository"))
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  Error: Failed to run external command:
+  'git ls-remote "file:///Users/samoht/git/dune/_build/.sandbox/a42697ca28111347be632d29a01199de/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository"'
+  Hint: Check that this Git URL in the project configuration is correct:
+  "file:///Users/samoht/git/dune/_build/.sandbox/a42697ca28111347be632d29a01199de/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository"
+  Error: Lock directory is not active for context "default".
+  [1]
+  $ build_single_package baz
+  fatal: '$TESTCASE_ROOT/mock-opam-repository' does not appear to be a git repository
+  fatal: Could not read from remote repository.
+  
+  Please make sure you have the correct access rights
+  and the repository exists.
+  File "dune-workspace", line 6, characters 6-154:
+  6 |  (url "git+file:///Users/samoht/git/dune/_build/.sandbox/a42697ca28111347be632d29a01199de/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository"))
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  Error: Failed to run external command:
+  'git ls-remote "file:///Users/samoht/git/dune/_build/.sandbox/a42697ca28111347be632d29a01199de/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository"'
+  Hint: Check that this Git URL in the project configuration is correct:
+  "file:///Users/samoht/git/dune/_build/.sandbox/a42697ca28111347be632d29a01199de/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository"
+  Error: Lock directory is not active for context "default".
+  [1]
   $ build_single_package error1
-  Solution for dune.lock (1 package):
-  opam:
-  - error1.0.0.1
-  File "dune.lock/error1.0.0.1.pkg", line 7, characters 4-17:
-  7 |     %{pkg-self:a}
-          ^^^^^^^^^^^^^
-  Error: Undefined package variable "a"
+  fatal: '$TESTCASE_ROOT/mock-opam-repository' does not appear to be a git repository
+  fatal: Could not read from remote repository.
+  
+  Please make sure you have the correct access rights
+  and the repository exists.
+  File "dune-workspace", line 6, characters 6-154:
+  6 |  (url "git+file:///Users/samoht/git/dune/_build/.sandbox/a42697ca28111347be632d29a01199de/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository"))
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  Error: Failed to run external command:
+  'git ls-remote "file:///Users/samoht/git/dune/_build/.sandbox/a42697ca28111347be632d29a01199de/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository"'
+  Hint: Check that this Git URL in the project configuration is correct:
+  "file:///Users/samoht/git/dune/_build/.sandbox/a42697ca28111347be632d29a01199de/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository"
+  Error: Lock directory is not active for context "default".
   [1]
   $ build_single_package error2
-  Solution for dune.lock (1 package):
-  opam:
-  - error2.0.0.1
-  File "dune.lock/error2.0.0.1.pkg", line 7, characters 4-17:
-  7 |     %{pkg-self:a}
-          ^^^^^^^^^^^^^
-  Error: Undefined package variable "a"
+  fatal: '$TESTCASE_ROOT/mock-opam-repository' does not appear to be a git repository
+  fatal: Could not read from remote repository.
+  
+  Please make sure you have the correct access rights
+  and the repository exists.
+  File "dune-workspace", line 6, characters 6-154:
+  6 |  (url "git+file:///Users/samoht/git/dune/_build/.sandbox/a42697ca28111347be632d29a01199de/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository"))
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  Error: Failed to run external command:
+  'git ls-remote "file:///Users/samoht/git/dune/_build/.sandbox/a42697ca28111347be632d29a01199de/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository"'
+  Hint: Check that this Git URL in the project configuration is correct:
+  "file:///Users/samoht/git/dune/_build/.sandbox/a42697ca28111347be632d29a01199de/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository"
+  Error: Lock directory is not active for context "default".
   [1]
   $ build_single_package error3
-  Solution for dune.lock (1 package):
-  opam:
-  - error3.0.0.1
-  File "dune.lock/error3.0.0.1.pkg", line 5, characters 7-20:
-  5 |   (run not-a-program echo hello)))
-             ^^^^^^^^^^^^^
-  Error: Program not-a-program not found in the tree or in PATH
-   (context: default)
+  fatal: '$TESTCASE_ROOT/mock-opam-repository' does not appear to be a git repository
+  fatal: Could not read from remote repository.
+  
+  Please make sure you have the correct access rights
+  and the repository exists.
+  File "dune-workspace", line 6, characters 6-154:
+  6 |  (url "git+file:///Users/samoht/git/dune/_build/.sandbox/a42697ca28111347be632d29a01199de/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository"))
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  Error: Failed to run external command:
+  'git ls-remote "file:///Users/samoht/git/dune/_build/.sandbox/a42697ca28111347be632d29a01199de/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository"'
+  Hint: Check that this Git URL in the project configuration is correct:
+  "file:///Users/samoht/git/dune/_build/.sandbox/a42697ca28111347be632d29a01199de/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository"
+  Error: Lock directory is not active for context "default".
   [1]
   $ build_single_package error4
-  Solution for dune.lock (1 package):
-  opam:
-  - error4.0.0.1
-  File "dune.lock/error4.0.0.1.pkg", line 5, characters 7-37:
-  5 |   (run not-a-program-%{pkg-self:name} echo hello)))
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  Error: Program not-a-program-error4 not found in the tree or in PATH
-   (context: default)
+  fatal: '$TESTCASE_ROOT/mock-opam-repository' does not appear to be a git repository
+  fatal: Could not read from remote repository.
+  
+  Please make sure you have the correct access rights
+  and the repository exists.
+  File "dune-workspace", line 6, characters 6-154:
+  6 |  (url "git+file:///Users/samoht/git/dune/_build/.sandbox/a42697ca28111347be632d29a01199de/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository"))
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  Error: Failed to run external command:
+  'git ls-remote "file:///Users/samoht/git/dune/_build/.sandbox/a42697ca28111347be632d29a01199de/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository"'
+  Hint: Check that this Git URL in the project configuration is correct:
+  "file:///Users/samoht/git/dune/_build/.sandbox/a42697ca28111347be632d29a01199de/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository"
+  Error: Lock directory is not active for context "default".
   [1]

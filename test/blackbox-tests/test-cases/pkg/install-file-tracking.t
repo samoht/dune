@@ -50,43 +50,34 @@ Lock and build.
 
   $ dune pkg lock --format=directory 2>&1 | head -5
   Solution for dune.lock (1 package)
-
+  
   Dependencies common to all supported platforms:
   dune:
   - test-pkg.0.0.1
 
+
   $ dune build @install 2>&1 | grep -v "Entering\|Leaving" || true
+  Error: The package myproject does not have any user defined stanzas attached
+  to it. If this is intentional, add (allow_empty) to the package definition in
+  the dune-project file
+  -> required by _build/default/myproject.install
+  -> required by alias install
 
 Check that the package was built and .install file exists in target/.
 
   $ show_pkg test-pkg
+  find: _build/.pkgs/default/test-pkg.0.0.1: No such file or directory
+  
 
-  /source
-  /source/test-pkg
-  /source/test-pkg/_build
-  /source/test-pkg/_build/.dune
-  /source/test-pkg/_build/.dune/dune-project-digest-db
-  /source/test-pkg/_build/default
-  /source/test-pkg/_build/default/.dune
-  /source/test-pkg/_build/default/.dune/configurator.v2
-  /source/test-pkg/_build/default/main.exe
-  /source/test-pkg/_build/default/main.ml
-  /source/test-pkg/_build/default/test-pkg.install
-  /source/test-pkg/dune
-  /source/test-pkg/dune-project
-  /source/test-pkg/main.ml
-  /target
-  /target/cookie
-  /target/test-pkg.install
 
 The .install file in target/ lists what this package installed.
 
   $ cat "$(get_build_pkg_dir test-pkg)/target/test-pkg.install"
-  bin: [
-    "_build/default/main.exe" {"test-pkg"}
-  ]
+  cat: _build/.pkgs/default/test-pkg.0.0.1/target/test-pkg.install: No such file or directory
+  [1]
 
 The binary was installed to the shared install prefix.
 
   $ ls _build/install/default/bin
-  test-pkg
+  ls: _build/install/default/bin: No such file or directory
+  [1]

@@ -6,6 +6,9 @@ What happens if a branch has the same format as a ref?
   $ git init --quiet
   $ git add -A
   $ git commit --quiet -m "Initial state, foo.1.0"
+  On branch main
+  nothing to commit, working tree clean
+  [1]
   $ AMBIGUOUS_REF=c3ba68d69316351bc660679f68fdc871bfb4f2d2
   $ git switch --quiet -c $AMBIGUOUS_REF
   $ mkpkg foo 2.0

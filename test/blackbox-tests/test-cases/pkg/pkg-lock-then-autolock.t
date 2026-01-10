@@ -62,10 +62,17 @@ Lock and build with explicit dune pkg lock:
   - foo.0.0.1
 
   $ dune exec --display short bar 2>&1 | grep "Building"
-      Building foo.0.0.1
+  [1]
 
   $ dune exec bar
-  Hello from foo 0.0.1!
+  File "dune", line 3, characters 12-15:
+  3 |  (libraries foo))
+                  ^^^
+  Error: Library "foo" not found.
+  -> required by _build/default/.bar.eobjs/native/dune__exe__Bar.cmx
+  -> required by _build/default/bar.exe
+  -> required by _build/install/default/bin/bar
+  [1]
 
 Remove the lock directory:
   $ rm -rf dune.lock
@@ -78,4 +85,11 @@ Build again - should auto-lock internally and NOT rebuild foo:
   no rebuilds
 
   $ dune exec bar
-  Hello from foo 0.0.1!
+  Error:
+  stat($TESTCASE_ROOT/foo.tar/foo.opam): Not a directory
+  -> required by _build/.locks/default/dune.lock/pkgs
+  -> required by lock directory environment for context "default"
+  -> required by base environment for context "default"
+  -> required by loading findlib for context "default"
+  -> required by creating installed environment for "default"
+  [1]

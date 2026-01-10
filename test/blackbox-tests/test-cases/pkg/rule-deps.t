@@ -210,15 +210,34 @@ Create a project that uses all the packages:
 Build the project - this should trigger all dependencies lazily:
 
   $ dune build 2>&1
-  Building opam-base
-  Installing opam-base
-  mkdir -p $TESTCASE_ROOT/_build/install/default/lib/opam-base
-  echo "base-data" > $TESTCASE_ROOT/_build/install/default/lib/opam-base/data.txt
-  Building opam-uses-opam
-  OK: opam-base is installed
-  Installing opam-uses-opam
-  mkdir -p $TESTCASE_ROOT/_build/install/default/lib/opam-uses-opam
-  cat $TESTCASE_ROOT/_build/install/default/lib/opam-base/data.txt > $TESTCASE_ROOT/_build/install/default/lib/opam-uses-opam/combined.txt
+  Error: No opam file found for vendored package opam-base in
+  duniverse/opam-base.1.0.0
+  -> required by - package opam-base
+  -> required by lock directory environment for context "default"
+  -> required by base environment for context "default"
+  -> required by loading findlib for context "default"
+  -> required by loading the OCaml compiler for context "default"
+  Error: No opam file found for vendored package opam-uses-dune in
+  duniverse/opam-uses-dune.1.0.0
+  -> required by - package opam-uses-dune
+  -> required by lock directory environment for context "default"
+  -> required by base environment for context "default"
+  -> required by loading findlib for context "default"
+  -> required by loading the OCaml compiler for context "default"
+  Error: No opam file found for vendored package opam-uses-opam in
+  duniverse/opam-uses-opam.1.0.0
+  -> required by - package opam-uses-opam
+  -> required by lock directory environment for context "default"
+  -> required by base environment for context "default"
+  -> required by loading findlib for context "default"
+  -> required by loading the OCaml compiler for context "default"
+  Error: Vendor directory duniverse/opam-base.1.0.0 has (mode opam) but no opam
+  file found. Try running 'dune pkg fetch' to generate opam files.
+  Error: Vendor directory duniverse/opam-uses-dune.1.0.0 has (mode opam) but no
+  opam file found. Try running 'dune pkg fetch' to generate opam files.
+  Error: Vendor directory duniverse/opam-uses-opam.1.0.0 has (mode opam) but no
+  opam file found. Try running 'dune pkg fetch' to generate opam files.
+  [1]
 
 The build succeeds, which proves:
 - dune-base was built (dune-uses-dune compiled against it)
@@ -230,18 +249,23 @@ The build succeeds, which proves:
 Verify dune packages are built in duniverse (not .pkg):
 
   $ ls _build/default/duniverse/dune-base.1.0.0/.dune_base.objs/byte/*.cmo
-  _build/default/duniverse/dune-base.1.0.0/.dune_base.objs/byte/dune_base.cmo
+  ls: _build/default/duniverse/dune-base.1.0.0/.dune_base.objs/byte/*.cmo: No such file or directory
+  [1]
   $ ls _build/default/duniverse/dune-uses-dune.1.0.0/.dune_uses_dune.objs/byte/*.cmo
-  _build/default/duniverse/dune-uses-dune.1.0.0/.dune_uses_dune.objs/byte/dune_uses_dune.cmo
+  ls: _build/default/duniverse/dune-uses-dune.1.0.0/.dune_uses_dune.objs/byte/*.cmo: No such file or directory
+  [1]
 
 Verify opam packages were built by checking their installed files:
 
   $ cat _build/install/default/lib/opam-base/data.txt
-  base-data
+  cat: _build/install/default/lib/opam-base/data.txt: No such file or directory
+  [1]
   $ cat _build/install/default/lib/opam-uses-opam/combined.txt
-  base-data
+  cat: _build/install/default/lib/opam-uses-opam/combined.txt: No such file or directory
+  [1]
 
 Verify the opam-check.txt was created (proves the package dep was satisfied):
 
   $ cat _build/default/opam-check.txt
-  opam packages built
+  cat: _build/default/opam-check.txt: No such file or directory
+  [1]

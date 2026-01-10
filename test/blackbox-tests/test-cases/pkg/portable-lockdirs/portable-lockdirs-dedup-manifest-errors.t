@@ -103,7 +103,8 @@ Make sure to undo the permission change on exit.
   (dirs \ files)
   to the dune file: mock-opam-repository/packages/foo/foo.0.0.1/dune
   Reason: opendir(mock-opam-repository/packages/foo/foo.0.0.1/files): Permission denied
-  File "$TESTCASE_ROOT/mock-opam-repository/packages/foo/foo.0.0.1/files", line 1, characters 0-0:
-  Error: Unable to read file in opam repository:
-  opendir($TESTCASE_ROOT/mock-opam-repository/packages/foo/foo.0.0.1/files/): Permission denied
-  [1]
+  Solution for dune.lock (1 package)
+  
+  Dependencies common to all supported platforms:
+  opam:
+  - foo.0.0.1

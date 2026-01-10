@@ -106,6 +106,8 @@ corresponding Dune version.
   
   (depends
    (all_platforms (foo)))
+  
+  (build_id 1f05485ef31bd2e001f5dcddb9d85c1c)
 
 The values here are not important, but Dune should be able to interpret the variables.
 

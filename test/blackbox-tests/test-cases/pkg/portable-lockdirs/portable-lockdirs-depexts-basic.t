@@ -36,3 +36,5 @@ Demonstrate various cases representing depexts in lockfiles.
     (= %{os_distribution} ubuntu))
    ((foo-arch bar-arch)
     (= %{os_distribution} archlinux)))
+  
+  (build_id 2e3a23d2893ef3b328a424c732aba58c)

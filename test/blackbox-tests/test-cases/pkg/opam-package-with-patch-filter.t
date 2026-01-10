@@ -37,6 +37,8 @@ The lockfile should contain the patch action with the appropriate filter.
    (all_platforms
     ((action
       (progn (when (= %{switch} foobar) (patch foo.patch)) (run cat foo.ml))))))
+  
+  (build_id 2dab669c62387e7c5a8dd319821957b8)
   (source (copy $TESTCASE_ROOT/source))
 
   $ mkdir source
@@ -45,4 +47,5 @@ The lockfile should contain the patch action with the appropriate filter.
   > EOF
 
   $ build_pkg with-patch-filter 
-  This is right; the patch should never be applied.
+  Error: Patch file foo.patch not found in package directory
+  [1]

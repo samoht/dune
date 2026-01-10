@@ -59,6 +59,8 @@ Verify the lockdir contents show dune packages use dune build command:
   
   (build
    (run dune build -p %{pkg-self:name} -j %{jobs}))
+  
+  (build_id 2fcb6cb721f1a3ca342a8d5e13517515)
 
 
   $ cat dune.lock/opam-pkg.pkg
@@ -69,5 +71,7 @@ Verify the lockdir contents show dune packages use dune build command:
   
   (build
    (run make all))
+  
+  (build_id c417b93c1588ac9e2b956644c1362208)
 
 

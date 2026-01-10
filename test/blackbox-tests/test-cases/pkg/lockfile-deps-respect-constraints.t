@@ -36,6 +36,8 @@ rather than "a.0.0.1".
 Confirm that we locked "a.0.0.2".
   $ cat ${default_lock_dir}/a.0.0.2.pkg
   (version 0.0.2)
+  
+  (build_id 8159c04987e5d7c366ee20afd825b435)
 
 The deps in the lockfile for "c" shouldn't contain "a" since the only version
 of "a" that "c" could depend on is "a.0.0.1" which isn't part of the solution.
@@ -44,3 +46,5 @@ of "a" that "c" could depend on is "a.0.0.1" which isn't part of the solution.
   
   (depends
    (all_platforms (b)))
+  
+  (build_id 59d82061aff6191a0aec0e466557f71d)

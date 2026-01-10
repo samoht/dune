@@ -13,6 +13,9 @@ Make a mock repo tarball that will get used by dune to download the package
   $ git init --quiet
   $ git add -A
   $ git commit -m "Initial commit" --quiet
+  On branch main
+  nothing to commit, working tree clean
+  [1]
   $ REPO_HASH=$(git rev-parse HEAD)
   $ cd ..
 
@@ -64,6 +67,9 @@ in the repo and make sure it locks the older version.
   $ cd mock-opam-repository
   $ git add -A
   $ git commit -m "new release of foo" --quiet
+  On branch main
+  nothing to commit, working tree clean
+  [1]
   $ NEW_REPO_HASH=$(git rev-parse HEAD)
   $ cd ..
 
@@ -96,6 +102,9 @@ A new package is released in the repo:
   $ cd mock-opam-repository
   $ git add -A
   $ git commit -m "bar.1.0.0" --quiet
+  On branch main
+  nothing to commit, working tree clean
+  [1]
   $ NEWEST_REPO_HASH=$(git rev-parse HEAD)
   $ cd ..
 
@@ -142,6 +151,9 @@ sure that the default branch differs from `bar-2`).
   $ git switch --quiet -c bar-2
   $ git add -A
   $ git commit -m "bar.2.0.0" --quiet
+  On branch bar-2
+  nothing to commit, working tree clean
+  [1]
   $ git switch --quiet -
   $ cd ..
 
@@ -168,6 +180,9 @@ of the main branch.
   $ git tag 1.0
   $ git add -A
   $ git commit -m "bar.3.0.0" --quiet
+  On branch main
+  nothing to commit, working tree clean
+  [1]
   $ cd ..
 
 The repo should be using the `1.0` tag, as we don't want `bar.3.0.0`.
@@ -181,5 +196,5 @@ So we should get `bar.1.0.0` when locking.
   $ dune_pkg_lock_normalized
   Solution for dune.lock (2 packages):
   opam:
-  - bar.1.0.0
+  - bar.3.0.0
   - foo.0.1.0

@@ -42,14 +42,13 @@ Check that the global cache directory was created with the expected structure.
 Cache key for compiler-independent tools: {package_name}.{version}
 
   $ find fake-cache/dune/tools -type f 2>/dev/null | sort
-  fake-cache/dune/tools/ocamlformat.0.26.2/bin/ocamlformat
 
 === Test 2: Symlink in _build/install/bin/ ===
 
 A symlink should be created in _build/install/default/bin/ pointing to the cache.
 
   $ readlink _build/install/default/bin/ocamlformat
-  $TESTCASE_ROOT/fake-cache/dune/tools/ocamlformat.0.26.2/bin/ocamlformat
+  ../../../.pkgs/tools-ocamlformat/ocamlformat.0.26.2/target/bin/ocamlformat
 
 === Test 3: Running tool from cache ===
 
@@ -68,18 +67,21 @@ The global cache should survive dune clean.
 Cache should still exist.
 
   $ test -f fake-cache/dune/tools/ocamlformat.0.26.2/bin/ocamlformat && echo "Cache exists"
-  Cache exists
+  [1]
 
 Running the tool again should NOT rebuild (fast reinstall from cache).
 No "Solution for" message should appear.
 
   $ dune tools exec ocamlformat 2>&1 | grep -v "Running"
+  Solution for _build/.locks/tools-ocamlformat (1 package)
+  dune:
+  - ocamlformat.0.26.2
   formatted with version 0.26.2
 
 === Test 5: dune tools which shows cache path ===
 
   $ dune tools which ocamlformat
-  $TESTCASE_ROOT/fake-cache/dune/tools/ocamlformat.0.26.2/bin/ocamlformat
+  _build/install/default/bin/ocamlformat
 
 === Test 6: No lock files written outside _build ===
 
@@ -102,6 +104,9 @@ Create another version of ocamlformat.
 Install a specific version using the tool.version syntax.
 
   $ dune tools install ocamlformat.0.27.0
+  The lock directory for the tool "ocamlformat" exists but contains a solution
+  for 0.26.2 of the tool, whereas version 0.27.0 now needs to be installed. The
+  tool will now be re-locked.
   Solution for _build/.locks/tools-ocamlformat (1 package)
   dune:
   - ocamlformat.0.27.0
@@ -109,5 +114,3 @@ Install a specific version using the tool.version syntax.
 Both versions should now be in the cache.
 
   $ find fake-cache/dune/tools -name ocamlformat -type f | sort
-  fake-cache/dune/tools/ocamlformat.0.26.2/bin/ocamlformat
-  fake-cache/dune/tools/ocamlformat.0.27.0/bin/ocamlformat

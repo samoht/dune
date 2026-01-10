@@ -32,8 +32,7 @@ This does not currently seem to be the case.
   > EOF
 
   $ solve with-patch
-  File "$TESTCASE_ROOT/mock-opam-repository/packages/with-patch/with-patch.0.0.1/files", line 1, characters 0-0:
-  Error: Unable to read file in opam repository:
-  opendir($TESTCASE_ROOT/mock-opam-repository/packages/with-patch/with-patch.0.0.1/files/dir): Permission denied
-  [1]
+  Solution for dune.lock (1 package):
+  opam:
+  - with-patch.0.0.1
 

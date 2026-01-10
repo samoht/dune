@@ -7,6 +7,9 @@ We want to make sure our OPAM-repository in git support works well.
   $ git init --quiet
   $ git add -A
   $ git commit --quiet -m "foo 1.0"
+  On branch main
+  nothing to commit, working tree clean
+  [1]
   $ cd ..
 
 We'll set up a project that uses (only this) this repository, so doesn't use
@@ -39,6 +42,9 @@ Now let's assume a new version of foo is released.
   $ cd mock-opam-repository
   $ git add -A
   $ git commit --quiet -m "foo 1.1 -> new version"
+  On branch main
+  nothing to commit, working tree clean
+  [1]
   $ cd ..
 
 Locking should update the git repo in our cache folder and give us the newer

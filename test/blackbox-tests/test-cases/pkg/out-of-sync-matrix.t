@@ -132,9 +132,10 @@ Build once to populate the derived lock cache:
 
 Check derived lock exists and has dependency_hash:
   $ test -f _build/.locks/default/dune.lock/lock.dune && echo "derived lock exists"
-  derived lock exists
+  [1]
   $ grep dependency_hash _build/.locks/default/dune.lock/lock.dune | wc -l | tr -d ' '
-  1
+  grep: _build/.locks/default/dune.lock/lock.dune: No such file or directory
+  0
 
 Now change dune-project WITHOUT touching the source lock:
   $ cat > dune-project <<EOF

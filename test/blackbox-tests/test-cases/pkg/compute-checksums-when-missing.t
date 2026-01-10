@@ -36,6 +36,8 @@ path.
     (checksum md5=bea8252ff4e80f41719ea13cdf007273)))
   
   (dev)
+  
+  (build_id 936f949d0fcb1ffcedf199d2fd3b59e8)
 
 Now make sure we can gracefully handle the case when the archive is missing.
 Recreate the foo package with a fake port number to signal that the file will
@@ -63,6 +65,8 @@ Recreate the foo package with a fake port number to signal that the file will
     (url http://0.0.0.0:9000)))
   
   (dev)
+  
+  (build_id aca062a5f22b6e46474d86e77d7bfebf)
 
 Check that no checksum is computed for a local source file:
 

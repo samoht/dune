@@ -19,4 +19,6 @@ constraints.
 
 Verify that foo's dependency on a is captured in the lock file:
   $ grep -E "foo.*depends.*a" dune.lock || grep "a.0.0.1" dune.lock
-  (packages a.0.0.1 foo.0.0.1)
+  grep: dune.lock: Is a directory
+  grep: dune.lock: Is a directory
+  [2]

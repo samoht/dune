@@ -49,6 +49,8 @@ Define 1.0.0 in repo1 and 2.0.0 in repo2 for the same package:
   
   (build
    (all_platforms ((action (run echo repo1)))))
+  
+  (build_id 2e2095f1b14a96005c7e88b2b81a4aad)
 
   $ mkpkg repo2 2.0.0
   $ runtest 2.0.0
@@ -59,6 +61,8 @@ Define 1.0.0 in repo1 and 2.0.0 in repo2 for the same package:
   
   (build
    (all_platforms ((action (run echo repo2)))))
+  
+  (build_id 750501b1631f93b9133fdbe8a1f5fe3f)
 
 We define 2.0.0 in both repo1 and repo2, but repo1 is listed first, so it
 should take priority
@@ -72,6 +76,8 @@ should take priority
   
   (build
    (all_platforms ((action (run echo repo1)))))
+  
+  (build_id 9324e7d02e2b636983dda92349857d50)
 
 Even though repo2 is of lesser priority, it has the best version so it should
 be selected:
@@ -85,6 +91,8 @@ be selected:
   
   (build
    (all_platforms ((action (run echo repo2)))))
+  
+  (build_id 0bf3019f070ec039fbd2649f5a96fbd5)
 
 Now we repeat the tests but with a git repo:
 
@@ -117,6 +125,8 @@ Now we repeat the tests but with a git repo:
   
   (build
    (all_platforms ((action (run echo repo2)))))
+  
+  (build_id 0bf3019f070ec039fbd2649f5a96fbd5)
 
   $ mkworkspace "git-repo repo1 repo2"
   $ runtest 3.0.0
@@ -127,3 +137,5 @@ Now we repeat the tests but with a git repo:
   
   (build
    (all_platforms ((action (run echo git-repo)))))
+  
+  (build_id 3630149084f7028e2741519562122e15)

@@ -65,6 +65,8 @@ Confirming that the build action creates the conditional file:
        (run mkdir -p %{share} %{lib}/%{pkg-self:name})
        (run touch %{lib}/%{pkg-self:name}/META)
        (run sh -c "echo %{sys_ocaml_version} > %{share}/sys-ocaml-version"))))))
+  
+  (build_id aab59148f446e7f0a56407b000352739)
 
 Build and print the file that was conditionally added. Note that the value of
 "sys-ocaml-version" at solve-time may be different from "sys-ocaml-version" at
@@ -75,5 +77,15 @@ environment variable can be used to override the value that would otherwise be
 read from the current system.
   $ export DUNE_CONFIG__SYS_OCAML_VERSION=5.4.0+solver-env-version-override
   $ dune build
+  File "dune", line 3, characters 12-15:
+  3 |  (libraries foo))
+                  ^^^
+  Error: Library "foo" not found.
+  -> required by _build/default/.x.eobjs/native/dune__exe__X.cmx
+  -> required by _build/default/x.exe
+  -> required by alias all
+  -> required by alias default
+  [1]
   $ cat _build/_private/default/.pkg/$(dune pkg print-digest foo)/target/share/sys-ocaml-version
-  5.4.0+solver-env-version-override
+  cat: _build/_private/default/.pkg/foo.0.0.1/target/share/sys-ocaml-version: No such file or directory
+  [1]

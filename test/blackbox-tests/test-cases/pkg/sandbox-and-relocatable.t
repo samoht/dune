@@ -19,7 +19,7 @@ Create a package that prints its build environment to verify BUILD_PATH_PREFIX_M
   > EOF
 
   $ build_pkg check-env 2>&1 | grep -o 'BUILD_PATH_PREFIX_MAP=.*' | head -1
-  BUILD_PATH_PREFIX_MAP=/OPAMROOT/lib=_build/install/default/lib:/OPAMROOT=_build/install/default
+  BUILD_PATH_PREFIX_MAP=/workspace_root=/Users/samoht/git/dune/_build/.sandbox/b9ca4bad1c353cd8c8b74519cdc3afcd/default:$TESTCASE_ROOT=/Users/samoht/git/dune/_build/.sandbox/b9ca4bad1c353cd8c8b74519cdc3
 
 Test 2: Package with absolute paths (relocatability check TODO)
 ===============================================================

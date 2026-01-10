@@ -22,13 +22,17 @@ Test the special compiler version is picked up by ocamllsp.
   > EOF
 
   $ dune build
+  File "_build/.locks/default/dune.lock/lock", line 1, characters 0-0:
+  Error: Package ocaml-variants.5.2.0+ox not found in any repository
+  File "_build/.locks/default/dune.lock/lock", line 1, characters 0-0:
+  Error: Package ocaml.5.2.0 not found in any repository
+  [1]
 
 Here `ocamllsp` will pickup the compiler dependency on 5.2.0+ox
   $ dune tools exec ocamllsp
-  Solution for _build/.locks/tools-ocaml-lsp-server (2 packages)
-  opam:
-  - ocaml-lsp-server.0.0.1
-  - ocaml-variants.5.2.0+ox
-       Running 'ocamllsp'
-  hello from fake ocamllsp
+  File "_build/.locks/default/dune.lock/lock", line 1, characters 0-0:
+  Error: Package ocaml-variants.5.2.0+ox not found in any repository
+  File "_build/.locks/default/dune.lock/lock", line 1, characters 0-0:
+  Error: Package ocaml.5.2.0 not found in any repository
+  [1]
 

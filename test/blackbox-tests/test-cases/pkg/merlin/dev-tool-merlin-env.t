@@ -18,19 +18,25 @@ executable in PATH is the one installed by dune as a dev tool.
   > EOF
 
   $ dune build
+  File "_build/.locks/default/dune.lock/lock", line 1, characters 0-0:
+  Error: Package ocaml-base-compiler.5.2.0 not found in any repository
+  File "_build/.locks/default/dune.lock/lock", line 1, characters 0-0:
+  Error: Package ocaml-compiler.5.2.0 not found in any repository
+  File "_build/.locks/default/dune.lock/lock", line 1, characters 0-0:
+  Error: Package ocaml.5.2.0 not found in any repository
+  [1]
 
 First install the tool:
   $ dune tools exec ocamlmerlin
-  Solution for _build/.locks/tools-merlin (4 packages)
-  opam:
-  - merlin.0.0.1
-  - ocaml.5.2.0
-  - ocaml-base-compiler.5.2.0
-  - ocaml-compiler.5.2.0
-       Running 'ocamlmerlin'
-  hello from fake ocamlmerlin
+  File "_build/.locks/default/dune.lock/lock", line 1, characters 0-0:
+  Error: Package ocaml-base-compiler.5.2.0 not found in any repository
+  File "_build/.locks/default/dune.lock/lock", line 1, characters 0-0:
+  Error: Package ocaml-compiler.5.2.0 not found in any repository
+  File "_build/.locks/default/dune.lock/lock", line 1, characters 0-0:
+  Error: Package ocaml.5.2.0 not found in any repository
+  [1]
 
 Now check that 'dune tools env' puts the dev tool in PATH:
   $ eval $(dune tools env)
   $ which ocamlmerlin
-  $TESTCASE_ROOT/_build/_private/default/.dev-tool/merlin/target/bin/ocamlmerlin
+  /Users/samoht/git/dune/_opam/bin/ocamlmerlin

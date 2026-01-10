@@ -45,8 +45,10 @@ Create a package that writes a different value to some files depending on the os
   (dependency_hash 36e640fbcda71963e7e2f689f6c96c3e)
   
   (repositories
-   (complete false)
-   (used))
+   (complete true)
+   (used
+    ((source
+      file:///Users/samoht/git/dune/_build/.sandbox/ff2136352adcf132c093015f7b12ba27/default/test/blackbox-tests/test-cases/pkg/portable-lockdirs/mock-opam-repository#c21438f3053d809fcc21c365d726c9be2af58cc5))))
   
   (solved_for_platforms
    ((arch x86_64)
@@ -91,15 +93,39 @@ Create a package that writes a different value to some files depending on the os
         (run touch %{lib}/%{pkg-self:name}/META)
         (run sh -c "echo Darwin > %{share}/kernel")
         (run sh -c "echo arm64 > %{share}/machine")))))))
+  
+  (build_id 5e27d13fee96f58e7e42d014cefe73f0)
 
   $ DUNE_CONFIG__ARCH=arm64 dune build
+  File "dune", line 3, characters 12-15:
+  3 |  (libraries foo))
+                  ^^^
+  Error: Library "foo" not found.
+  -> required by _build/default/.x.eobjs/native/dune__exe__X.cmx
+  -> required by _build/default/x.exe
+  -> required by alias all
+  -> required by alias default
+  [1]
   $ cat $pkg_root/$(dune pkg print-digest foo)/target/share/kernel
-  Linux
+  cat: _build/.pkgs/default/foo.0.0.1/target/share/kernel: No such file or directory
+  [1]
   $ cat $pkg_root/$(dune pkg print-digest foo)/target/share/machine
-  arm64
+  cat: _build/.pkgs/default/foo.0.0.1/target/share/machine: No such file or directory
+  [1]
 
   $ DUNE_CONFIG__OS=macos DUNE_CONFIG__ARCH=x86_64 DUNE_CONFIG__OS_FAMILY=homebrew DUNE_CONFIG__OS_DISTRIBUTION=homebrew DUNE_CONFIG__OS_VERSION=15.3.1 dune build
+  File "dune", line 3, characters 12-15:
+  3 |  (libraries foo))
+                  ^^^
+  Error: Library "foo" not found.
+  -> required by _build/default/.x.eobjs/native/dune__exe__X.cmx
+  -> required by _build/default/x.exe
+  -> required by alias all
+  -> required by alias default
+  [1]
   $ cat $pkg_root/$(dune pkg print-digest foo)/target/share/kernel
-  Darwin
+  cat: _build/.pkgs/default/foo.0.0.1/target/share/kernel: No such file or directory
+  [1]
   $ cat $pkg_root/$(dune pkg print-digest foo)/target/share/machine
-  x86_64
+  cat: _build/.pkgs/default/foo.0.0.1/target/share/machine: No such file or directory
+  [1]

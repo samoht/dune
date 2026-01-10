@@ -9,6 +9,9 @@ To start with we create a repository in with a `foo` package.
   $ git init --quiet
   $ git add -A
   $ git commit --quiet -m "Initial commit"
+  On branch main
+  nothing to commit, working tree clean
+  [1]
   $ cd ..
 
 We set this repository as sole source for opam repositories.

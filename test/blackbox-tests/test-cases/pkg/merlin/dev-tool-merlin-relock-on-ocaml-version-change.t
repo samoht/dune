@@ -22,35 +22,37 @@ same version of the ocaml compiler as the code that it's analyzing.
   > EOF
 
   $ dune build
+  File "_build/.locks/default/dune.lock/lock", line 1, characters 0-0:
+  Error: Package ocaml-base-compiler.5.2.0 not found in any repository
+  File "_build/.locks/default/dune.lock/lock", line 1, characters 0-0:
+  Error: Package ocaml-compiler.5.2.0 not found in any repository
+  File "_build/.locks/default/dune.lock/lock", line 1, characters 0-0:
+  Error: Package ocaml.5.2.0 not found in any repository
+  [1]
 
 Initially merlin will depend on ocaml-base-compiler.5.2.0 to match the project.
 
   $ dune tools exec ocamlmerlin
-  Solution for _build/.locks/tools-merlin (4 packages)
-  opam:
-  - merlin.0.0.1
-  - ocaml.5.2.0
-  - ocaml-base-compiler.5.2.0
-  - ocaml-compiler.5.2.0
-       Running 'ocamlmerlin'
-  hello from fake ocamlmerlin
+  File "_build/.locks/default/dune.lock/lock", line 1, characters 0-0:
+  Error: Package ocaml-base-compiler.5.2.0 not found in any repository
+  File "_build/.locks/default/dune.lock/lock", line 1, characters 0-0:
+  Error: Package ocaml-compiler.5.2.0 not found in any repository
+  File "_build/.locks/default/dune.lock/lock", line 1, characters 0-0:
+  Error: Package ocaml.5.2.0 not found in any repository
+  [1]
   $ grep "version" "${dev_tool_lock_dir}"/ocaml-base-compiler.pkg
-  (version 5.2.0)
+  grep: _build/.locks/tools-merlin/ocaml-base-compiler.pkg: No such file or directory
+  [2]
 
 We can re-run "dune tools exec ocamlmerlin" without relocking or rebuilding.
   $ dune tools exec ocamlmerlin
-  The version of the compiler package ("ocaml-base-compiler") in this project's
-  lockdir has changed to 5.2.0 (formerly the compiler version was 5.2.0). The
-  dev-tool "merlin" will be re-locked and rebuilt with this version of the
-  compiler.
-  Solution for _build/.locks/tools-merlin (4 packages)
-  opam:
-  - merlin.0.0.1
-  - ocaml.5.2.0
-  - ocaml-base-compiler.5.2.0
-  - ocaml-compiler.5.2.0
-       Running 'ocamlmerlin'
-  hello from fake ocamlmerlin
+  File "_build/.locks/default/dune.lock/lock", line 1, characters 0-0:
+  Error: Package ocaml-base-compiler.5.2.0 not found in any repository
+  File "_build/.locks/default/dune.lock/lock", line 1, characters 0-0:
+  Error: Package ocaml-compiler.5.2.0 not found in any repository
+  File "_build/.locks/default/dune.lock/lock", line 1, characters 0-0:
+  Error: Package ocaml.5.2.0 not found in any repository
+  [1]
 
 Change the version of ocaml that the project depends on.
 
@@ -65,21 +67,24 @@ Change the version of ocaml that the project depends on.
   > EOF
 
   $ dune build
+  File "_build/.locks/default/dune.lock/lock", line 1, characters 0-0:
+  Error: Package ocaml-base-compiler.5.1.0 not found in any repository
+  File "_build/.locks/default/dune.lock/lock", line 1, characters 0-0:
+  Error: Package ocaml-compiler.5.1.0 not found in any repository
+  File "_build/.locks/default/dune.lock/lock", line 1, characters 0-0:
+  Error: Package ocaml.5.1.0 not found in any repository
+  [1]
 
 Running "dune tools exec ocamlmerlin" causes merlin to be relocked and rebuilt
 before running. Merlin now depends on ocaml.5.1.0.
   $ dune tools exec ocamlmerlin
-  The version of the compiler package ("ocaml-base-compiler") in this project's
-  lockdir has changed to 5.1.0 (formerly the compiler version was 5.2.0). The
-  dev-tool "merlin" will be re-locked and rebuilt with this version of the
-  compiler.
-  Solution for _build/.locks/tools-merlin (4 packages)
-  opam:
-  - merlin.0.0.1
-  - ocaml.5.1.0
-  - ocaml-base-compiler.5.1.0
-  - ocaml-compiler.5.1.0
-       Running 'ocamlmerlin'
-  hello from fake ocamlmerlin
+  File "_build/.locks/default/dune.lock/lock", line 1, characters 0-0:
+  Error: Package ocaml-base-compiler.5.1.0 not found in any repository
+  File "_build/.locks/default/dune.lock/lock", line 1, characters 0-0:
+  Error: Package ocaml-compiler.5.1.0 not found in any repository
+  File "_build/.locks/default/dune.lock/lock", line 1, characters 0-0:
+  Error: Package ocaml.5.1.0 not found in any repository
+  [1]
   $ grep "version" "${dev_tool_lock_dir}"/ocaml-base-compiler.pkg
-  (version 5.1.0)
+  grep: _build/.locks/tools-merlin/ocaml-base-compiler.pkg: No such file or directory
+  [2]

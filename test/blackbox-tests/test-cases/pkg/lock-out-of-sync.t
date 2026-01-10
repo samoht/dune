@@ -97,7 +97,7 @@ Add a new dependency without re-locking:
 Out-of-sync should be detected for single-file lock too:
 (Note: error points to derived lock.dune in _build/.locks/, not source dune.lock)
   $ dune build
-  File "dune.lock/lock.dune", line 1, characters 0-0:
+  File "dune.lock/pkgs/lock.dune", line 1, characters 0-0:
   Error: Lock dir out of sync with dune-project
   Hint: Run 'dune pkg lock' to regenerate
   Hint: Or use '--lock=always' or set '(lock always)' in ~/.config/dune/config

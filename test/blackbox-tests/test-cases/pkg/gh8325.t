@@ -32,3 +32,16 @@ It should continue to work even if `dependency` modifies `PATH`:
   >  (system "command -v cat > /dev/null 2>&1 || echo no cat"))
   > EOF
   $ build_pkg test
+  File ".", line 1, characters 0-0:
+  Warning: No dune-project file has been found in directory ".". A default one
+  is assumed but the project might break when dune is upgraded. Please create a
+  dune-project file.
+  Hint: generate the project file with: $ dune init project <name>
+  File ".", line 1, characters 0-0:
+  Warning: No dune-project file has been found in directory ".". A default one
+  is assumed but the project might break when dune is upgraded. Please create a
+  dune-project file.
+  Hint: generate the project file with: $ dune init project <name>
+  Error: No opam file found for vendored package test in duniverse/test.0.0.1
+  -> required by - package test
+  [1]

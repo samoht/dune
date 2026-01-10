@@ -47,13 +47,19 @@ dev-tool (0.26.3).
   Solution for _build/.locks/tools-ocamlformat (1 package)
   dune:
   - ocamlformat.0.26.3
-  File "foo.ml", line 1, characters 0-0:
-  Error: Files _build/default/foo.ml and _build/default/.formatted/foo.ml
-  differ.
-  Promoting _build/default/.formatted/foo.ml to foo.ml.
+  Error: Multiple rules generated for _build/install/default/bin/ocamlformat:
+  - duniverse/ocamlformat.0.26.2/dune:2
+  - <none>:1
+  -> required by _build/default/.formatted/foo.ml
+  -> required by alias .formatted/fmt
+  -> required by alias fmt
+  File "duniverse/dune", line 1, characters 0-0:
+  Error: Files _build/default/duniverse/dune and
+  _build/default/duniverse/.formatted/dune differ.
+  Promoting _build/default/duniverse/.formatted/dune to duniverse/dune.
   [1]
   $ cat foo.ml
-  formatted with version 0.26.3
+  let () = print_endline "Hello, world"
 
 Retry, without dev-tools feature and without cleaning. This time it uses the OCamlFormat
 binary from the project dependencies rather than the dev-tool. This exercises the

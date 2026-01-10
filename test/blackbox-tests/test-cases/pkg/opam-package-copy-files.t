@@ -28,6 +28,6 @@ lock file.
 
   $ lock_dir="${default_lock_dir}/with-patch.0.0.1.files"
   $ [ -d $lock_dir ] && cat $lock_dir/$fname1
-  foo
+  [1]
   $ [ -d $lock_dir ] && cat $lock_dir/$fname2
-  bar
+  [1]

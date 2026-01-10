@@ -10,6 +10,7 @@ Add a lock file for a fake library foo:
 Verify that the build progress is displayed correctly
   $ dune build @pkg-install --display short
       Building foo.0.0.1 (1/1)
+    Installing foo.0.0.1 (1/1)
 
   $ dune clean
 

@@ -55,10 +55,17 @@ Create a project that depends on foo:
 
 Build with auto-locking:
   $ dune exec --display short bar 2>&1 | grep "Building"
-      Building foo.0.0.1
+  [1]
 
   $ dune exec bar
-  Hello from foo version 0.0.1!
+  Error:
+  stat($TESTCASE_ROOT/foo.tar/foo.opam): Not a directory
+  -> required by _build/.locks/default/dune.lock/pkgs
+  -> required by lock directory environment for context "default"
+  -> required by base environment for context "default"
+  -> required by loading findlib for context "default"
+  -> required by creating installed environment for "default"
+  [1]
 
 Add an unrelated package to the repository:
   $ mkpkg baz <<EOF
@@ -70,7 +77,14 @@ Build again - adding unrelated package should NOT trigger rebuild:
   no rebuilds
 
   $ dune exec bar
-  Hello from foo version 0.0.1!
+  Error:
+  stat($TESTCASE_ROOT/foo.tar/foo.opam): Not a directory
+  -> required by _build/.locks/default/dune.lock/pkgs
+  -> required by lock directory environment for context "default"
+  -> required by base environment for context "default"
+  -> required by loading findlib for context "default"
+  -> required by creating installed environment for "default"
+  [1]
 
 Now add a newer version of foo to the repository:
 
@@ -103,7 +117,14 @@ Now add a newer version of foo to the repository:
 Build again - auto-locking should detect the new version and rebuild:
   $ dune clean
   $ dune exec --display short bar 2>&1 | grep "Building"
-      Building foo.0.0.2
+  [1]
 
   $ dune exec bar
-  Hello from foo 0.0.2!
+  Error:
+  stat($TESTCASE_ROOT/foo-0.0.2.tar/foo.opam): Not a directory
+  -> required by _build/.locks/default/dune.lock/pkgs
+  -> required by lock directory environment for context "default"
+  -> required by base environment for context "default"
+  -> required by loading findlib for context "default"
+  -> required by creating installed environment for "default"
+  [1]

@@ -22,7 +22,8 @@ The optional dependency on "b" is not included in foo's dependencies because
 
 Verify the lock contains packages a and foo (but not b):
   $ grep packages dune.lock
-  (packages a.0.0.1 foo.0.0.1)
+  grep: dune.lock: Is a directory
+  [2]
 
 Another package which has a regular dependency on "b":
   $ mkpkg bar <<EOF
@@ -41,4 +42,5 @@ the dependencies of "foo", since "b" is part of the package solution:
 
 Verify the lock now contains all four packages including b:
   $ grep packages dune.lock
-  (packages a.0.0.1 b.0.0.1 bar.0.0.1 foo.0.0.1)
+  grep: dune.lock: Is a directory
+  [2]

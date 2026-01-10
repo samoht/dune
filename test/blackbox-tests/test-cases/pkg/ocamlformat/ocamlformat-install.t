@@ -14,4 +14,4 @@ Install ocamlformat as a dev tool:
 
 Verify that ocamlformat is installed:
   $ dune tools which ocamlformat
-  _build/_private/default/.dev-tool/ocamlformat/target/bin/ocamlformat
+  _build/install/default/bin/ocamlformat

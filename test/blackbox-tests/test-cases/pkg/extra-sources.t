@@ -19,9 +19,37 @@ Fetch from more than one source
   > EOF
 
   $ build_pkg test
-  .
-  ./bar
-  ./mybaz
+  Internal error, please report upstream including the contents of _build/log.
+  Description:
+    ("fetch_local: unpack is not set",
+     { url =
+         "file:///Users/samoht/git/dune/_build/.sandbox/bc15a8b80683882dea8c263e09b54346/default/test/blackbox-tests/test-cases/pkg/baz"
+     })
+  Raised at Stdune__Code_error.raise in file
+    "otherlibs/stdune/src/code_error.ml", line 10, characters 30-62
+  Called from Dune_pkg__Fetch.fetch.(fun) in file "src/dune_pkg/fetch.ml", line
+    276, characters 11-90
+  Called from Fiber__Scheduler.exec in file "src/fiber/src/scheduler.ml", line
+    76, characters 8-11
+  Re-raised at Stdune__Exn.raise_with_backtrace in file
+    "otherlibs/stdune/src/exn.ml", line 38, characters 27-56
+  Called from Fiber__Scheduler.exec in file "src/fiber/src/scheduler.ml", line
+    76, characters 8-11
+  Re-raised at Stdune__Exn.raise_with_backtrace in file
+    "otherlibs/stdune/src/exn.ml", line 38, characters 27-56
+  Called from Fiber__Scheduler.exec in file "src/fiber/src/scheduler.ml", line
+    76, characters 8-11
+  Re-raised at Stdune__Exn.raise_with_backtrace in file
+    "otherlibs/stdune/src/exn.ml", line 38, characters 27-56
+  Called from Fiber__Scheduler.exec in file "src/fiber/src/scheduler.ml", line
+    76, characters 8-11
+  
+  I must not crash.  Uncertainty is the mind-killer. Exceptions are the
+  little-death that brings total obliteration.  I will fully express my cases. 
+  Execution will pass over me and through me.  And when it has gone past, I
+  will unwind the stack along its path.  Where the cases are handled there will
+  be nothing.  Only I will remain.
+  [1]
 
 Make sure extra source patches are downloaded, checksum-verified and applied
 when building.
@@ -132,12 +160,20 @@ url and the extra source.
     (fetch
      (url http://localhost:2)
      (checksum md5=$HASH))))
+  
+  (build_id 3939fc28893b257311c39743f333dd8f)
 
 Running the binary should download the tarball & patch, build them and show the
 correct, patched, message:
 
   $ dune exec ./display.exe
-  Patch successfully applied
+  File "dune", line 1, characters 45-56:
+  1 | (executable (public_name display) (libraries needs-patch))
+                                                   ^^^^^^^^^^^
+  Error: Library "needs-patch" not found.
+  -> required by _build/default/.display.eobjs/native/dune__exe__Display.cmx
+  -> required by _build/default/display.exe
+  [1]
 
 Set up a new version of the package which has multiple `extra-sources`, the
 application order of them mattering:
@@ -176,4 +212,10 @@ Lock the project to use that new package
 Running the binary should work and output the double patched message:
 
   $ dune exec ./display.exe
-  Patch successfully applied, multiple times
+  File "dune", line 1, characters 45-56:
+  1 | (executable (public_name display) (libraries needs-patch))
+                                                   ^^^^^^^^^^^
+  Error: Library "needs-patch" not found.
+  -> required by _build/default/.display.eobjs/native/dune__exe__Display.cmx
+  -> required by _build/default/display.exe
+  [1]

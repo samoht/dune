@@ -44,6 +44,8 @@ Solve the package using the default solver env:
         %{jobs}
         (when (catch_undefined_var (= %{pkg-self:foo} bar) false) --foobar)
         @install))))))
+  
+  (build_id 33a52618ca4c3d6df71103b124981f13)
 
 Make a custom solver env:
   $ cat > dune-workspace <<EOF
@@ -77,3 +79,5 @@ Run the solver using the new env:
    (all_platforms
     ((action
       (run dune build -p %{pkg-self:name} -j %{jobs} --foobar @install @doc)))))
+  
+  (build_id 2e756357b0b8a17d110da17c1b8c80fa)

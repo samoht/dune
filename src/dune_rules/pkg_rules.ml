@@ -2419,9 +2419,54 @@ module Copy_to_prefix_action = struct
         Io.copy_file ~src ~dst ()
     ;;
 
+    (* Find and remove files from old versions of this package.
+       This handles package upgrades/downgrades by cleaning up stale files. *)
+    let cleanup_old_versions ~package ~current_target_dir ~prefix_path =
+      (* Derive pkgs_dir from target_dir:
+         target_dir = _build/.pkgs/<ctx>/<name>.<version>/target
+         pkgs_dir = _build/.pkgs/<ctx>/ *)
+      let pkg_root = Path.parent_exn current_target_dir in
+      let pkgs_dir = Path.parent_exn pkg_root in
+      let package_prefix = Package.Name.to_string package ^ "." in
+      (* List all directories in pkgs_dir that start with this package name *)
+      match Path.Untracked.readdir_unsorted pkgs_dir with
+      | Error _ -> () (* pkgs_dir doesn't exist yet, nothing to clean *)
+      | Ok entries ->
+        List.iter entries ~f:(fun entry ->
+          if String.is_prefix entry ~prefix:package_prefix
+          then (
+            let entry_path = Path.relative pkgs_dir entry in
+            (* Skip the current package version *)
+            if not (Path.equal entry_path pkg_root)
+            then (
+              (* Look for cookie in <entry>/target/cookie *)
+              let old_cookie_path =
+                Path.relative (Path.relative entry_path "target") "cookie"
+              in
+              match Install_cookie.Persistent.load old_cookie_path with
+              | None -> () (* No cookie, nothing to clean *)
+              | Some old_cookie ->
+                (* Delete files listed in old cookie from prefix *)
+                let old_target_dir = Path.relative entry_path "target" in
+                List.iter old_cookie.files ~f:(fun (_section, files) ->
+                  List.iter files ~f:(fun file_in_old_target ->
+                    match Path.drop_prefix file_in_old_target ~prefix:old_target_dir with
+                    | None -> ()
+                    | Some relative ->
+                      let dst = Path.append_local prefix_path relative in
+                      if Path.Untracked.exists dst
+                      then Fpath.unlink_no_err (Path.to_string dst))))))
+    ;;
+
     let action { cookie_file; target_dir; prefix; package } ~ectx:_ ~eenv:_ =
       let open Fiber.O in
       let* () = Fiber.return () in
+      let prefix_path = Path.build prefix in
+      (* First, clean up files from old versions of this package *)
+      let* () =
+        Async.async (fun () ->
+          cleanup_old_versions ~package ~current_target_dir:target_dir ~prefix_path)
+      in
       (* Read the cookie to get the list of files.
          Provide a clear error message including the package name if loading fails. *)
       let* cookie =
@@ -2440,7 +2485,6 @@ module Copy_to_prefix_action = struct
               ])
       in
       (* Copy each file from target_dir to prefix *)
-      let prefix_path = Path.build prefix in
       let+ () =
         Section.Map.to_list cookie.files
         |> List.concat_map ~f:(fun (_section, files) -> files)

@@ -25,6 +25,8 @@ Only a1 or a2 should appear but not both.
   
   (depends
    (all_platforms (a1)))
+  
+  (build_id 89735aa8cd78572cd97de90f90639260)
 
 Release a new version of the second package in the disjunction to
 demonstrate that relative version numbers don't affect the

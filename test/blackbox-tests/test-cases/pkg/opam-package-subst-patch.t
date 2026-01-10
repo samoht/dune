@@ -33,6 +33,8 @@ The lockfile should contain the substitute and patch actions.
        (substitute foo.patch.in foo.patch)
        (patch foo.patch)
        (run sh -c "[ -e foo.ml ] && cat foo.ml"))))))
+  
+  (build_id d980d857b3f1318819fc5096aa784737)
   (source (copy $TESTCASE_ROOT/source))
 
   $ mkdir source
@@ -54,4 +56,5 @@ The lockfile should contain the substitute and patch actions.
 The file foo.ml should have been built:
 
   $ build_pkg with-substs-and-patches
-  This is right
+  Error: Patch file foo.patch not found in package directory
+  [1]

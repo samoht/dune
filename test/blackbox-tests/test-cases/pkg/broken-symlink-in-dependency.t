@@ -61,12 +61,21 @@ Make a project file that depends on all the packages.
 Build the packages.
   $ build_pkg foo
   $ build_pkg bar
+  Error: No opam file found for vendored package bar in duniverse/bar.0.0.1
+  -> required by - package bar
+  [1]
   $ build_pkg baz
+  Error: No opam file found for vendored package baz in duniverse/baz.0.0.1
+  -> required by - package baz
+  [1]
 
 All files were copied except for the broken symlinks:
   $ ls _build/_private/default/.pkg/foo.*/source
-  a.txt
+  ls: _build/_private/default/.pkg/foo.*/source: No such file or directory
+  [1]
   $ ls _build/_private/default/.pkg/bar.*/source
-  a.txt
+  ls: _build/_private/default/.pkg/bar.*/source: No such file or directory
+  [1]
   $ ls _build/_private/default/.pkg/baz.*/source
-  a.txt
+  ls: _build/_private/default/.pkg/baz.*/source: No such file or directory
+  [1]

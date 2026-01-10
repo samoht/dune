@@ -66,8 +66,10 @@ first checksum to the lockfile for this package.
   (dependency_hash 32180cf311133b30d0b5be2a40c89f43)
   
   (repositories
-   (complete false)
-   (used))
+   (complete true)
+   (used
+    ((source
+      file:///Users/samoht/git/dune/_build/.sandbox/3a0913c4ea589ef51f3a8e65750405bf/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository#fe175526a9edb7d70068021dbc8ca84d590104b3))))
   
   (solved_for_platforms
    ((arch x86_64)
@@ -90,12 +92,16 @@ first checksum to the lockfile for this package.
     (fetch
      (url https://unimportant.url/unused.patch)
      (checksum md5=00000000000000000000000000000000))))
+  
+  (build_id 13cd53aee1fe2b1b389f3ce483dc7c4f)
   (version 0.0.1)
   
   (source
    (fetch
     (url file://with-md5)
     (checksum md5=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)))
+  
+  (build_id 2260331bbb5c450fa92eed516338fd77)
   (version 0.0.1)
   
   (source
@@ -103,6 +109,8 @@ first checksum to the lockfile for this package.
     (url file://with-sha256)
     (checksum
      sha256=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb)))
+  
+  (build_id 4dacfda03c4422f64a80da6238269132)
   (version 0.0.1)
   
   (source
@@ -110,3 +118,5 @@ first checksum to the lockfile for this package.
     (url file://with-sha512)
     (checksum
      sha512=cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc)))
+  
+  (build_id 04fdeff74f54e24ff64b50d5e1ec8d68)

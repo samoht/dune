@@ -55,6 +55,12 @@ Now we set up a lock file with this package and then attempt to use it:
   $ export PATH="$PWD/.bin:$PATH"
 
   $ dune build --fetch=disabled @ocaml-index
-  File ".foo.objs/_unknown_", line 1, characters 0-0:
-  Command exited with code 1.
+  File "dune", line 3, characters 12-21:
+  3 |  (libraries mypkg.lib))
+                  ^^^^^^^^^
+  Error: Library "mypkg.lib" not found.
+  -> required by library "foo" in _build/default
+  -> required by _build/default/.foo.objs/byte/foo.cmt
+  -> required by _build/default/.foo.objs/cctx.ocaml-index
+  -> required by alias ocaml-index
   [1]

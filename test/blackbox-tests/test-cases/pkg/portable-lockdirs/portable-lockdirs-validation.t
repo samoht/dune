@@ -46,13 +46,12 @@ Remove a package from the lockdir.
 
 Validate the lockdir. This time dune detects that a required lockfile is missing.
   $ dune pkg validate-lockdir
-  Lockdir dune.lock does not contain a solution for local packages:
   File "dune-project", line 2, characters 0-47:
   Error: The dependencies of local package "foo" could not be satisfied from
   the lockdir:
   Package "a" is missing
   Hint: The lockdir no longer contains a solution for the local packages in
   this project. Regenerate the lockdir by running: 'dune pkg lock'
-  Error: Some lockdirs do not contain solutions for local packages:
+  Error: Lock file validation failed:
   - dune.lock
   [1]

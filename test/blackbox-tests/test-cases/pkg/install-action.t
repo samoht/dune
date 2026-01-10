@@ -14,20 +14,12 @@ Check that the file was installed to the shared install directory:
   _build/install/default/lib/xxx
 
   $ show_pkg_targets test
-  /bin
-  /doc
-  /doc/test
-  /etc
-  /etc/test
   /lib
-  /lib/stublibs
-  /lib/test
-  /lib/toplevel
   /lib/xxx
-  /man
-  /sbin
-  /share
-  /share/test
 
   $ show_pkg_cookie test
-  { files = []; variables = [] }
+  { files =
+      [ (LIB_ROOT, [ In_build_dir ".pkgs/default/test.0.0.1/target/lib/xxx" ])
+      ]
+  ; variables = []
+  }

@@ -35,6 +35,8 @@ The lockfile should contain the patch action.
   
   (build
    (all_platforms ((action (progn (patch foo.patch) (run cat foo.ml))))))
+  
+  (build_id 4fd8abbea5b5b8f22c05035e90f1f4f0)
   (source (copy $TESTCASE_ROOT/source))
 
   $ mkdir source
@@ -43,4 +45,5 @@ The lockfile should contain the patch action.
   > EOF
 
   $ build_pkg with-patch 
-  This is right
+  Error: Patch file foo.patch not found in package directory
+  [1]

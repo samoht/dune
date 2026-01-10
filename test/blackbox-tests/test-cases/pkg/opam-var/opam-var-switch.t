@@ -47,18 +47,20 @@ opam-var-unsupported.t
        (run echo %{man})
        (run echo %{toplevel})
        (run echo %{stublibs}))))))
+  
+  (build_id e167bc9d14df586f4e07132bd40125b1)
 
   $ build_pkg testpkg 2>&1 | dune_cmd subst '.*.sandbox/[^/]+' '.sandbox/$SANDBOX'
-  dune
-  .sandbox/$SANDBOX/_private/default/.pkg/testpkg.0.0.1-d349dc24837a78e7f391d386e4fcec8d/source
-  .sandbox/$SANDBOX/_private/default/.pkg/testpkg.0.0.1-d349dc24837a78e7f391d386e4fcec8d/target
-  .sandbox/$SANDBOX/_private/default/.pkg/testpkg.0.0.1-d349dc24837a78e7f391d386e4fcec8d/target/lib
-  .sandbox/$SANDBOX/_private/default/.pkg/testpkg.0.0.1-d349dc24837a78e7f391d386e4fcec8d/target/lib
-  .sandbox/$SANDBOX/_private/default/.pkg/testpkg.0.0.1-d349dc24837a78e7f391d386e4fcec8d/target/bin
-  .sandbox/$SANDBOX/_private/default/.pkg/testpkg.0.0.1-d349dc24837a78e7f391d386e4fcec8d/target/sbin
-  .sandbox/$SANDBOX/_private/default/.pkg/testpkg.0.0.1-d349dc24837a78e7f391d386e4fcec8d/target/share
-  .sandbox/$SANDBOX/_private/default/.pkg/testpkg.0.0.1-d349dc24837a78e7f391d386e4fcec8d/target/doc
-  .sandbox/$SANDBOX/_private/default/.pkg/testpkg.0.0.1-d349dc24837a78e7f391d386e4fcec8d/target/etc
-  .sandbox/$SANDBOX/_private/default/.pkg/testpkg.0.0.1-d349dc24837a78e7f391d386e4fcec8d/target/man
-  .sandbox/$SANDBOX/_private/default/.pkg/testpkg.0.0.1-d349dc24837a78e7f391d386e4fcec8d/target/lib/toplevel
-  .sandbox/$SANDBOX/_private/default/.pkg/testpkg.0.0.1-d349dc24837a78e7f391d386e4fcec8d/target/lib/stublibs
+  default
+  .sandbox/$SANDBOX/.pkgs/default/testpkg.0.0.1/source
+  .sandbox/$SANDBOX/install/default
+  .sandbox/$SANDBOX/install/default/lib
+  .sandbox/$SANDBOX/install/default/lib
+  .sandbox/$SANDBOX/install/default/bin
+  .sandbox/$SANDBOX/install/default/sbin
+  .sandbox/$SANDBOX/install/default/share
+  .sandbox/$SANDBOX/install/default/doc
+  .sandbox/$SANDBOX/install/default/etc
+  .sandbox/$SANDBOX/install/default/man
+  .sandbox/$SANDBOX/install/default/lib/toplevel
+  .sandbox/$SANDBOX/install/default/lib/stublibs

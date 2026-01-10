@@ -160,6 +160,8 @@ stored in the lockdir metadata:
    (progn
     (run echo foo)
     (run echo baz)))
+  
+  (build_id 4be5a9089c5d792b2c37cdd25f7170e5)
   $ cat ${default_lock_dir}/lock.dune
   (lang package 0.1)
   

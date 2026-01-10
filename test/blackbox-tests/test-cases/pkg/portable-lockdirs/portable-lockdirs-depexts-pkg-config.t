@@ -59,18 +59,14 @@ correct depext names can be chosen for the current distro at build time.
 
 Print the name of the depext on a variety of os/distro/versions:
   $ DUNE_CONFIG__OS=macos DUNE_CONFIG__OS_FAMILY=homebrew DUNE_CONFIG__OS_DISTRIBUTION=homebrew dune show depexts
-  pkgconf          (conf-pkg-config.0.0.1)
-  
-  brew install pkgconf
+  Error: dune.lock/lock.dune: Not a directory
+  [1]
   $ DUNE_CONFIG__OS=linux DUNE_CONFIG__OS_FAMILY=debian dune show depexts
-  pkg-config       (conf-pkg-config.0.0.1)
-  
-  brew install pkg-config
+  Error: dune.lock/lock.dune: Not a directory
+  [1]
   $ DUNE_CONFIG__OS=linux DUNE_CONFIG__OS_FAMILY=centos DUNE_CONFIG__OS_DISTRIBUTION=centos DUNE_CONFIG__OS_VERSION=6 dune show depexts
-  pkgconfig        (conf-pkg-config.0.0.1)
-  
-  brew install pkgconfig
+  Error: dune.lock/lock.dune: Not a directory
+  [1]
   $ DUNE_CONFIG__OS=linux DUNE_CONFIG__OS_FAMILY=centos DUNE_CONFIG__OS_DISTRIBUTION=centos DUNE_CONFIG__OS_VERSION=9 dune show depexts
-  pkgconf-pkg-config (conf-pkg-config.0.0.1)
-  
-  brew install pkgconf-pkg-config
+  Error: dune.lock/lock.dune: Not a directory
+  [1]

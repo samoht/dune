@@ -39,6 +39,8 @@ We print the source separately for ease of post processing the output.
    (all_platforms ((dune))))
   
   (dev)
+  
+  (build_id d3555703c974d80f2a6143f45b77614e)
 
 Now we make sure that the source is set correctly.
 

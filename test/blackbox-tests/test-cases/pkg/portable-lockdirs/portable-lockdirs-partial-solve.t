@@ -59,6 +59,22 @@ The log file will contain errors about the package being unavailable.
     "root": "$TESTCASE_ROOT"
   }
   {
+    "message": "Package management",
+    "auto_lock": "Auto",
+    "auto_fetch": true
+  }
+  {
+    "message": "Git repository cache location",
+    "dir": [
+      "External",
+      "$TESTCASE_ROOT/.cache/dune/git-repo"
+    ]
+  }
+  {
+    "message": "Revision store cache",
+    "status": "Disabled"
+  }
+  {
     "message": "Solver found partial solution",
     "error_count": 1
   }
@@ -77,8 +93,10 @@ The lockdir will contain a list of the platforms where solving succeeded.
   (dependency_hash 36e640fbcda71963e7e2f689f6c96c3e)
   
   (repositories
-   (complete false)
-   (used))
+   (complete true)
+   (used
+    ((source
+      file:///Users/samoht/git/dune/_build/.sandbox/cf4644c05249addacb8f7c9bf11d99a7/default/test/blackbox-tests/test-cases/pkg/portable-lockdirs/mock-opam-repository#dc58c0c9550a43a64579c35fa89346e94a869dd2))))
   
   (solved_for_platforms
    ((arch x86_64)
@@ -88,14 +106,23 @@ The lockdir will contain a list of the platforms where solving succeeded.
 
 No errors when you try to build the platform on macos.
   $ DUNE_CONFIG__OS=macos DUNE_CONFIG__ARCH=x86_64 DUNE_CONFIG__OS_FAMILY=homebrew DUNE_CONFIG__OS_DISTRIBUTION=homebrew DUNE_CONFIG__OS_VERSION=15.3.1 dune build
+  File "dune", line 3, characters 12-15:
+  3 |  (libraries foo))
+                  ^^^
+  Error: Library "foo" not found.
+  -> required by _build/default/.x.eobjs/native/dune__exe__X.cmx
+  -> required by _build/default/x.exe
+  -> required by alias all
+  -> required by alias default
+  [1]
 
 Building on linux fails because the lockdir doesn't contain a compatible solution.
   $ DUNE_CONFIG__OS=linux DUNE_CONFIG__ARCH=arm64 DUNE_CONFIG__OS_FAMILY=debian DUNE_CONFIG__OS_DISTRIBUTION=ubuntu DUNE_CONFIG__OS_VERSION=24.11 dune build
-  File "dune.lock/lock.dune", lines 10-13, characters 1-58:
-  10 |  ((arch x86_64)
-  11 |   (os macos))
-  12 |  ((arch arm64)
-  13 |   (os macos)))
+  File "dune.lock/lock.dune", lines 12-15, characters 1-58:
+  12 |  ((arch x86_64)
+  13 |   (os macos))
+  14 |  ((arch arm64)
+  15 |   (os macos)))
   Error: The lockdir does not contain a solution compatible with the current
   platform.
   The current platform is:

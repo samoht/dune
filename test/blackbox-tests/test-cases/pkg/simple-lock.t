@@ -16,9 +16,23 @@ The pkg directory contains build marker and cookie for dependency tracking:
 
   $ show_pkg test
   
-  /.dune-pkg-build-done
-  /cookie
-  /source
+  /installed
+  /target
+  /target/bin
+  /target/bin/foo
+  /target/cookie
+  /target/doc
+  /target/doc/test
+  /target/etc
+  /target/etc/test
+  /target/lib
+  /target/lib/stublibs
+  /target/lib/test
+  /target/lib/toplevel
+  /target/man
+  /target/sbin
+  /target/share
+  /target/share/test
 
 
 

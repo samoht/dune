@@ -87,8 +87,6 @@ Enumerate the contents of the fake toolchains directory:
   fake-cache/dune/toolchains
   fake-cache/dune/toolchains/ocaml-base-compiler.1-HASH
   fake-cache/dune/toolchains/ocaml-base-compiler.1-HASH/target
-  fake-cache/dune/toolchains/ocaml-base-compiler.1-HASH/target/bin
-  fake-cache/dune/toolchains/ocaml-base-compiler.1-HASH/target/bin/ocamlc
   fake-cache/dune/toolchains/ocaml-base-compiler.1-HASH/target/cookie
 
 Also test that DUNE_CACHE_ROOT is respected.
@@ -99,6 +97,4 @@ Enumerate the contents of the fake toolchains directory:
   other-fake-cache/toolchains/
   other-fake-cache/toolchains/ocaml-base-compiler.1-HASH
   other-fake-cache/toolchains/ocaml-base-compiler.1-HASH/target
-  other-fake-cache/toolchains/ocaml-base-compiler.1-HASH/target/bin
-  other-fake-cache/toolchains/ocaml-base-compiler.1-HASH/target/bin/ocamlc
   other-fake-cache/toolchains/ocaml-base-compiler.1-HASH/target/cookie

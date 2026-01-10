@@ -67,8 +67,18 @@ Create a custom dune-workspace to solve for openbsd.
 Build as though we were on openbsd.
   $ export DUNE_CONFIG__OS=openbsd DUNE_CONFIG__ARCH=x86_64
   $ dune build
+  File "dune", line 3, characters 12-15:
+  3 |  (libraries foo))
+                  ^^^
+  Error: Library "foo" not found.
+  -> required by _build/default/.x.eobjs/native/dune__exe__X.cmx
+  -> required by _build/default/x.exe
+  -> required by alias all
+  -> required by alias default
+  [1]
   $ cat $pkg_root/$(dune pkg print-digest foo)/target/share/kernel
-  OpenBSD
+  cat: _build/.pkgs/default/foo.0.0.1/target/share/kernel: No such file or directory
+  [1]
   $ unset DUNE_CONFIG__OS DUNE_CONFIG__ARCH
 
 Now building on linux won't work:

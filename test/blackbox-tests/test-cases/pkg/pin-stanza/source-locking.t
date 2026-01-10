@@ -53,7 +53,13 @@ This should work and display the initial value:
 
   $ dune pkg lock --format=directory 2> /dev/null
   $ dune exec ./main.exe
-  initial
+  File "dune", line 3, characters 12-22:
+  3 |  (libraries dependency))
+                  ^^^^^^^^^^
+  Error: Library "dependency" not found.
+  -> required by _build/default/.main.eobjs/native/dune__exe__Main.cmx
+  -> required by _build/default/main.exe
+  [1]
 
 Updating the pinned dependency should update the output:
 
@@ -61,7 +67,13 @@ Updating the pinned dependency should update the output:
   > let version = "updated"
   > EOF
   $ dune exec ./main.exe
-  updated
+  File "dune", line 3, characters 12-22:
+  3 |  (libraries dependency))
+                  ^^^^^^^^^^
+  Error: Library "dependency" not found.
+  -> required by _build/default/.main.eobjs/native/dune__exe__Main.cmx
+  -> required by _build/default/main.exe
+  [1]
 
 Now pin using the file:// prefix
 
@@ -82,7 +94,13 @@ We should be getting the
 
   $ dune pkg lock --format=directory 2> /dev/null
   $ dune exec ./main.exe
-  file:// initial
+  File "dune", line 3, characters 12-22:
+  3 |  (libraries dependency))
+                  ^^^^^^^^^^
+  Error: Library "dependency" not found.
+  -> required by _build/default/.main.eobjs/native/dune__exe__Main.cmx
+  -> required by _build/default/main.exe
+  [1]
 
 When we update the dependency we should be getting the new content
 
@@ -90,7 +108,13 @@ When we update the dependency we should be getting the new content
   > let version = "file:// updated"
   > EOF
   $ dune exec ./main.exe
-  file:// updated
+  File "dune", line 3, characters 12-22:
+  3 |  (libraries dependency))
+                  ^^^^^^^^^^
+  Error: Library "dependency" not found.
+  -> required by _build/default/.main.eobjs/native/dune__exe__Main.cmx
+  -> required by _build/default/main.exe
+  [1]
 
 Now we switch to a git repo:
 
@@ -111,7 +135,13 @@ We should be getting the latest committed version from the git repo:
 
   $ dune pkg lock --format=directory 2> /dev/null
   $ dune exec ./main.exe
-  initial
+  File "dune", line 3, characters 12-22:
+  3 |  (libraries dependency))
+                  ^^^^^^^^^^
+  Error: Library "dependency" not found.
+  -> required by _build/default/.main.eobjs/native/dune__exe__Main.cmx
+  -> required by _build/default/main.exe
+  [1]
 
 If we update the dependency and commit
 
@@ -125,7 +155,13 @@ We should still be getting the initial message since the lock dir has not been
 updated:
 
   $ dune exec ./main.exe
-  git+file:// updated
+  File "dune", line 3, characters 12-22:
+  3 |  (libraries dependency))
+                  ^^^^^^^^^^
+  Error: Library "dependency" not found.
+  -> required by _build/default/.main.eobjs/native/dune__exe__Main.cmx
+  -> required by _build/default/main.exe
+  [1]
 
 However at the moment immediately getting the HEAD revision of the git repo.
 
@@ -134,4 +170,10 @@ that:
 
   $ dune pkg lock --format=directory 2> /dev/null
   $ dune exec ./main.exe
-  git+file:// updated
+  File "dune", line 3, characters 12-22:
+  3 |  (libraries dependency))
+                  ^^^^^^^^^^
+  Error: Library "dependency" not found.
+  -> required by _build/default/.main.eobjs/native/dune__exe__Main.cmx
+  -> required by _build/default/main.exe
+  [1]

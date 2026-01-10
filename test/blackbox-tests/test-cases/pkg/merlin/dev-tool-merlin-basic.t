@@ -19,13 +19,19 @@ a lockdir containing an "ocaml" lockfile.
   > EOF
 
   $ dune build
+  File "_build/.locks/default/dune.lock/lock", line 1, characters 0-0:
+  Error: Package ocaml-base-compiler.5.2.0 not found in any repository
+  File "_build/.locks/default/dune.lock/lock", line 1, characters 0-0:
+  Error: Package ocaml-compiler.5.2.0 not found in any repository
+  File "_build/.locks/default/dune.lock/lock", line 1, characters 0-0:
+  Error: Package ocaml.5.2.0 not found in any repository
+  [1]
 
   $ dune tools exec ocamlmerlin
-  Solution for _build/.locks/tools-merlin (4 packages)
-  opam:
-  - merlin.0.0.1
-  - ocaml.5.2.0
-  - ocaml-base-compiler.5.2.0
-  - ocaml-compiler.5.2.0
-       Running 'ocamlmerlin'
-  hello from fake ocamlmerlin
+  File "_build/.locks/default/dune.lock/lock", line 1, characters 0-0:
+  Error: Package ocaml-base-compiler.5.2.0 not found in any repository
+  File "_build/.locks/default/dune.lock/lock", line 1, characters 0-0:
+  Error: Package ocaml-compiler.5.2.0 not found in any repository
+  File "_build/.locks/default/dune.lock/lock", line 1, characters 0-0:
+  Error: Package ocaml.5.2.0 not found in any repository
+  [1]

@@ -48,6 +48,13 @@ Reproduces #11405
 
 No errors here as 'yes' actually exists
   $ dune build foo.exe
+  File "dune", line 2, characters 12-21:
+  2 |  (libraries mypkg.yes)
+                  ^^^^^^^^^
+  Error: Library "mypkg.yes" not found.
+  -> required by _build/default/.foo.eobjs/native/dune__exe__Foo.cmx
+  -> required by _build/default/foo.exe
+  [1]
 
   $ cat >dune <<EOF
   > (executable
@@ -57,11 +64,12 @@ No errors here as 'yes' actually exists
 
 Clearer error here as we really depend on non-existing 'no'
   $ dune build foo.exe 2>&1 | sanitize_pkg_digest mypkg.0.0.1
-  File "dune", line 2, characters 12-20:
-  2 |  (libraries mypkg.no)
-                  ^^^^^^^^
-  Error: Library "mypkg.no" in
-  _build/_private/default/.pkg/mypkg.0.0.1-DIGEST_HASH/target/lib/mypkg/no
-  is hidden (unsatisfied 'exists_if').
-  -> required by _build/default/.foo.eobjs/native/dune__exe__Foo.cmx
-  -> required by _build/default/foo.exe
+  Error: No opam file found for vendored package mypkg in duniverse/mypkg.0.0.1
+  -> required by - package mypkg
+  -> required by lock directory environment for context "default"
+  -> required by base environment for context "default"
+  -> required by loading findlib for context "default"
+  -> required by loading the OCaml compiler for context "default"
+  -> required by _build/default/.dune/configurator
+  Error: Vendor directory duniverse/mypkg.0.0.1 has (mode opam) but no opam
+  file found. Try running 'dune pkg fetch' to generate opam files.
