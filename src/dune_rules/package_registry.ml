@@ -72,12 +72,30 @@ let compiler entry =
   | Source.From_lock _ | Source.From_workspace _ -> None
 ;;
 
+(* Find the package that provides a given compiler name. *)
+let find_compiler t compiler_name =
+  Package.Name.Map.to_list t.entries
+  |> List.find_map ~f:(fun (_, entry) ->
+    match compiler entry with
+    | Some name when Package.Name.equal name compiler_name -> Some entry
+    | _ -> None)
+;;
+
 (* Get the toolchain name provided by a package, if any.
    Only vendor packages can declare toolchain providers. *)
 let toolchain entry =
   match entry.source with
   | Source.From_vendor { stanza; _ } -> stanza.toolchain
   | Source.From_lock _ | Source.From_workspace _ -> None
+;;
+
+(* Find the package that provides a given toolchain name. *)
+let find_toolchain t toolchain_name =
+  Package.Name.Map.to_list t.entries
+  |> List.find_map ~f:(fun (_, entry) ->
+    match toolchain entry with
+    | Some name when String.equal name toolchain_name -> Some entry
+    | _ -> None)
 ;;
 
 let of_lock_packages pkgs =

@@ -76,6 +76,7 @@ type builder =
   ; env : Env.t Memo.t
   ; implicit : bool
   ; findlib_toolchain : Context_name.t option
+  ; vendored_toolchain_paths : Path.t list option
   ; for_host : (Context_name.t * t Memo.t) option
   ; path : Path.t list
   }
@@ -105,6 +106,7 @@ module Builder = struct
     ; env = Memo.return Env.empty
     ; implicit = false
     ; findlib_toolchain = None
+    ; vendored_toolchain_paths = None
     ; for_host = None
     ; path = []
     }
@@ -324,15 +326,20 @@ module Build_environment_kind = struct
 
   type t =
     | Cross_compilation_using_findlib_toolchain of Context_name.t
+    | Vendored_toolchain of
+        { name : Context_name.t
+        ; paths : Path.t list
+        }
     | Hardcoded_path of string list
     | Opam2_environment of string (* opam switch prefix *)
     | Lock
     | Unknown
 
-  let query ~kind ~findlib_toolchain ~env =
-    match findlib_toolchain with
-    | Some s -> Cross_compilation_using_findlib_toolchain s
-    | None ->
+  let query ~kind ~findlib_toolchain ~vendored_toolchain_paths ~env =
+    match findlib_toolchain, vendored_toolchain_paths with
+    | Some s, Some paths -> Vendored_toolchain { name = s; paths }
+    | Some s, None -> Cross_compilation_using_findlib_toolchain s
+    | None, _ ->
       let opam_prefix = Env.get env Opam_switch.opam_switch_prefix_var_name in
       (match kind with
        | `Opam ->
@@ -372,6 +379,7 @@ module Build_environment_kind = struct
                  ]
                  ~f:Pp.text
              ]
+       | Vendored_toolchain { name = _; paths } -> paths
        | Hardcoded_path l -> List.map l ~f:Path.of_filename_relative_to_initial_cwd
        | Opam2_environment opam_prefix ->
          let p = Path.of_filename_relative_to_initial_cwd opam_prefix in
@@ -501,6 +509,7 @@ let create (builder : Builder.t) ~(kind : Kind.t) =
         Build_environment_kind.query
           ~kind
           ~findlib_toolchain:builder.findlib_toolchain
+          ~vendored_toolchain_paths:builder.vendored_toolchain_paths
           ~env
         |> Build_environment_kind.findlib_paths ~findlib ~ocaml_bin:ocaml.bin_dir
       in
@@ -570,9 +579,27 @@ module Group = struct
         | Named findlib_toolchain ->
           Some
             (Memo.Lazy.create ~name:"findlib_toolchain" (fun () ->
+               let* vendored_toolchain_paths =
+                 let toolchain_name = Context_name.to_string findlib_toolchain in
+                 let+ registry = Package_registry.of_ctx builder.name in
+                 match Package_registry.find_toolchain registry toolchain_name with
+                 | None -> None
+                 | Some entry ->
+                   (* Compute paths to the vendored toolchain's installed libs *)
+                   let pkg_name = entry.name in
+                   let pkg_build_dir =
+                     Vendor_rules.pkg_build_dir ~context:builder.name ~pkg_name
+                   in
+                   let target_dir = Path.Build.relative pkg_build_dir "target" in
+                   Some [ Path.build (Path.Build.relative target_dir "lib") ]
+               in
                let name = Context_name.target builder.name ~toolchain:findlib_toolchain in
                create
-                 { builder with name; findlib_toolchain = Some findlib_toolchain }
+                 { builder with
+                   name
+                 ; findlib_toolchain = Some findlib_toolchain
+                 ; vendored_toolchain_paths
+                 }
                  ~kind
                |> Memo.return)))
     in

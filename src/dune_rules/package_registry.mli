@@ -73,9 +73,15 @@ val install_to_prefix : entry -> bool
     Only vendor packages can declare compiler providers via [(compiler ...)]. *)
 val compiler : entry -> Package.Name.t option
 
+(** Find the package that provides a given compiler name. *)
+val find_compiler : t -> Package.Name.t -> entry option
+
 (** Get the toolchain name provided by a package, if any.
     Only vendor packages can declare toolchain providers via [(toolchain ...)]. *)
 val toolchain : entry -> string option
+
+(** Find the package that provides a given toolchain name. *)
+val find_toolchain : t -> string -> entry option
 
 (** Create a registry from a map of lock file packages.
     Used for dev tool contexts which don't have a workspace context. *)
