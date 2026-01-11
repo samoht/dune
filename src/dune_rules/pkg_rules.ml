@@ -3052,22 +3052,25 @@ let toolchain_of_resolved_pkg context pkg =
   Action_builder.of_memo @@ Ocaml_toolchain.of_binaries ~path context env binaries
 ;;
 
+(* Check if a toolchain name indicates the native compiler *)
+let is_native_toolchain name = String.equal name "native" || String.equal name "default"
+
 let ocaml_toolchain context =
   Memo.push_stack_frame ~human_readable_description:(fun () ->
     Pp.textf "Loading OCaml toolchain for context %S" (Context_name.to_string context))
   @@ fun () ->
   let* registry = Package_registry.of_ctx context in
-  (* First check for vendor packages declaring a compiler - they take precedence *)
-  let vendor_compiler =
+  (* First check for vendor packages declaring a native toolchain - they take precedence *)
+  let vendor_native_toolchain =
     Package_registry.to_list registry
     |> List.find_map ~f:(fun entry ->
-      match Package_registry.compiler entry with
-      | Some _ -> Some entry
-      | None -> None)
+      match Package_registry.toolchain entry with
+      | Some name when is_native_toolchain name -> Some entry
+      | _ -> None)
   in
-  match vendor_compiler with
+  match vendor_native_toolchain with
   | Some entry ->
-    (* Use vendor compiler *)
+    (* Use vendor toolchain as native compiler *)
     let+ pkg =
       Resolve.resolve_entry registry entry ~package_universe:(Dependencies context)
     in

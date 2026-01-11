@@ -1,4 +1,4 @@
-Test the (compiler ...) field in vendor stanzas for providing OCaml compilers.
+Test the (toolchain native) field in vendor stanzas for providing OCaml compilers.
 
   $ cat >dune-project <<EOF
   > (lang dune 3.17)
@@ -24,13 +24,13 @@ Create a vendored OCaml compiler package (mock):
   > let version = "5.2.0"
   > EOF
 
-Set up the vendor stanza with compiler field:
+Set up the vendor stanza with toolchain native:
 
   $ cat >duniverse/dune <<EOF
   > (vendored_dirs *)
   > (vendor ocaml.5.2.0
   >  (libraries ocaml.stdlib)
-  >  (compiler ocaml.5.2.0))
+  >  (toolchain native))
   > EOF
 
 Create main app:
@@ -45,19 +45,19 @@ Create main app:
   > let () = print_endline "Hello"
   > EOF
 
-Build should succeed (uses system compiler since vendor compiler doesn't
+Build should succeed (uses system compiler since vendor toolchain doesn't
 actually provide ocamlc/ocamlopt binaries):
 
   $ dune build main.exe
 
-Test that the compiler field is parsed correctly:
+Test that the toolchain field is parsed correctly with "default" as well:
 
   $ cat >duniverse/dune <<EOF
   > (vendored_dirs *)
   > (vendor ocaml.5.2.0
   >  (libraries ocaml.stdlib)
   >  (packages ocaml)
-  >  (compiler ocaml.5.2.0))
+  >  (toolchain default))
   > EOF
 
   $ dune build main.exe

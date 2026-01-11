@@ -110,18 +110,18 @@ Test vendor stanza with install field:
 
   $ dune build main.exe
 
-Test vendor stanza with compiler field:
+Test vendor stanza with toolchain field (native compiler):
 
   $ cat >duniverse/dune <<EOF
   > (vendored_dirs *)
   > (vendor fmt.0.9.0
   >  (libraries fmt)
-  >  (compiler ocaml.5.2.0))
+  >  (toolchain native))
   > EOF
 
   $ dune build main.exe
 
-Test vendor stanza with toolchain field:
+Test vendor stanza with toolchain field (cross-compilation):
 
   $ cat >duniverse/dune <<EOF
   > (vendored_dirs *)
@@ -141,8 +141,7 @@ Test vendor stanza with all fields:
   >  (packages fmt)
   >  (mode dune)
   >  (install true)
-  >  (compiler ocaml.5.2.0)
-  >  (toolchain windows))
+  >  (toolchain native))
   > EOF
 
   $ dune build main.exe

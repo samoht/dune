@@ -69,15 +69,9 @@ val needs_marker : entry -> bool
     Most packages do, except vendor packages with install=false. *)
 val install_to_prefix : entry -> bool
 
-(** Get the compiler name provided by a package, if any.
-    Only vendor packages can declare compiler providers via [(compiler ...)]. *)
-val compiler : entry -> Package.Name.t option
-
-(** Find the package that provides a given compiler name. *)
-val find_compiler : t -> Package.Name.t -> entry option
-
 (** Get the toolchain name provided by a package, if any.
-    Only vendor packages can declare toolchain providers via [(toolchain ...)]. *)
+    Only vendor packages can declare toolchain providers via [(toolchain ...)].
+    "native" or "default" = native compiler, others = cross-compilation. *)
 val toolchain : entry -> string option
 
 (** Find the package that provides a given toolchain name. *)

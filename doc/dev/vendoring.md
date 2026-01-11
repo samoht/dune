@@ -151,8 +151,7 @@ The `vendor` stanza declares a vendored dependency directory:
  (packages <pkg-name> ...)    ; optional: packages to expose (all if omitted)
  (mode <method>)              ; optional: build mode (dune or opam, default: dune)
  (install <bool>)             ; optional: promote to shared install path (default: true)
- (compiler <name>)            ; optional: marks this as providing a compiler
- (toolchain <name>))          ; optional: marks this as providing a findlib toolchain
+ (toolchain <name>))          ; optional: marks this as providing a toolchain
 ```
 
 Both `<lib-name>` and `<pkg-name>` use the standard ordered set language (like `(modules ...)`) with:
@@ -164,60 +163,46 @@ All fields are optional. When omitted:
 - `(libraries ...)` and `(packages ...)` should be auto-detected by scanning the directory
 - `(mode ...)` should be auto-detected: `dune` if dune files exist, `opam` otherwise
 - `(install ...)` defaults to `true`, except when `:as` aliasing is used (then `false`)
-- `(compiler ...)` defaults to none, unless the package provides an OCaml compiler
-- `(toolchain ...)` defaults to none, unless the package provides a cross-compilation toolchain
+- `(toolchain ...)` defaults to none
 
-### Compiler and Toolchain Declaration
+### Toolchain Declaration
 
-The `(compiler ...)` and `(toolchain ...)` fields mark vendored packages as providing
-compilers or cross-compilation toolchains. These are auto-detected when omitted:
-- A package is detected as a compiler if it provides `ocaml`, `ocamlc`, or `ocamlopt`
-- A package is detected as a toolchain if it provides cross-compilation binaries
+The `(toolchain ...)` field marks vendored packages as providing toolchains (compilers).
+A toolchain is a complete set of OCaml build tools: `ocamlc`, `ocamlopt`, standard library, etc.
 
-Explicit declaration:
+- `(toolchain native)` or `(toolchain default)` — provides the native compiler
+- `(toolchain <name>)` — provides a cross-compilation toolchain for the named target
 
 ```lisp
-; Native compilers - used by (context (workspace (compiler ...)))
+; Native compiler - provides ocamlc, ocamlopt, etc. for the default context
 (vendor ocaml.5.2.0
- (compiler ocaml.5.2.0))
+ (toolchain native))
 
+; Another native compiler version
 (vendor ocaml.4.14.2
- (compiler ocaml.4.14.2))
+ (toolchain default))
 
-; Cross-compilation toolchain - registers a findlib toolchain
+; Cross-compilation toolchain for Windows
 (vendor ocaml-windows.5.2.0
  (toolchain windows))
 ```
 
-These can then be referenced in dune-workspace:
+These can then be used via workspace targets:
 
 ```dune
-; Define toolchain (references vendored ocaml-windows package)
-(toolchain windows
-  (package ocaml-windows))
-
-; Uses ocaml.5.4 as the native compiler
-(context (workspace (compiler ocaml.5.4)))
-
-; Uses ocaml.4.14 as the native compiler, named ocaml414
-(context (workspace (compiler ocaml.4.14) (name ocaml414)))
-
-; Uses ocaml.5.4 for native, creates default.windows using toolchain "windows"
-(context (workspace
-  (compiler ocaml.5.4)
+; Build for native and Windows targets
+; - native context uses (toolchain native) vendor package
+; - windows context uses (toolchain windows) vendor package
+(context (default
   (targets native windows)))
 ```
 
-**`(compiler ...)`**:
-- Declares the package as an OCaml compiler provider
-- Makes the compiler name available for workspace context `(compiler ...)` field
-- Dune builds this package first to get `ocamlc`, `ocamlopt`, etc.
-
 **`(toolchain ...)`**:
-- Declares the package as providing a findlib toolchain for cross-compilation
-- The toolchain name matches what `(targets ...)` references (e.g., `windows`)
-- Dune uses this to know which packages to build when preparing cross-compilation contexts
-- Sets `OCAMLFIND_TOOLCHAIN=<name>` for the target context
+- Declares the package as providing a toolchain (native or cross-compilation)
+- `native` or `default` = native compiler for the host platform
+- Other names = cross-compilation toolchains matching `(targets ...)` in dune-workspace
+- Dune builds this package first to get `ocamlc`, `ocamlopt`, etc.
+- For cross-compilation, sets `OCAMLFIND_TOOLCHAIN=<name>` for the target context
 
 ## Selective Library Exposure
 
