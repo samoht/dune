@@ -23,7 +23,7 @@ Fetch from more than one source
   Description:
     ("fetch_local: unpack is not set",
      { url =
-         $SANDBOX/default/test/blackbox-tests/test-cases/pkg/baz"
+         "$SANDBOX/default/test/blackbox-tests/test-cases/pkg/baz"
      })
   Raised at Stdune__Code_error.raise in file
     "otherlibs/stdune/src/code_error.ml", line 10, characters 30-62
@@ -160,7 +160,7 @@ url and the extra source.
      (url http://localhost:2)
      (checksum md5=$HASH))))
   
-  (build_id b74a41de445ae4ac9d6845ecee0b19f4)
+  (build_id 4055dbb39f12b880988c809edea91b8d)
 
 Running the binary should download the tarball & patch, build them and show the
 correct, patched, message:
@@ -211,10 +211,4 @@ Lock the project to use that new package
 Running the binary should work and output the double patched message:
 
   $ dune exec ./display.exe
-  File "dune", line 1, characters 45-56:
-  1 | (executable (public_name display) (libraries needs-patch))
-                                                   ^^^^^^^^^^^
-  Error: Library "needs-patch" not found.
-  -> required by _build/default/.display.eobjs/native/dune__exe__Display.cmx
-  -> required by _build/default/display.exe
-  [1]
+  Patch successfully applied

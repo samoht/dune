@@ -19,5 +19,5 @@ Test that section pforms are substituted with absolute paths.
 Note that currently dune incorrectly substitutes relative paths for pforms that
 appear in string interpolations.
   $ build_pkg test 2>&1 | strip_sandbox
-  --prefix $SANDBOX/.pkgs/default/test/target
-  $SANDBOX/.pkgs/default/test/target
+  --prefix /Users/samoht/git/dune/$SANDBOX/default/test/blackbox-tests/test-cases/pkg/$SANDBOX/.pkgs/default/test/target
+  --prefix=/Users/samoht/git/dune/$SANDBOX/default/test/blackbox-tests/test-cases/pkg/$SANDBOX/.pkgs/default/test/target

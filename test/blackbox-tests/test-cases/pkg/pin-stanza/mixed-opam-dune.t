@@ -40,7 +40,7 @@ should favor the dune metadata in such a case.
   
   (dev)
   
-  (build_id ec043db3e7314a3cbdbeee60cc51ffb1)
+  (build_id b07f32859bdab4e908cf7df7f404d803)
   $ dune_cmd delete-between 'source' '^$' < ${default_lock_dir}/foo.dev.pkg 
   (version dev)
   
@@ -49,4 +49,4 @@ should favor the dune metadata in such a case.
   
   (dev)
   
-  (build_id 23077e56a93c7d425b9e37541b92a474)
+  (build_id 8a71e8441461dfeab8162dce8b962473)

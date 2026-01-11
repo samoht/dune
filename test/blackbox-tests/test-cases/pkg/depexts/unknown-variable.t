@@ -23,7 +23,7 @@ With single-file format (the default), depexts are derived from opam repo:
   $ cat dune.lock | strip_sandbox | dune_cmd subst '[a-f0-9]{40}' 'COMMIT_HASH' | grep -v "^$" | head -10
   (lang package 0.1)
   (repos
-   $SANDBOX/default/test/blackbox-tests/test-cases/pkg/depexts/mock-opam-repository
+   ($SANDBOX/default/test/blackbox-tests/test-cases/pkg/depexts/mock-opam-repository
     COMMIT_HASH))
   (packages foo.0.0.1)
   (platforms

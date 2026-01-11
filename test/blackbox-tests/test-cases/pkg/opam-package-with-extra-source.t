@@ -52,7 +52,7 @@ The lockfile should contain the fetching of extra sources.
      (checksum
       sha256=8beda92f97cde6d4a55a836ca6dc9f860bb5f1a6b765b80be4594943288571cf))))
   
-  (build_id 539f6af5a5e8cdb7463f07f6440fc7c1)
+  (build_id c6930e28d4fa150741d4555274565af6)
   (source (copy $TESTCASE_ROOT/source))
 
 The lockfile should contain the fetching of extra sources with md5 checksums.
@@ -66,7 +66,7 @@ The lockfile should contain the fetching of extra sources with md5 checksums.
      (url https://some-url)
      (checksum md5=8beda92f97cde6d4a55a836ca6dc9f86))))
   
-  (build_id 0b3ffbb2945476710cc9294465d42737)
+  (build_id 03db33f2c9fedb2badc6be92f1eb7241)
 
 The lockfile should contain the fetching of extra sources with the first checksum from the
 list of checksums.
@@ -81,4 +81,4 @@ list of checksums.
      (checksum
       sha256=8beda92f97cde6d4a55a836ca6dc9f860bb5f1a6b765b80be4594943288571cf))))
   
-  (build_id 6eda98ea3a5c15c716203d60c11803a5)
+  (build_id 6cf152cb298c6a0c61e0bd1d2f41e0cc)

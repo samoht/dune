@@ -70,10 +70,10 @@ Demonstrate the build command we construct for different types of projects:
    (all_platforms ((dune))))
   $ build_command "(build" mixed
   (build
-  (build_id 843f4243cce2970f44c73f6f9f4fa1aa)
+  (build_id 889b2b69eadcd957a1e5400753c9c7b6)
   $ build_command "(build" opam-only
   (build
-  (build_id e26465164e690d08e6dfeafc6939805e)
+  (build_id c15dfc97bd2c1c73b94d6b5502746997)
 
 If we build the deps, everything works fine and we see the output of the opam
 pins:

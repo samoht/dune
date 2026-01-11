@@ -30,7 +30,7 @@ file in the package's source.
   Description:
     ("fetch_local: unpack is not set",
      { url =
-         $SANDBOX/default/test/blackbox-tests/test-cases/pkg/foo.txt"
+         "$SANDBOX/default/test/blackbox-tests/test-cases/pkg/foo.txt"
      })
   Raised at Stdune__Code_error.raise in file
     "otherlibs/stdune/src/code_error.ml", line 10, characters 30-62
