@@ -114,7 +114,9 @@ vendor/
  (libraries <lib-spec>...)    ; optional
  (packages <pkg-spec>...)     ; optional
  (mode <build-mode>)          ; optional: dune | opam
- (install <bool>))            ; optional: promote artifacts to shared install path
+ (install <bool>)             ; optional: promote artifacts to shared install path
+ (compiler <name>)            ; optional: marks this as providing a compiler
+ (toolchain <name>))          ; optional: marks this as providing a findlib toolchain
 ```
 
 Both `<lib-spec>` and `<pkg-spec>` use the standard ordered set language (like `(modules ...)`) with:

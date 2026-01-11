@@ -149,7 +149,8 @@ The `vendor` stanza declares a vendored dependency directory:
 (vendor <directory>           ; required: path to vendored source (relative to dune file)
  (libraries <lib-name> ...)   ; optional: libraries to expose (all if omitted)
  (packages <pkg-name> ...)    ; optional: packages to expose (all if omitted)
- (build <method>)             ; optional: build method (dune or opam, default: dune)
+ (mode <method>)              ; optional: build mode (dune or opam, default: dune)
+ (install <bool>)             ; optional: promote to shared install path (default: true)
  (compiler <name>)            ; optional: marks this as providing a compiler
  (toolchain <name>))          ; optional: marks this as providing a findlib toolchain
 ```
@@ -338,7 +339,7 @@ Excluded libraries:
 
 ## Build Methods
 
-The `build` field controls how vendored code is built:
+The `mode` field controls how vendored code is built:
 
 | Method | Description |
 |--------|-------------|
@@ -388,9 +389,9 @@ For each locked package, `dune pkg fetch`:
    - `none` otherwise
 4. Writes vendor stanza to `duniverse/dune`
 
-### Sandbox Mode Detection
+### Mode Detection
 
-A package needs `(sandbox opam)` if its lock file entry contains:
+A package needs `(mode opam)` if its lock file entry contains:
 - `%{...}%` variable substitutions (opam variables)
 - Non-dune build commands (`make`, `./configure`, etc.)
 - Install commands that reference opam paths
@@ -519,14 +520,14 @@ The detected mode is recorded in `duniverse/dune`:
 (vendor fmt.0.9.0)              ; build: [dune build ...] → no sandbox needed
 
 (vendor old-lib.1.0.0
- (sandbox opam))                ; build: [make] → explicit sandbox
+ (mode opam))                   ; build: [make] → explicit mode
 ```
 
-For regular packages, sandbox mode is determined from the lock file (which
-contains the opam build commands). For pins, we need to fetch the source first
-to read the opam file, then record the detected mode in `duniverse/dune`.
+For regular packages, mode is determined from the lock file (which contains
+the opam build commands). For pins, we need to fetch the source first to read
+the opam file, then record the detected mode in `duniverse/dune`.
 
-For overrides, explicit `(sandbox ...)` in `dune-project` takes precedence over
+For overrides, explicit `(mode ...)` in `dune-project` takes precedence over
 the generated `duniverse/dune`.
 
 ## Opam File Generation
