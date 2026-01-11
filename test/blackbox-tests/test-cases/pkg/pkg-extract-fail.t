@@ -4,6 +4,8 @@ exit codes and error messages, see #11560 for example output
 Create a mock package whose url is a corrupted/invalid tar file attempt to
 build this package and check for sufficient error handling
 
+  $ mkrepo
+
   $ echo "corrupted tar" > corrupted.tar
 
   $ mkpkg foo <<EOF
@@ -14,21 +16,12 @@ build this package and check for sufficient error handling
 
   $ add_mock_repo_if_needed
   $ solve foo
-  fatal: '$TESTCASE_ROOT/mock-opam-repository' does not appear to be a git repository
-  fatal: Could not read from remote repository.
-  
-  Please make sure you have the correct access rights
-  and the repository exists.
-  File "dune-workspace", line 6, characters 6-154:
-  6 |  (url "git+file:///Users/samoht/git/dune/_build/.sandbox/27e327df915e1c3feb3b9f40b7bdd3ba/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository"))
-            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  Error: Failed to run external command:
-  'git ls-remote "file:///Users/samoht/git/dune/_build/.sandbox/27e327df915e1c3feb3b9f40b7bdd3ba/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository"'
-  Hint: Check that this Git URL in the project configuration is correct:
-  "file:///Users/samoht/git/dune/_build/.sandbox/27e327df915e1c3feb3b9f40b7bdd3ba/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository"
-  [1]
+  Solution for dune.lock (1 package):
+  opam:
+  - foo.0.0.1
   $ build_pkg foo 2>&1 | dune_cmd print-from 'Error:' | dune_cmd print-until '^Reason' | dune_cmd subst "'[0-9]*'" X
-  Error: Lock directory is not active for context "default".
+  Error: failed to extract 'corrupted.tar'
+  Reason: 'tar' failed with non-zero exit code X and output:
 
 Repeat the same test as above but ensure that error output from gzip is
 captured
@@ -42,22 +35,13 @@ captured
   > EOF
 
   $ solve foo
-  fatal: '$TESTCASE_ROOT/mock-opam-repository' does not appear to be a git repository
-  fatal: Could not read from remote repository.
-  
-  Please make sure you have the correct access rights
-  and the repository exists.
-  File "dune-workspace", line 6, characters 6-154:
-  6 |  (url "git+file:///Users/samoht/git/dune/_build/.sandbox/27e327df915e1c3feb3b9f40b7bdd3ba/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository"))
-            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  Error: Failed to run external command:
-  'git ls-remote "file:///Users/samoht/git/dune/_build/.sandbox/27e327df915e1c3feb3b9f40b7bdd3ba/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository"'
-  Hint: Check that this Git URL in the project configuration is correct:
-  "file:///Users/samoht/git/dune/_build/.sandbox/27e327df915e1c3feb3b9f40b7bdd3ba/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository"
-  [1]
+  Solution for dune.lock (1 package):
+  opam:
+  - foo.0.0.1
 
   $ build_pkg foo 2>&1 | dune_cmd print-from 'Error:' | dune_cmd print-until '^Reason' | dune_cmd subst "'[0-9]*'" X
-  Error: Lock directory is not active for context "default".
+  Error: failed to extract 'corrupted.tar.gz'
+  Reason: 'tar' failed with non-zero exit code X and output:
 
 Now try another local package but this time of zip format to test if stderr is
 captured from the unzip tool. Note that preprocessing here makes the unzip
@@ -73,19 +57,10 @@ error message a bit less clear
 
   $ add_mock_repo_if_needed
   $ solve foo
-  fatal: '$TESTCASE_ROOT/mock-opam-repository' does not appear to be a git repository
-  fatal: Could not read from remote repository.
-  
-  Please make sure you have the correct access rights
-  and the repository exists.
-  File "dune-workspace", line 6, characters 6-154:
-  6 |  (url "git+file:///Users/samoht/git/dune/_build/.sandbox/27e327df915e1c3feb3b9f40b7bdd3ba/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository"))
-            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  Error: Failed to run external command:
-  'git ls-remote "file:///Users/samoht/git/dune/_build/.sandbox/27e327df915e1c3feb3b9f40b7bdd3ba/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository"'
-  Hint: Check that this Git URL in the project configuration is correct:
-  "file:///Users/samoht/git/dune/_build/.sandbox/27e327df915e1c3feb3b9f40b7bdd3ba/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository"
-  [1]
+  Solution for dune.lock (1 package):
+  opam:
+  - foo.0.0.1
 
   $ build_pkg foo 2>&1 | dune_cmd print-from 'Error:' | dune_cmd print-until '^Reason' | dune_cmd subst "'[0-9]*'" X
-  Error: Lock directory is not active for context "default".
+  Error: failed to extract 'corrupted.zip'
+  Reason: 'unzip' failed with non-zero exit code X and output:

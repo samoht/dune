@@ -11,6 +11,21 @@ Helper shell function that generates an opam file for a package:
   > EOF
   > }
 
+Set up the mock repository with required packages:
+
+  $ mkrepo
+  $ add_mock_repo_if_needed
+  $ emptyverpkg bar 0.0.1
+  $ emptyverpkg bar 0.4.0
+  $ emptyverpkg bar 0.5.0
+  $ emptyverpkg baz 0.1.0
+  $ mkpkg foo <<EOF
+  > depends: [
+  >     "baz" {>= "0.1"}
+  >     "bar" {>= "0.2"}
+  > ]
+  > EOF
+
 Generate a `dune-project` file.
   $ cat >dune-project <<EOF
   > (lang dune 3.8)
@@ -20,57 +35,36 @@ Generate a `dune-project` file.
   >    foo
   >    (bar (>= "0.3"))))
   > EOF
-  > mkpkg foo <<EOF
-  > depends: [
-  >     "baz" {>= "0.1"}
-  >     "bar" {>= "0.2"}
-  > ]
-  > EOF
-  $ add_mock_repo_if_needed
 
 Run the solver and generate a lock directory.
 
   $ dune_pkg_lock_normalized
-  fatal: '$TESTCASE_ROOT/mock-opam-repository' does not appear to be a git repository
-  fatal: Could not read from remote repository.
-  
-  Please make sure you have the correct access rights
-  and the repository exists.
-  File "dune-workspace", line 6, characters 6-176:
-  6 |  (url "git+file:///Users/samoht/git/dune/_build/.sandbox/da1268f68d17ef40b6da706f210178e4/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"))
-            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  Error: Failed to run external command:
-  'git ls-remote "file:///Users/samoht/git/dune/_build/.sandbox/da1268f68d17ef40b6da706f210178e4/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"'
-  Hint: Check that this Git URL in the project configuration is correct:
-  "file:///Users/samoht/git/dune/_build/.sandbox/da1268f68d17ef40b6da706f210178e4/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"
-  [1]
+  Solution for dune.lock (3 packages):
+  opam:
+  - bar.0.5.0
+  - baz.0.1.0
+  - foo.0.0.1
 
-Helper to the name and contents of each file in the lock directory separated by
-"---", sorting by filename for consistency.
-  $ print_all() { find ${default_lock_dir} -type f | sort | xargs -I{} sh -c "printf '{}:\n\n'; cat {}; printf '\n\n---\n\n'"; }
-
-Print the contents of each file in the lockdir:
-  $ print_all
-  find: dune.lock: No such file or directory
+Verify the lockdir was created:
+  $ ls ${default_lock_dir}
+  bar.0.5.0.pkg
+  baz.0.1.0.pkg
+  foo.0.0.1.pkg
+  lock.dune
 
 Run the solver again preferring oldest versions of dependencies:
   $ dune_pkg_lock_normalized --version-preference=oldest
-  fatal: '$TESTCASE_ROOT/mock-opam-repository' does not appear to be a git repository
-  fatal: Could not read from remote repository.
-  
-  Please make sure you have the correct access rights
-  and the repository exists.
-  File "dune-workspace", line 6, characters 6-176:
-  6 |  (url "git+file:///Users/samoht/git/dune/_build/.sandbox/da1268f68d17ef40b6da706f210178e4/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"))
-            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  Error: Failed to run external command:
-  'git ls-remote "file:///Users/samoht/git/dune/_build/.sandbox/da1268f68d17ef40b6da706f210178e4/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"'
-  Hint: Check that this Git URL in the project configuration is correct:
-  "file:///Users/samoht/git/dune/_build/.sandbox/da1268f68d17ef40b6da706f210178e4/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"
-  [1]
+  Solution for dune.lock (3 packages):
+  opam:
+  - bar.0.4.0
+  - baz.0.1.0
+  - foo.0.0.1
 
-  $ print_all
-  find: dune.lock: No such file or directory
+  $ ls ${default_lock_dir}
+  bar.0.4.0.pkg
+  baz.0.1.0.pkg
+  foo.0.0.1.pkg
+  lock.dune
 
 Regenerate the `dune-project` file introducing an unsatisfiable constraint.
   $ cat >dune-project <<EOF
@@ -84,19 +78,16 @@ Regenerate the `dune-project` file introducing an unsatisfiable constraint.
 
 Run the solver again. This time it will fail.
   $ dune_pkg_lock_normalized
-  fatal: '$TESTCASE_ROOT/mock-opam-repository' does not appear to be a git repository
-  fatal: Could not read from remote repository.
+  Error:
+  Unable to solve dependencies while generating lock directory: dune.lock
   
-  Please make sure you have the correct access rights
-  and the repository exists.
-  File "dune-workspace", line 6, characters 6-176:
-  6 |  (url "git+file:///Users/samoht/git/dune/_build/.sandbox/da1268f68d17ef40b6da706f210178e4/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"))
-            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  Error: Failed to run external command:
-  'git ls-remote "file:///Users/samoht/git/dune/_build/.sandbox/da1268f68d17ef40b6da706f210178e4/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"'
-  Hint: Check that this Git URL in the project configuration is correct:
-  "file:///Users/samoht/git/dune/_build/.sandbox/da1268f68d17ef40b6da706f210178e4/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"
+  Couldn't solve the package dependency formula.
+  Selected candidates: baz.0.1.0 foo.0.0.1 lockfile_generation_test.dev
+  - bar -> (no usable version)
+      Rejected by depends of local package lockfile_generation_test
+      (constraint: >= 0.6) [0.5.0, 0.4.0, 0.0.1]
   [1]
+
 
 We'll also test how the lockfile generation works with alternate solutions.
 `bar-or-baz` is a package that depends on either `bar` or `baz` and the solver
@@ -116,19 +107,10 @@ After running this we expact a solution that has either `bar` or `baz` but not
 both.
 
   $ dune_pkg_lock_normalized
-  fatal: '$TESTCASE_ROOT/mock-opam-repository' does not appear to be a git repository
-  fatal: Could not read from remote repository.
-  
-  Please make sure you have the correct access rights
-  and the repository exists.
-  File "dune-workspace", line 6, characters 6-176:
-  6 |  (url "git+file:///Users/samoht/git/dune/_build/.sandbox/da1268f68d17ef40b6da706f210178e4/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"))
-            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  Error: Failed to run external command:
-  'git ls-remote "file:///Users/samoht/git/dune/_build/.sandbox/da1268f68d17ef40b6da706f210178e4/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"'
-  Hint: Check that this Git URL in the project configuration is correct:
-  "file:///Users/samoht/git/dune/_build/.sandbox/da1268f68d17ef40b6da706f210178e4/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"
-  [1]
+  Solution for dune.lock (2 packages):
+  opam:
+  - bar.0.5.0
+  - bar-or-baz.0.0.1
 Top level or is simple, but does nested or work? nested-r defines nested or
 patterns that can't be simplified
 
@@ -150,19 +132,12 @@ After runninng we expect the solution to have quux and either baz or quz as
 well as bar or qux.
 
   $ dune_pkg_lock_normalized
-  fatal: '$TESTCASE_ROOT/mock-opam-repository' does not appear to be a git repository
-  fatal: Could not read from remote repository.
-  
-  Please make sure you have the correct access rights
-  and the repository exists.
-  File "dune-workspace", line 6, characters 6-176:
-  6 |  (url "git+file:///Users/samoht/git/dune/_build/.sandbox/da1268f68d17ef40b6da706f210178e4/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"))
-            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  Error: Failed to run external command:
-  'git ls-remote "file:///Users/samoht/git/dune/_build/.sandbox/da1268f68d17ef40b6da706f210178e4/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"'
-  Hint: Check that this Git URL in the project configuration is correct:
-  "file:///Users/samoht/git/dune/_build/.sandbox/da1268f68d17ef40b6da706f210178e4/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"
-  [1]
+  Solution for dune.lock (4 packages):
+  opam:
+  - bar.0.5.0
+  - baz.0.1.0
+  - nested-or.0.0.1
+  - quux.0.0.1
 In the dependency formulas, & should bind stronger than | so if we depend on
 bar and quux or baz, it should pick the first two or the last one, but nothing
 in between.
@@ -178,24 +153,16 @@ in between.
   > EOF
 
   $ dune_pkg_lock_normalized
-  fatal: '$TESTCASE_ROOT/mock-opam-repository' does not appear to be a git repository
-  fatal: Could not read from remote repository.
-  
-  Please make sure you have the correct access rights
-  and the repository exists.
-  File "dune-workspace", line 6, characters 6-176:
-  6 |  (url "git+file:///Users/samoht/git/dune/_build/.sandbox/da1268f68d17ef40b6da706f210178e4/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"))
-            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  Error: Failed to run external command:
-  'git ls-remote "file:///Users/samoht/git/dune/_build/.sandbox/da1268f68d17ef40b6da706f210178e4/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"'
-  Hint: Check that this Git URL in the project configuration is correct:
-  "file:///Users/samoht/git/dune/_build/.sandbox/da1268f68d17ef40b6da706f210178e4/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"
-  [1]
- 
+  Solution for dune.lock (3 packages):
+  opam:
+  - bar.0.5.0
+  - priorities.0.0.1
+  - quux.0.0.1
+
 We also want to make sure nested negation in versions work fine. For this we
 have the same package with version 1-4 and we want to negate the choice of
 versions 1 or 3, as well as making sure it doesn't pick the newest version.
- 
+
   $ emptyverpkg pkg 1
   $ emptyverpkg pkg 2
   $ emptyverpkg pkg 3
@@ -214,16 +181,7 @@ With versions 1 and 3 negated and version 4 removed via version constraint,
 we'd expect version 2 to be chosen:
 
   $ dune_pkg_lock_normalized
-  fatal: '$TESTCASE_ROOT/mock-opam-repository' does not appear to be a git repository
-  fatal: Could not read from remote repository.
-  
-  Please make sure you have the correct access rights
-  and the repository exists.
-  File "dune-workspace", line 6, characters 6-176:
-  6 |  (url "git+file:///Users/samoht/git/dune/_build/.sandbox/da1268f68d17ef40b6da706f210178e4/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"))
-            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  Error: Failed to run external command:
-  'git ls-remote "file:///Users/samoht/git/dune/_build/.sandbox/da1268f68d17ef40b6da706f210178e4/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"'
-  Hint: Check that this Git URL in the project configuration is correct:
-  "file:///Users/samoht/git/dune/_build/.sandbox/da1268f68d17ef40b6da706f210178e4/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"
-  [1]
+  Solution for dune.lock (2 packages):
+  opam:
+  - negation.0.0.1
+  - pkg.2

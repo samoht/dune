@@ -58,19 +58,18 @@ Make a project that uses the fake ocamlformat:
   $ make_project_with_dev_tool_lockdir
 
 First run of 'dune fmt' is supposed to format the fail.
-  $ DUNE_CONFIG__LOCK_DEV_TOOL=enabled dune fmt
+  $ DUNE_CONFIG__LOCK_DEV_TOOL=enabled dune fmt 2>&1 | dune_cmd subst '\.sandbox/[^/]+' '.sandbox/SANDBOX'
   Solution for _build/.locks/tools-ocamlformat (1 package)
   dune:
   - ocamlformat.0.26.2
   Error:
-  open(_build/.sandbox/933fe56f446e1f930051483bc79f2cfd/.pkgs/tools-ocamlformat/ocamlformat/source/patch-for-ocamlformat.patch): No such file or directory
+  open(_build/.sandbox/SANDBOX/.pkgs/tools-ocamlformat/ocamlformat/source/patch-for-ocamlformat.patch): No such file or directory
   -> required by _build/.pkgs/tools-ocamlformat/ocamlformat/target/cookie
   -> required by _build/.pkgs/tools-ocamlformat/ocamlformat/installed
   -> required by _build/install/default/bin/ocamlformat
   -> required by _build/default/.formatted/foo.ml
   -> required by alias .formatted/fmt
   -> required by alias fmt
-  [1]
 
 The foo.ml file is now formatted with the patched version of ocamlformat.
   $ cat foo.ml

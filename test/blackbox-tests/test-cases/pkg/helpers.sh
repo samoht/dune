@@ -50,7 +50,7 @@ show_pkg() {
 }
 
 strip_sandbox() {
-  dune_cmd subst '[^ ]*.sandbox/[^/]+' '$SANDBOX'
+  dune_cmd subst '_build/\.sandbox/[^/]+' '$SANDBOX'
 }
 
 show_pkg_targets() {
