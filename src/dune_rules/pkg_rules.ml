@@ -3029,39 +3029,67 @@ let resolve_pkg_dep context (loc, package_name) =
     Resolve.resolve_entry registry entry ~package_universe:(Dependencies context)
 ;;
 
+(* Helper to build an OCaml toolchain from a resolved package *)
+let toolchain_of_resolved_pkg context pkg =
+  let open Action_builder.O in
+  let transitive_deps = pkg :: Resolved_pkg.deps_closure pkg in
+  let* env, binaries =
+    Action_builder.List.fold_left
+      ~init:(Global.env (), Path.Set.empty)
+      ~f:(fun (env, binaries) pkg ->
+        let env = Env.extend_env env (Resolved_pkg.exported_env pkg) in
+        let+ cookie = (Pkg_installed.of_paths pkg.paths).cookie in
+        let binaries =
+          Section.Map.find cookie.files Bin
+          |> Option.value ~default:[]
+          |> Path.Set.of_list
+          |> Path.Set.union binaries
+        in
+        env, binaries)
+      transitive_deps
+  in
+  let path = Env_path.path (Global.env ()) in
+  Action_builder.of_memo @@ Ocaml_toolchain.of_binaries ~path context env binaries
+;;
+
 let ocaml_toolchain context =
   Memo.push_stack_frame ~human_readable_description:(fun () ->
-    Pp.textf
-      "Loading OCaml toolchain from Lock directory for context %S"
-      (Context_name.to_string context))
+    Pp.textf "Loading OCaml toolchain for context %S" (Context_name.to_string context))
   @@ fun () ->
-  let* lock_dir = Lock_dir.get_exn context in
-  match lock_dir.ocaml with
-  | None -> Memo.return None
-  | Some ocaml ->
-    let+ pkg = resolve_pkg_dep context ocaml in
-    let toolchain =
-      let open Action_builder.O in
-      let transitive_deps = pkg :: Resolved_pkg.deps_closure pkg in
-      let* env, binaries =
-        Action_builder.List.fold_left
-          ~init:(Global.env (), Path.Set.empty)
-          ~f:(fun (env, binaries) pkg ->
-            let env = Env.extend_env env (Resolved_pkg.exported_env pkg) in
-            let+ cookie = (Pkg_installed.of_paths pkg.paths).cookie in
-            let binaries =
-              Section.Map.find cookie.files Bin
-              |> Option.value ~default:[]
-              |> Path.Set.of_list
-              |> Path.Set.union binaries
-            in
-            env, binaries)
-          transitive_deps
-      in
-      let path = Env_path.path (Global.env ()) in
-      Action_builder.of_memo @@ Ocaml_toolchain.of_binaries ~path context env binaries
+  let* registry = Package_registry.of_ctx context in
+  (* First check for vendor packages declaring a compiler - they take precedence *)
+  let vendor_compiler =
+    Package_registry.to_list registry
+    |> List.find_map ~f:(fun entry ->
+      match Package_registry.compiler entry with
+      | Some _ -> Some entry
+      | None -> None)
+  in
+  match vendor_compiler with
+  | Some entry ->
+    (* Use vendor compiler *)
+    let+ pkg =
+      Resolve.resolve_entry registry entry ~package_universe:(Dependencies context)
     in
+    let toolchain = toolchain_of_resolved_pkg context pkg in
     Some (Action_builder.memoize "ocaml_toolchain" toolchain)
+  | None ->
+    (* Fall back to lock file compiler *)
+    let* lock_dir_opt =
+      Lock_dir.lock_dir_active context
+      >>= function
+      | false -> Memo.return None
+      | true -> Lock_dir.get_exn context >>| Option.some
+    in
+    (match lock_dir_opt with
+     | None -> Memo.return None
+     | Some lock_dir ->
+       (match lock_dir.ocaml with
+        | None -> Memo.return None
+        | Some ocaml ->
+          let+ pkg = resolve_pkg_dep context ocaml in
+          let toolchain = toolchain_of_resolved_pkg context pkg in
+          Some (Action_builder.memoize "ocaml_toolchain" toolchain)))
 ;;
 
 let all_deps universe =
