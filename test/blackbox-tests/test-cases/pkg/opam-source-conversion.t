@@ -27,7 +27,7 @@ Test conversion of opam sources into lock dir package specifications
     (url http://caml.inria.fr/pub/distrib/ocaml-3.11/ocaml-3.11.1.tar.gz)
     (checksum md5=069aa55d40e548280f92af693f6c625a)))
   
-  (build_id f45dc1c89820073e4124dafd4c108ea2)
+  (build_id ef610f7272995a1ce246c59da07960c6)
 
   $ mkdir testpkgsources
 
@@ -54,7 +54,7 @@ Test conversion of opam sources into lock dir package specifications
   
   (dev)
   
-  (build_id f2b8b00854423dfb2e7fcdc0203aaafa)
+  (build_id 4b35c36bf23cc8313124bc9dc8666ac2)
 
 Unsupported backends:
 
@@ -79,7 +79,7 @@ Unsupported backends:
     (url hg+http://no-support.com/foo)
     (checksum md5=069aa55d40e548280f92af693f6c625a)))
   
-  (build_id dd7625f5580d9b891ac642747989057f)
+  (build_id ef610f7272995a1ce246c59da07960c6)
 
 git+http
 
@@ -103,7 +103,7 @@ git+http
     (url git+http://github.com/foo)
     (checksum md5=069aa55d40e548280f92af693f6c625a)))
   
-  (build_id f5cc8ac24c29238bb29b2df136ea345f)
+  (build_id ef610f7272995a1ce246c59da07960c6)
 
 git+file
 
@@ -126,7 +126,7 @@ git+file
     (url git+file://here)
     (checksum md5=069aa55d40e548280f92af693f6c625a)))
   
-  (build_id c576a0724329959551e5d70add6cd2b6)
+  (build_id ef610f7272995a1ce246c59da07960c6)
 
 git+foobar
 
@@ -149,7 +149,7 @@ git+foobar
     (url git+foobar://random-thing-here)
     (checksum md5=069aa55d40e548280f92af693f6c625a)))
   
-  (build_id d7489b5cd714a884f85e6b8913b02032)
+  (build_id ef610f7272995a1ce246c59da07960c6)
 
 file+git
 

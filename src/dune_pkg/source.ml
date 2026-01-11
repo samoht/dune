@@ -38,7 +38,14 @@ let hash { url; checksum } =
     (url, checksum)
 ;;
 
-let digest_feed = Dune_digest.Feed.generic
+let digest_feed hasher { url = _; checksum } =
+  (* Only hash the checksum (content hash), not the URL. This makes build_id
+     stable across machines and mirrors - what matters is the content. *)
+  Dune_digest.Feed.option
+    (fun hasher (_loc, checksum) -> Dune_digest.Feed.generic hasher checksum)
+    hasher
+    checksum
+;;
 
 let fetch_archive_cached =
   let cache = Single_run_file_cache.create () in

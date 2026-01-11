@@ -201,6 +201,7 @@ module Info = struct
     Package_version.digest_feed hasher version;
     Digest_feed.bool hasher dev;
     Digest_feed.bool hasher avoid;
+    (* Source.digest_feed only hashes the checksum, not the URL *)
     Digest_feed.option Source.digest_feed hasher source;
     Digest_feed.list
       (Digest_feed.tuple2 Digest_feed.generic Source.digest_feed)
