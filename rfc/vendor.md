@@ -3,11 +3,13 @@
 ## Summary
 
 Add a `(vendor ...)` stanza that extends `(vendored_dirs)` with selective library
-exposure, library aliasing, and support for non-dune packages.
+exposure, library aliasing, and leverages existing package management infrastructure
+to support non-dune packages.
 
 ## Workflow
 
-The workflow is simple: copy source code into a directory and run `dune build`.
+The workflow is simple: copy source code into a directory, add a vendor stanza,
+and run `dune build`.
 
 ```
 my-project/
@@ -15,9 +17,11 @@ my-project/
   vendor/
     fmt.0.9.0/       # copied from somewhere
     yojson.2.0.0/    # copied from somewhere else
+    dune             # contains (vendor ...) stanzas
   dune-project
 ```
 
+The `(vendor ...)` stanza goes in a `dune` file (like the existing `(vendored_dirs)`).
 Dune doesn't care where the source came from or how it got there. It just builds
 what's in the directory.
 
@@ -186,6 +190,12 @@ Provides the `windows` toolchain for `(targets native windows)`.
 2. If `(libraries ...)` specified, expose only those listed
 3. Unlisted libraries should not be built and cannot be used as dependencies
 
+**Package filtering:**
+The `(packages ...)` field filters opam package definitions (same meaning as in other
+dune stanzas like `(package ...)`). When specified, only the listed packages are
+considered for opam-mode builds. This allows vendoring OCaml compilers and
+cross-compilation toolchains.
+
 **Library aliasing:**
 - `(<name> :as <alias>)` should change the public name used in `(libraries ...)` stanzas
 - OCaml module names inside the library should remain unchanged
@@ -203,6 +213,28 @@ multiple versions in the workspace. In this case, dune should error if two packa
 the same name both have `(install true)` in the same context, with a message suggesting
 to set `(install false)` on one of them.
 
+**Dependency resolution:**
+
+Dune resolves dependencies at the library level, not the package level. When anything
+in the workspace needs library "foo" — a dune library, executable, or vendored package —
+dune looks for "foo" in:
+1. Vendored dune packages in the workspace
+2. Vendored opam packages (installed to shared prefix)
+3. Locked packages from dune.lock
+4. System OCAMLPATH (for libraries with C bindings)
+
+This is the same resolution mechanism for all consumers. Dune sets up OCAMLPATH and
+other findlib variables so that build commands can discover dependencies via ocamlfind.
+
+Importantly, dune does not require a closure of opam packages. If a vendored opam
+package's `depends:` field lists package "foo", but the required libraries are available
+from a different source (e.g., a dune package), that works. Errors occur at build time
+if ocamlfind cannot locate a required library.
+
+There is no automatic library-to-package resolution. If a missing library requires an
+opam package, the user must explicitly add it to `dune-project` so it appears in the
+lock file.
+
 **Compiler declaration:**
 - `(compiler <name>)` marks the package as providing an OCaml compiler
 - The compiler name can be referenced by `(context (workspace (compiler ...)))` in dune-workspace
@@ -214,8 +246,12 @@ to set `(install false)` on one of them.
 - Dune sets `OCAMLFIND_TOOLCHAIN=<name>` for the target context
 
 **Error handling:**
-- If `(libraries foo)` lists a library not found in the directory → should error at parse time
-- If two `(vendor)` stanzas expose the same library name → should error at parse time
+- If `(libraries foo)` lists a library not found in the directory → error at parse time
+- If two `(vendor)` stanzas expose the same library name → error at parse time
+- If `(mode dune)` but directory has no dune files → error at parse time
+- If `(mode opam)` but directory has no opam file → error at parse time
+- If `(<name> :as <alias>)` has invalid syntax → error at parse time
+- If `(<name> :as <alias>)` where alias conflicts with another library → error at parse time
 - Windows paths and paths with spaces should be supported
 
 **Build mode:**
@@ -224,6 +260,10 @@ to set `(install false)` on one of them.
 |--------------------|--------------|
 | Contains `dune-project` or `dune` files | `dune` |
 | Contains only `*.opam` file | `opam` |
+
+In `dune` mode, the vendored directory is built like normal dune code, with library
+filtering and aliasing applied. This is equivalent to `(vendored_dirs)` plus the
+ability to hide or rename libraries.
 
 In `opam` mode, dune should provide full compatibility with opam's build semantics:
 
@@ -384,6 +424,20 @@ The `(vendor)` stanza provides build-time infrastructure that higher-level tools
 target. Lock file generators, source fetchers, or dependency managers can generate
 `(vendor)` stanzas as their output format, enabling a clean separation between
 resolution and building.
+
+## Open Questions
+
+**Should opam package libraries be usable without an install step?**
+
+Currently, dune libraries can be used directly from their build location without
+being installed to a shared prefix. Opam packages, however, install to
+`_build/install/<context>/` for their libraries to be discoverable.
+
+Should opam package libraries also be usable directly from their build location
+(`_build/.pkgs/<context>/<name>/target/lib/`)? This would:
+- Make behavior consistent between dune and opam mode
+- Avoid copying artifacts to the shared install prefix
+- Require OCAMLPATH to point to build directories directly
 
 ## References
 

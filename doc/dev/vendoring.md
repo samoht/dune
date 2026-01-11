@@ -353,6 +353,34 @@ Excluded libraries:
 - Their `dune` files are not parsed
 - Their source files are ignored
 
+## Dependency Resolution
+
+Dune resolves dependencies at the library level, not the package level. When anything
+in the workspace needs library "foo" — a dune library, executable, or vendored package —
+dune looks for "foo" in:
+
+1. Vendored dune packages in the workspace
+2. Vendored opam packages (installed to shared prefix)
+3. Locked packages from dune.lock
+4. System OCAMLPATH (for libraries with C bindings)
+
+This is the same resolution mechanism for all consumers. For opam-mode packages, dune
+sets up:
+- `OCAMLPATH` → all dependency lib directories
+- `CAML_LD_LIBRARY_PATH` → stublibs
+- Other findlib variables
+
+Build commands use `ocamlfind` to discover libraries.
+
+Importantly, dune does not require a closure of opam packages. If a vendored opam
+package's `depends:` field lists package "foo", but the required libraries are available
+from a different source (e.g., a dune package), that works. Errors occur at build time
+if ocamlfind cannot locate a required library.
+
+There is no automatic library-to-package resolution. If a missing library requires an
+opam package, the user must explicitly add it to `dune-project` so it appears in the
+lock file.
+
 ## Build Methods
 
 The `mode` field controls how vendored code is built:
