@@ -176,6 +176,8 @@ Dune detects the opam file and runs its build commands.
 - When `(install true)` (default), artifacts are promoted to `_build/install/<context>/`
 - When `(install false)`, artifacts remain in the vendor build directory only (but are
   still available within the workspace)
+- Using `:as` aliasing implies `(install false)` — aliased names are workspace-local and
+  external packages cannot reference them
 
 Opam semantics require that only one package with a given name can be installed per context.
 This only becomes an issue when a vendored opam package depends on a package that has

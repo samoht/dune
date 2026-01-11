@@ -9,12 +9,11 @@ open Import
       (vendor fmt.0.9.0 (libraries fmt fmt.tty))
       (vendor make-pkg.1.0.0 (mode opam))  ; Build using opam sandbox
       (vendor yojson.1.7.0 (libraries (yojson :as yojson_v1)))
-      (vendor foo.2.0.0 (libraries (foo :as bar)) (install false))
     ]}
 
-    The [(install false)] option prevents the package from being installed
-    to the shared prefix. Use this for packages with library remapping that
-    should coexist with other versions of the same package.
+    Using [:as] aliasing implies [(install false)] - aliased names are
+    workspace-local and external packages cannot reference them. This can
+    be overridden with an explicit [(install true)] if needed.
 
     The directory is relative to the location of the dune file containing
     the stanza. *)
@@ -96,6 +95,13 @@ type t =
        Set to false for packages with library remapping. *)
   }
 
+(* Check if any library entry uses :as aliasing *)
+let has_aliasing libraries =
+  match libraries with
+  | None -> false
+  | Some libs -> List.exists libs ~f:(fun (e : Library_entry.t) -> Option.is_some e.alias)
+;;
+
 let decode =
   let open Decoder in
   let* loc = loc in
@@ -105,7 +111,14 @@ let decode =
   let+ libraries = field_o "libraries" (repeat Library_entry.decode)
   and+ packages = field_o "packages" (repeat Package_name.decode)
   and+ build_method = field_o "mode" Build_method.decode
-  and+ install = field "install" bool ~default:true in
+  and+ install_explicit = field_o "install" bool in
+  (* :as aliasing implies (install false) - aliased names are workspace-local
+     and external packages cannot reference them *)
+  let install =
+    match install_explicit with
+    | Some v -> v
+    | None -> not (has_aliasing libraries)
+  in
   { loc; directory; libraries; packages; build_method; install }
 ;;
 
