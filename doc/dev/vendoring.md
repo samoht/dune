@@ -230,14 +230,23 @@ When `(libraries ...)` is specified:
 
 ### Library List
 
-The `libraries` field lists the libraries to expose:
+The `libraries` field uses ordered set language to specify which libraries to expose:
 
 ```lisp
 ; Expose only specific libraries
 (libraries fmt fmt.tty)
+
+; Expose all libraries (explicit :standard)
+(libraries :standard)
+
+; Expose all libraries except some
+(libraries :standard \ internal-utils)
+
+; Expose all except multiple libraries
+(libraries :standard \ test-helpers internal-utils)
 ```
 
-If omitted, all libraries in the vendored directory are exposed.
+If omitted, all libraries in the vendored directory are exposed (equivalent to `:standard`).
 
 ### Library Aliasing
 
@@ -297,6 +306,18 @@ Vendor only what you need from a monorepo:
  (libraries core core_kernel))
 ; Ignores core_unix, core_thread, etc.
 ```
+
+#### Hiding Internal Libraries
+
+Expose only public libraries, hiding internal implementation details:
+
+```lisp
+(vendor duniverse/cohttp.6.0.0
+ (libraries :standard \ cohttp-async))
+; Exposes all libraries except cohttp-async
+```
+
+This is useful when a package contains libraries you don't want to depend on directly.
 
 #### Conflict Resolution
 

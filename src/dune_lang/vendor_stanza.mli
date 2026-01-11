@@ -9,10 +9,16 @@ open Import
       (vendor fmt.0.9.0 (libraries fmt fmt.tty))
       (vendor make-pkg.1.0.0 (mode opam))  ; Build using opam sandbox
       (vendor yojson.1.7.0 (libraries (yojson :as yojson_v1)))
+      (vendor cohttp.6.0.0 (libraries :standard \ cohttp-async))
       (vendor foo.2.0.0 (libraries (foo :as bar)) (install false))
       (vendor ocaml.5.2.0 (toolchain native))  ; Provides native compiler
       (vendor ocaml-arm.5.2.0 (toolchain arm-linux-gnueabihf))  ; Cross-compiler
     ]}
+
+    The [(libraries ...)] and [(packages ...)] fields use ordered set language:
+    - [:standard] means all libraries/packages found in the directory
+    - [\ name] excludes items from the set
+    - [(name :as alias)] provides aliasing (incompatible with :standard)
 
     The [(install false)] option prevents the package from being installed
     to the shared prefix. Use this for packages with library remapping that
@@ -58,11 +64,48 @@ module Library_entry : sig
   val exposed_name : t -> Lib_name.t
 end
 
+module Libraries_spec : sig
+  (** Specification for which libraries to expose from a vendor stanza.
+      Supports ordered set language with :standard and exclusions. *)
+  type t =
+    | All (** [:standard] or omitted - expose all libraries *)
+    | All_except of Lib_name.t list (** [:standard \ lib1 lib2] - all except excluded *)
+    | Explicit of Library_entry.t list (** Explicit list, possibly with aliasing *)
+
+  val decode : t Decoder.t
+  val to_dyn : t -> Dyn.t
+
+  (** Check if spec uses aliasing *)
+  val has_aliasing : t -> bool
+
+  (** Check if a library should be visible according to this spec *)
+  val library_visible : t -> lib_name:Lib_name.t -> bool
+
+  (** Find the exposed name for a library (may be aliased) *)
+  val library_exposed_name : t -> lib_name:Lib_name.t -> Lib_name.t option
+end
+
+module Packages_spec : sig
+  (** Specification for which packages to expose from a vendor stanza.
+      Supports ordered set language with :standard and exclusions. *)
+  type t =
+    | All (** [:standard] or omitted - expose all packages *)
+    | All_except of Package_name.t list
+    (** [:standard \ pkg1 pkg2] - all except excluded *)
+    | Explicit of Package_name.t list (** Explicit list of packages *)
+
+  val decode : t Decoder.t
+  val to_dyn : t -> Dyn.t
+
+  (** Check if a package should be visible according to this spec *)
+  val package_visible : t -> pkg_name:Package_name.t -> bool
+end
+
 type t =
   { loc : Loc.t
   ; directory : Filename.t
-  ; libraries : Library_entry.t list option
-  ; packages : Package_name.t list option
+  ; libraries : Libraries_spec.t
+  ; packages : Packages_spec.t
   ; build_method : Build_method.t option
     (** How to build this vendored package. None means use default
         (Dune_native for dune packages, Opam_sandboxed for non-dune). *)

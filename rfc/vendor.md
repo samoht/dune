@@ -276,12 +276,12 @@ When building something that uses fmt:
 No auto-fetching, no solving — dune builds what's in the workspace.
 
 **Error handling:**
-- If `(libraries foo)` lists a library not found in the directory → error at parse time
-- If two `(vendor)` stanzas expose the same library name → error at parse time
-- If `(mode dune)` but directory has no dune files → error at parse time
-- If `(mode opam)` but directory has no opam file → error at parse time
+- If `(libraries foo)` lists a library not found in the directory → error at library resolution time
+- If two `(vendor)` stanzas expose the same library name → error at library resolution time
+- If `(mode dune)` but directory has no dune files → error (library not found)
+- If `(mode opam)` but directory has no opam file → error with clear message
 - If `(<name> :as <alias>)` has invalid syntax → error at parse time
-- If `(<name> :as <alias>)` where alias conflicts with another library → error at parse time
+- If `(<name> :as <alias>)` where alias conflicts with another library → error at library resolution time
 - Windows paths and paths with spaces should be supported
 
 **Build mode:**
