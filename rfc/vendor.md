@@ -240,6 +240,41 @@ lock file.
 - Dune sets `OCAMLFIND_TOOLCHAIN=<name>` for the target context
 - Dune builds toolchain packages first before any code that depends on them
 
+**Build ordering:**
+
+No solver, no version constraints. Dependencies must be in the workspace or ambient
+system (PATH, OCAMLPATH, and related environment variables).
+
+When a target needs a library from an opam-mode package:
+1. Parse the package's opam `depends:` field, evaluating filters (`{os = "linux"}`, etc.)
+2. For each dependency package name, look for a package with that name in workspace
+   (vendored, locked, or `(package ...)` stanza). If found, build it first.
+   If not found, assume the ambient system provides it.
+3. Build the opam package with OCAMLPATH = workspace libraries + ambient system
+4. If ocamlfind can't find a library, error: "Library X not found (required by package Y)"
+
+Example: vendor fmt (a topkg package) to patch it:
+```
+my-project/
+  src/
+    cmdliner.ml
+    dune              # (library (name cmdliner) (public_name cmdliner))
+  vendor/
+    fmt/              # cloned from git, with local patches
+      opam            # depends: ["ocaml" "ocamlfind" "cmdliner" ...]
+    dune              # (vendor fmt)
+  dune-project        # (package (name cmdliner))
+```
+
+When building something that uses fmt:
+1. Parse fmt's `depends:` → `ocaml`, `ocamlfind`, `cmdliner`
+2. `ocaml`, `ocamlfind` → no package in workspace → assume system
+3. `cmdliner` → package defined in dune-project → build that package first
+4. Build fmt with OCAMLPATH pointing to workspace packages + system
+5. If fmt's build can't find a library → clear error
+
+No auto-fetching, no solving — dune builds what's in the workspace.
+
 **Error handling:**
 - If `(libraries foo)` lists a library not found in the directory → error at parse time
 - If two `(vendor)` stanzas expose the same library name → error at parse time
