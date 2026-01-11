@@ -66,47 +66,6 @@ val lib_cache_path : unit -> Path.Build.t
 (** Write lib-cache entries to file. *)
 val write_lib_cache : lib_cache_entry list -> unit
 
-(** {2 Vendored Package Map}
-
-    Maps packages to their info and provides library→package reverse lookup.
-    Built by scanning the duniverse directory. *)
-
-module Vendored_map : sig
-  type package_info =
-    { version : Package_version.t
-    ; source_dir : Path.Source.t
-    ; libraries : string list
-    ; build_method : Dune_lang.Vendor_stanza.Build_method.t option
-    ; install_to_prefix : bool
-    }
-
-  type t
-
-  val empty : t
-
-  val add
-    :  t
-    -> name:Package.Name.t
-    -> version:Package_version.t
-    -> source_dir:Path.Source.t
-    -> libraries:string list
-    -> build_method:Dune_lang.Vendor_stanza.Build_method.t option
-    -> install_to_prefix:bool
-    -> t
-
-  val find : t -> Package.Name.t -> package_info option
-  val is_installed : t -> Package.Name.t -> bool
-  val version : t -> Package.Name.t -> Package_version.t option
-  val source_dir : t -> Package.Name.t -> Path.Source.t option
-  val package_for_library : t -> string -> Package.Name.t option
-  val all_packages : t -> Package.Name.t list
-  val needs_marker : t -> Package.Name.t -> bool
-  val install_to_prefix : t -> Package.Name.t -> bool
-end
-
-val scan_vendor_dir : Path.Source.t -> Vendored_map.t
-val get_vendored_map : unit -> Vendored_map.t Memo.t
-
 (** {2 Package Build Directory}
 
     Path to a package's build directory: _build/.pkgs/<ctx>/<name>/
