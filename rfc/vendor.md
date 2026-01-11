@@ -119,8 +119,7 @@ vendor/
  (packages <pkg-spec>...)     ; optional
  (mode <build-mode>)          ; optional: dune | opam
  (install <bool>)             ; optional: promote artifacts to shared install path
- (compiler <name>)            ; optional: marks this as providing a compiler
- (toolchain <name>))          ; optional: marks this as providing a findlib toolchain
+ (toolchain <name>))          ; optional: marks this as providing a compiler/toolchain
 ```
 
 Both `<lib-spec>` and `<pkg-spec>` use the standard ordered set language (like `(modules ...)`) with:
@@ -132,8 +131,7 @@ All fields are optional. When omitted:
 - `(libraries ...)` and `(packages ...)` should be auto-detected by scanning the directory
 - `(mode ...)` should be auto-detected: `dune` if dune files exist, `opam` otherwise
 - `(install ...)` defaults to `true`, except when `:as` aliasing is used (then `false`)
-- `(compiler ...)` defaults to none, unless the package provides an OCaml compiler
-- `(toolchain ...)` defaults to none, unless the package provides a cross-compilation toolchain
+- `(toolchain ...)` defaults to none, unless the package provides a compiler
 
 ### Examples
 
@@ -169,12 +167,12 @@ Dune detects the opam file and runs its build commands.
  (mode opam))
 ```
 
-**Compiler provider:**
+**Native compiler:**
 ```dune
 (vendor vendor/ocaml.5.2.0
- (compiler ocaml.5.2.0))
+ (toolchain native))
 ```
-Makes `ocaml.5.2.0` available for `(context (workspace (compiler ocaml.5.2.0)))`.
+Provides the native OCaml compiler for the default context.
 
 **Cross-compilation toolchain:**
 ```dune
@@ -235,15 +233,12 @@ There is no automatic library-to-package resolution. If a missing library requir
 opam package, the user must explicitly add it to `dune-project` so it appears in the
 lock file.
 
-**Compiler declaration:**
-- `(compiler <name>)` marks the package as providing an OCaml compiler
-- The compiler name can be referenced by `(context (workspace (compiler ...)))` in dune-workspace
-- Dune builds this package first to get `ocamlc`, `ocamlopt`, etc.
-
 **Toolchain declaration:**
-- `(toolchain <name>)` marks the package as providing a findlib toolchain for cross-compilation
-- The toolchain name matches what `(targets ...)` references (e.g., `windows`)
+- `(toolchain <name>)` marks the package as providing a compiler or cross-compilation toolchain
+- `(toolchain native)` provides the native OCaml compiler (`ocamlc`, `ocamlopt`, etc.)
+- Other toolchain names (e.g., `windows`) provide cross-compilers for `(targets ...)`
 - Dune sets `OCAMLFIND_TOOLCHAIN=<name>` for the target context
+- Dune builds toolchain packages first before any code that depends on them
 
 **Error handling:**
 - If `(libraries foo)` lists a library not found in the directory → error at parse time
