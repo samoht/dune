@@ -263,12 +263,6 @@ module Vendored_map = struct
     ; install_to_prefix : bool
       (* Whether artifacts are copied to shared install prefix.
          When false, depend on cookie file instead of installed marker. *)
-    ; compiler : Package.Name.t option
-      (* If set, this package provides an OCaml compiler with this name.
-         Referenced by (context (workspace (compiler ...))) in dune-workspace. *)
-    ; toolchain : string option
-      (* If set, this package provides a findlib toolchain for cross-compilation.
-         The name matches what (targets ...) references (e.g., "windows"). *)
     }
 
   type t =
@@ -278,27 +272,8 @@ module Vendored_map = struct
 
   let empty = { packages = Package.Name.Map.empty; lib_to_package = String.Map.empty }
 
-  let add
-        t
-        ~name
-        ~version
-        ~source_dir
-        ~libraries
-        ~build_method
-        ~install_to_prefix
-        ~compiler
-        ~toolchain
-    =
-    let info =
-      { version
-      ; source_dir
-      ; libraries
-      ; build_method
-      ; install_to_prefix
-      ; compiler
-      ; toolchain
-      }
-    in
+  let add t ~name ~version ~source_dir ~libraries ~build_method ~install_to_prefix =
+    let info = { version; source_dir; libraries; build_method; install_to_prefix } in
     let packages = Package.Name.Map.set t.packages name info in
     let lib_to_package =
       List.fold_left libraries ~init:t.lib_to_package ~f:(fun acc lib ->
@@ -338,34 +313,6 @@ module Vendored_map = struct
     match Package.Name.Map.find t.packages name with
     | None -> true (* Default to true for unknown packages *)
     | Some info -> info.install_to_prefix
-  ;;
-
-  let compiler t name =
-    match Package.Name.Map.find t.packages name with
-    | None -> None
-    | Some info -> info.compiler
-  ;;
-
-  let toolchain t name =
-    match Package.Name.Map.find t.packages name with
-    | None -> None
-    | Some info -> info.toolchain
-  ;;
-
-  let find_compiler t compiler_name =
-    Package.Name.Map.to_list t.packages
-    |> List.find_map ~f:(fun (pkg_name, info) ->
-      match info.compiler with
-      | Some c when Package.Name.equal c compiler_name -> Some pkg_name
-      | _ -> None)
-  ;;
-
-  let find_toolchain t toolchain_name =
-    Package.Name.Map.to_list t.packages
-    |> List.find_map ~f:(fun (pkg_name, info) ->
-      match info.toolchain with
-      | Some t when String.equal t toolchain_name -> Some pkg_name
-      | _ -> None)
   ;;
 end
 
@@ -410,8 +357,6 @@ let scan_vendor_dir vendor_dir =
             ~libraries
             ~build_method:None
             ~install_to_prefix:true
-            ~compiler:None
-            ~toolchain:None
         | _ -> map))
 ;;
 
@@ -458,9 +403,7 @@ let get_vendored_map =
         ~source_dir:pkg_dir
         ~libraries
         ~build_method:stanza.Vendor_stanza.build_method
-        ~install_to_prefix:stanza.Vendor_stanza.install
-        ~compiler:stanza.Vendor_stanza.compiler
-        ~toolchain:stanza.Vendor_stanza.toolchain)
+        ~install_to_prefix:stanza.Vendor_stanza.install)
   in
   Memo.lazy_ ~name:"vendored-map" impl
 ;;

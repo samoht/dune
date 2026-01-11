@@ -64,6 +64,22 @@ let install_to_prefix entry =
   | Source.From_workspace _ -> true
 ;;
 
+(* Get the compiler name provided by a package, if any.
+   Only vendor packages can declare compiler providers. *)
+let compiler entry =
+  match entry.source with
+  | Source.From_vendor { stanza; _ } -> stanza.compiler
+  | Source.From_lock _ | Source.From_workspace _ -> None
+;;
+
+(* Get the toolchain name provided by a package, if any.
+   Only vendor packages can declare toolchain providers. *)
+let toolchain entry =
+  match entry.source with
+  | Source.From_vendor { stanza; _ } -> stanza.toolchain
+  | Source.From_lock _ | Source.From_workspace _ -> None
+;;
+
 let of_lock_packages pkgs =
   let entries =
     Package.Name.Map.mapi pkgs ~f:(fun name pkg ->

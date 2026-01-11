@@ -69,6 +69,14 @@ val needs_marker : entry -> bool
     Most packages do, except vendor packages with install=false. *)
 val install_to_prefix : entry -> bool
 
+(** Get the compiler name provided by a package, if any.
+    Only vendor packages can declare compiler providers via [(compiler ...)]. *)
+val compiler : entry -> Package.Name.t option
+
+(** Get the toolchain name provided by a package, if any.
+    Only vendor packages can declare toolchain providers via [(toolchain ...)]. *)
+val toolchain : entry -> string option
+
 (** Create a registry from a map of lock file packages.
     Used for dev tool contexts which don't have a workspace context. *)
 val of_lock_packages : Dune_pkg.Pkg.t Package.Name.Map.t -> t

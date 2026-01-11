@@ -78,10 +78,6 @@ module Vendored_map : sig
     ; libraries : string list
     ; build_method : Dune_lang.Vendor_stanza.Build_method.t option
     ; install_to_prefix : bool
-    ; compiler : Package.Name.t option
-      (** If set, this package provides an OCaml compiler with this name. *)
-    ; toolchain : string option
-      (** If set, this package provides a findlib toolchain for cross-compilation. *)
     }
 
   type t
@@ -96,8 +92,6 @@ module Vendored_map : sig
     -> libraries:string list
     -> build_method:Dune_lang.Vendor_stanza.Build_method.t option
     -> install_to_prefix:bool
-    -> compiler:Package.Name.t option
-    -> toolchain:string option
     -> t
 
   val find : t -> Package.Name.t -> package_info option
@@ -108,18 +102,6 @@ module Vendored_map : sig
   val all_packages : t -> Package.Name.t list
   val needs_marker : t -> Package.Name.t -> bool
   val install_to_prefix : t -> Package.Name.t -> bool
-
-  (** Get the compiler name provided by a package, if any. *)
-  val compiler : t -> Package.Name.t -> Package.Name.t option
-
-  (** Get the toolchain name provided by a package, if any. *)
-  val toolchain : t -> Package.Name.t -> string option
-
-  (** Find the package that provides a given compiler name. *)
-  val find_compiler : t -> Package.Name.t -> Package.Name.t option
-
-  (** Find the package that provides a given toolchain name. *)
-  val find_toolchain : t -> string -> Package.Name.t option
 end
 
 val scan_vendor_dir : Path.Source.t -> Vendored_map.t
