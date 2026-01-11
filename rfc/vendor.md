@@ -427,17 +427,56 @@ resolution and building.
 
 ## Open Questions
 
-**Should opam package libraries be usable without an install step?**
+**Nix-style derivations vs shared prefix?**
 
-Currently, dune libraries can be used directly from their build location without
-being installed to a shared prefix. Opam packages, however, install to
-`_build/install/<context>/` for their libraries to be discoverable.
+There are two models for how vendored opam packages expose their artifacts:
 
-Should opam package libraries also be usable directly from their build location
-(`_build/.pkgs/<context>/<name>/target/lib/`)? This would:
-- Make behavior consistent between dune and opam mode
-- Avoid copying artifacts to the shared install prefix
-- Require OCAMLPATH to point to build directories directly
+**Shared prefix (opam-style):**
+All packages install to `_build/install/<context>/`. Dune sets:
+- `PATH` → `_build/install/<context>/bin/`
+- `OCAMLPATH` → `_build/install/<context>/lib/`
+- `CAML_LD_LIBRARY_PATH` → `_build/install/<context>/lib/stublibs/`
+
+Executable dependencies (`%{bin:menhir}`) resolve from the shared bin directory.
+
+Pros:
+- Matches opam semantics exactly
+- Simple PATH/OCAMLPATH setup
+- `%{bin:...}` resolution is straightforward
+
+Cons:
+- Requires install step (copying artifacts)
+- Only one version of a package can be installed per context
+- Cleanup on upgrade requires tracking what was installed
+
+**Isolated derivations (nix-style):**
+Each package builds in `_build/.pkgs/<context>/<name>-<build-id>/` and artifacts
+are used directly from there. Dune sets:
+- `PATH` → union of all `<pkg>/target/bin/` directories
+- `OCAMLPATH` → union of all `<pkg>/target/lib/` directories
+
+Executable dependencies resolve by scanning package build directories.
+
+Pros:
+- No install/copy step
+- Multiple versions can coexist naturally
+- Consistent with how dune handles dune-native packages
+- Build-id in path enables precise caching
+
+Cons:
+- More complex PATH/OCAMLPATH setup
+- `%{bin:...}` resolution needs to search multiple directories
+- Diverges from opam's model
+
+**Impact on executable resolution:**
+
+In dune rules, executables can be referenced via `%{bin:menhir}` or as dependencies.
+The choice above affects how these are resolved:
+- Shared prefix: look in `_build/install/<context>/bin/`
+- Isolated: search through `_build/.pkgs/<context>/*/target/bin/`
+
+For dune-native vendored packages, executables are part of the normal build graph
+and dune resolves them directly. The question is specific to opam-mode packages.
 
 ## References
 
