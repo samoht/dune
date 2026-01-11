@@ -50,14 +50,14 @@ actually provide ocamlc/ocamlopt binaries):
 
   $ dune build main.exe
 
-Test that the toolchain field is parsed correctly with "default" as well:
+Test with packages field as well:
 
   $ cat >duniverse/dune <<EOF
   > (vendored_dirs *)
   > (vendor ocaml.5.2.0
   >  (libraries ocaml.stdlib)
   >  (packages ocaml)
-  >  (toolchain default))
+  >  (toolchain native))
   > EOF
 
   $ dune build main.exe

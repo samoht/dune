@@ -71,7 +71,7 @@ val install_to_prefix : entry -> bool
 
 (** Get the toolchain name provided by a package, if any.
     Only vendor packages can declare toolchain providers via [(toolchain ...)].
-    "native" or "default" = native compiler, others = cross-compilation. *)
+    "native" = native compiler, others = cross-compilation. *)
 val toolchain : entry -> string option
 
 (** Find the package that provides a given toolchain name. *)

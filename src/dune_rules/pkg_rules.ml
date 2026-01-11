@@ -3053,7 +3053,7 @@ let toolchain_of_resolved_pkg context pkg =
 ;;
 
 (* Check if a toolchain name indicates the native compiler *)
-let is_native_toolchain name = String.equal name "native" || String.equal name "default"
+let is_native_toolchain name = String.equal name "native"
 
 let ocaml_toolchain context =
   Memo.push_stack_frame ~human_readable_description:(fun () ->

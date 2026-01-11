@@ -19,7 +19,7 @@ open Import
     should coexist with other versions of the same package.
 
     The [(toolchain ...)] option marks the package as providing a toolchain.
-    "native" or "default" provides the native compiler, other names provide
+    native provides the native compiler, other names provide
     cross-compilation toolchains matching [(targets ...)] in dune-workspace.
 
     The directory is relative to the location of the dune file containing
@@ -72,7 +72,7 @@ type t =
         that should coexist with other versions of the same package. *)
   ; toolchain : string option
     (** Marks this package as providing a toolchain with the given name.
-        "native" or "default" = native compiler, others = cross-compilation.
+        native = native compiler, others = cross-compilation.
         The name matches what [(targets ...)] references in dune-workspace. *)
   }
 

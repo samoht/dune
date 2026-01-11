@@ -97,7 +97,7 @@ type t =
        Set to false for packages with library remapping. *)
   ; toolchain : string option
     (* Marks this package as providing a toolchain with the given name.
-       "native" or "default" = native compiler, others = cross-compilation *)
+       "native" = native compiler, others = cross-compilation *)
   }
 
 (* Check if any library entry uses :as aliasing *)

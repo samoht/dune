@@ -170,17 +170,13 @@ All fields are optional. When omitted:
 The `(toolchain ...)` field marks vendored packages as providing toolchains (compilers).
 A toolchain is a complete set of OCaml build tools: `ocamlc`, `ocamlopt`, standard library, etc.
 
-- `(toolchain native)` or `(toolchain default)` — provides the native compiler
+- `(toolchain native)` — provides the native compiler
 - `(toolchain <name>)` — provides a cross-compilation toolchain for the named target
 
 ```lisp
 ; Native compiler - provides ocamlc, ocamlopt, etc. for the default context
 (vendor ocaml.5.2.0
  (toolchain native))
-
-; Another native compiler version
-(vendor ocaml.4.14.2
- (toolchain default))
 
 ; Cross-compilation toolchain for Windows
 (vendor ocaml-windows.5.2.0
@@ -199,7 +195,7 @@ These can then be used via workspace targets:
 
 **`(toolchain ...)`**:
 - Declares the package as providing a toolchain (native or cross-compilation)
-- `native` or `default` = native compiler for the host platform
+- `native` = native compiler for the host platform
 - Other names = cross-compilation toolchains matching `(targets ...)` in dune-workspace
 - Dune builds this package first to get `ocamlc`, `ocamlopt`, etc.
 - For cross-compilation, sets `OCAMLFIND_TOOLCHAIN=<name>` for the target context
