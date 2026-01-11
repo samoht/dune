@@ -755,13 +755,12 @@ let source_path_of_lock_dir_path path =
      | [ locks_dir; _ctx_name; lock_dir; "pkgs" ]
        when String.equal locks_dir Dpath.Build.locks_dir_basename ->
        Path.Source.of_string lock_dir
-     (* Dev tool lock dir: _build/.locks/tools-{name}/ *)
+     (* Dev tool lock dir: <build_dir>/.locks/tools-{name}/ *)
      | [ locks_dir; ctx_name ]
        when String.equal locks_dir Dpath.Build.locks_dir_basename
             && String.is_prefix ctx_name ~prefix:"tools-" ->
-       Path.Source.L.relative
-         Path.Source.root
-         [ "_build"; Dpath.Build.locks_dir_basename; ctx_name ]
+       (* Use the actual build directory instead of hardcoding "_build" *)
+       Path.Source.of_string (Path.Build.to_string b)
      | components ->
        Code_error.raise
          "Unsupported build path"

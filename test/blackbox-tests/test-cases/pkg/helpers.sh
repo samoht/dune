@@ -50,7 +50,8 @@ show_pkg() {
 }
 
 strip_sandbox() {
-  dune_cmd subst '_build/\.sandbox/[^/]+' '$SANDBOX'
+  # Replace sandbox paths with $SANDBOX, then strip file:// prefix with absolute path before $SANDBOX
+  dune_cmd subst '_build/\.sandbox/[^/]+' '$SANDBOX' | sed 's|file://[^$]*\$SANDBOX|$SANDBOX|'
 }
 
 show_pkg_targets() {

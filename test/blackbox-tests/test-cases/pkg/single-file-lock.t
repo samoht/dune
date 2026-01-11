@@ -34,7 +34,7 @@ Check the contents of the single-file lock:
   (lang package 0.1)
   
   (repos
-   $SANDBOX/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository
+   ($SANDBOX/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository
     HASH))
   
   (packages foo.0.0.1)
@@ -98,7 +98,7 @@ Check the single-file lock contents include pins:
   (lang package 0.1)
   
   (repos
-   $SANDBOX/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository
+   ($SANDBOX/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository
     HASH))
   
   (packages my-pinned-pkg.dev)
@@ -135,7 +135,7 @@ Check lock has linux platform only:
   (lang package 0.1)
   
   (repos
-   $SANDBOX/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository
+   ($SANDBOX/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository
     HASH))
   
   (packages foo.0.0.1)
@@ -166,7 +166,7 @@ Check lock has linux with only x86_64 arch:
   (lang package 0.1)
   
   (repos
-   $SANDBOX/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository
+   ($SANDBOX/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository
     HASH))
   
   (packages foo.0.0.1)
@@ -196,7 +196,7 @@ Check lock has both platforms:
   (lang package 0.1)
   
   (repos
-   $SANDBOX/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository
+   ($SANDBOX/default/test/blackbox-tests/test-cases/pkg/mock-opam-repository
     HASH))
   
   (packages foo.0.0.1)

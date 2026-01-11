@@ -105,7 +105,7 @@ EOF
 
 (repository
  (name mock)
- (url "file://$(pwd)/mock-opam-repository"))
+ (url "git+file://$(pwd)/mock-opam-repository"))
 EOF
 }
 
