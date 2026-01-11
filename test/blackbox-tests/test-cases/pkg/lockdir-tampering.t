@@ -109,7 +109,7 @@ Regenerate the lockdir and validate the result.
   $ cat ${default_lock_dir}/b.0.0.2.pkg
   (version 0.0.2)
   
-  (build_id ac5ecdc74db1f8a12595fe69beea8f48)
+  (build_id a2edbd63955e848c24000298679e904c)
 Change the version of a dependency by modifying its lockfile.
   $ make_lockpkg b <<EOF
   > (version 0.0.1)

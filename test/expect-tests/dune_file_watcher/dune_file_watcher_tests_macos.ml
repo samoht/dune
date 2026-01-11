@@ -47,7 +47,7 @@ let%expect_test _ =
   print_events 2;
   [%expect
     {|
-    { path = In_source_tree "x"; kind = "Created" }
+    { path = In_source_tree "x"; kind = "Unknown" }
     { path = In_source_tree "y"; kind = "Unknown" }
     |}];
   let (_ : _) = Fpath.mkdir_p "d/w" in

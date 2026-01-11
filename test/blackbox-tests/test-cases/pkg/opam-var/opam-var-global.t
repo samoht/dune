@@ -26,7 +26,7 @@ variables can be found in `opam-var-os.t`.
        (run echo %{user})
        (run echo %{group}))))))
   
-  (build_id 6ae2c0ba17f2de64493df9ab799e2a59)
+  (build_id 605f8826b8459f5388a4974ffdaec6c7)
 
 
 - The implementation of %{user} uses Unix.getlogin which doesn't work in our Linux CI job.

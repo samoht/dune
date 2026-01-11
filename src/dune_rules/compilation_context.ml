@@ -1,14 +1,38 @@
 open Import
 open Memo.O
 
+(* Given a package registry entry, compute the marker file if needed.
+   Lock packages and opam-sandboxed vendor packages need markers. *)
+let marker_for_entry ~context (entry : Package_registry.entry) =
+  if Package_registry.needs_marker entry
+  then (
+    let root = Vendor_rules.pkg_build_dir ~context ~pkg_name:entry.name in
+    if Package_registry.install_to_prefix entry
+    then
+      (* _build/.pkgs/<ctx>/<name>/installed (in shared prefix) *)
+      Some (Path.Build.relative root "installed")
+    else
+      (* _build/.pkgs/<ctx>/<name>/target/cookie (build completed, not promoted) *)
+      Some (Path.Build.relative (Path.Build.relative root "target") "cookie"))
+  else None
+;;
+
 (* Compute vendor package marker dependencies for a list of libraries.
    This ensures vendor packages are built before compilation that needs them. *)
 let vendor_marker_deps ~context libs =
   let open Memo.O in
-  Memo.List.filter_map libs ~f:(fun lib ->
-    let lib_name = Lib.name lib |> Lib_name.to_string in
-    Vendor_rules.marker_for_library ~context lib_name)
-  >>| fun markers -> Dep.Set.of_list_map markers ~f:(fun m -> Dep.file (Path.build m))
+  let+ registry = Package_registry.of_ctx context in
+  let markers =
+    List.filter_map libs ~f:(fun lib ->
+      let lib_name = Lib.name lib |> Lib_name.to_string in
+      match Package_registry.package_for_library registry lib_name with
+      | None -> None
+      | Some pkg_name ->
+        (match Package_registry.find registry pkg_name with
+         | None -> None
+         | Some entry -> marker_for_entry ~context entry))
+  in
+  Dep.Set.of_list_map markers ~f:(fun m -> Dep.file (Path.build m))
 ;;
 
 module Includes = struct

@@ -10,11 +10,19 @@ open Import
       (vendor make-pkg.1.0.0 (mode opam))  ; Build using opam sandbox
       (vendor yojson.1.7.0 (libraries (yojson :as yojson_v1)))
       (vendor foo.2.0.0 (libraries (foo :as bar)) (install false))
+      (vendor ocaml.5.2.0 (compiler ocaml.5.2.0))  ; Provides a compiler
+      (vendor ocaml-windows.5.2.0 (toolchain windows))  ; Cross-compilation
     ]}
 
     The [(install false)] option prevents the package from being installed
     to the shared prefix. Use this for packages with library remapping that
     should coexist with other versions of the same package.
+
+    The [(compiler ...)] option marks the package as providing an OCaml compiler,
+    which can be referenced by [(context (workspace (compiler ...)))] in dune-workspace.
+
+    The [(toolchain ...)] option marks the package as providing a findlib toolchain
+    for cross-compilation. The name matches what [(targets ...)] references.
 
     The directory is relative to the location of the dune file containing
     the stanza. This stanza works alongside [vendored_dirs] - directories
@@ -64,6 +72,12 @@ type t =
     (** Whether to install this package to the shared prefix.
         Defaults to true. Set to false for packages with library remapping
         that should coexist with other versions of the same package. *)
+  ; compiler : Package_name.t option
+    (** Marks this package as providing a compiler with the given name.
+        Referenced by [(context (workspace (compiler ...)))] in dune-workspace. *)
+  ; toolchain : string option
+    (** Marks this package as providing a findlib toolchain for cross-compilation.
+        The name matches what [(targets ...)] references (e.g., "windows"). *)
   }
 
 val decode : t Decoder.t

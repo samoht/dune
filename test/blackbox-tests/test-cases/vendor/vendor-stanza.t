@@ -87,3 +87,62 @@ Test duplicate vendor stanza error:
   3 | (vendor fmt.0.9.0 (libraries fmt.tty))
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   Error: vendor stanza for directory "fmt.0.9.0" already defined
+
+Test vendor stanza with mode field:
+
+  $ cat >duniverse/dune <<EOF
+  > (vendored_dirs *)
+  > (vendor fmt.0.9.0
+  >  (libraries fmt)
+  >  (mode dune))
+  > EOF
+
+  $ dune build main.exe
+
+Test vendor stanza with install field:
+
+  $ cat >duniverse/dune <<EOF
+  > (vendored_dirs *)
+  > (vendor fmt.0.9.0
+  >  (libraries fmt)
+  >  (install true))
+  > EOF
+
+  $ dune build main.exe
+
+Test vendor stanza with compiler field:
+
+  $ cat >duniverse/dune <<EOF
+  > (vendored_dirs *)
+  > (vendor fmt.0.9.0
+  >  (libraries fmt)
+  >  (compiler ocaml.5.2.0))
+  > EOF
+
+  $ dune build main.exe
+
+Test vendor stanza with toolchain field:
+
+  $ cat >duniverse/dune <<EOF
+  > (vendored_dirs *)
+  > (vendor fmt.0.9.0
+  >  (libraries fmt)
+  >  (toolchain windows))
+  > EOF
+
+  $ dune build main.exe
+
+Test vendor stanza with all fields:
+
+  $ cat >duniverse/dune <<EOF
+  > (vendored_dirs *)
+  > (vendor fmt.0.9.0
+  >  (libraries fmt fmt.tty)
+  >  (packages fmt)
+  >  (mode dune)
+  >  (install true)
+  >  (compiler ocaml.5.2.0)
+  >  (toolchain windows))
+  > EOF
+
+  $ dune build main.exe

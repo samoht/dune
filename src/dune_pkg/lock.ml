@@ -201,11 +201,13 @@ type missing_dependency =
   ; loc : Loc.t
   }
 
-(* [validate_packages packages] returns
+(* [validate_packages packages ~local_package_names] returns
    [Error (`Missing_dependencies missing_dependencies)] where
    [missing_dependencies] is a non-empty list with an element for each package
-   dependency which doesn't have a corresponding entry in [packages]. *)
-let validate_packages packages =
+   dependency which doesn't have a corresponding entry in [packages].
+   Dependencies on local/workspace packages are skipped since they are provided
+   by the workspace rather than the lock file. *)
+let validate_packages packages ~local_package_names =
   let missing_dependencies =
     Packages.to_pkg_list packages
     |> List.concat_map ~f:(fun (dependant_package : Pkg.t) ->
@@ -216,6 +218,7 @@ let validate_packages packages =
           if
             Package_name.Map.mem packages depend.name
             || Package_name.equal depend.name Dune_dep.name
+            || Package_name.Set.mem local_package_names depend.name
           then None
           else Some { dependant_package; dependency = depend.name; loc = depend.loc })))
   in
@@ -301,7 +304,11 @@ let create_latest_version
     Package_name.Map.map packages ~f:(fun (pkg : Pkg.t) ->
       Package_version.Map.singleton pkg.info.version pkg)
   in
-  (match validate_packages packages with
+  let local_package_names =
+    List.map local_packages ~f:(fun (pkg : Local_package.For_solver.t) -> pkg.name)
+    |> Package_name.Set.of_list
+  in
+  (match validate_packages packages ~local_package_names with
    | Ok () -> ()
    | Error (`Missing_dependencies missing_dependencies) ->
      List.map missing_dependencies ~f:(fun { dependant_package; dependency; loc = _ } ->
@@ -901,20 +908,11 @@ module File = struct
         ; platforms = None
         })
     in
-    (* Extract pins from dev packages with sources *)
-    let pins =
-      Packages.to_pkg_list lck.packages
-      |> List.filter_map ~f:(fun (pkg : Pkg.t) ->
-        if pkg.info.dev
-        then
-          Option.map pkg.info.source ~f:(fun source ->
-            let _loc, url = source.url in
-            { Pin_entry.name = pkg.info.name
-            ; version = pkg.info.version
-            ; url = OpamUrl.to_string url
-            })
-        else None)
-    in
+    (* Pins should not be inferred from dev packages.
+       The single-file format doesn't currently support pins - they would need
+       to be tracked separately from the solver result. For now, pins are empty.
+       Regular opam packages (even with dev=true) should be derived from repos. *)
+    let pins = [] in
     let _loc, solved_for_platforms = lck.solved_for_platforms in
     (* Group solver envs by OS, collecting archs for each OS *)
     let platforms =
@@ -1331,7 +1329,9 @@ struct
   ;;
 
   let check_packages packages ~lock_dir_path =
-    match validate_packages packages with
+    (* When loading from disk, we don't have workspace package info yet.
+       Pass empty set - workspace deps will be validated at build time. *)
+    match validate_packages packages ~local_package_names:Package_name.Set.empty with
     | Ok () -> Ok ()
     | Error (`Missing_dependencies missing_dependencies) ->
       List.iter missing_dependencies ~f:(fun { dependant_package; dependency; loc } ->
@@ -1498,6 +1498,7 @@ let merge_conditionals a b =
   let normalize t =
     { t with
       packages = Package_name.Map.empty
+    ; repos = Repositories.default
     ; expanded_solver_variable_bindings = Solver_stats.Expanded_variable_bindings.empty
     ; solved_for_platforms = Loc.none, []
     }
@@ -1507,22 +1508,8 @@ let merge_conditionals a b =
     Code_error.raise
       "Platform-specific lockdirs differ in a non-platform-specific way"
       [ "lockdir_1", to_dyn a; "lockdir_2", to_dyn b ];
-  (* Recompute build_ids after merging since the merged packages have different
-     content (conditional deps/commands from multiple platforms) *)
-  let pkgs_by_name =
-    Packages.to_pkg_list packages
-    |> List.fold_left ~init:Package_name.Map.empty ~f:(fun acc (pkg : Pkg.t) ->
-      Package_name.Map.set acc pkg.info.name pkg)
-  in
-  let pkgs_with_ids = compute_build_ids pkgs_by_name in
-  let packages =
-    Packages.to_pkg_list packages
-    |> List.map ~f:(fun (pkg : Pkg.t) ->
-      match Package_name.Map.find pkgs_with_ids pkg.info.name with
-      | Some pkg_with_id -> pkg_with_id
-      | None -> pkg)
-    |> Packages.of_pkg_list
-  in
+  (* build_ids are already merged by Pkg.merge_conditionals via concat+rehash,
+     and packages unique to one platform keep their original build_ids. *)
   { a with packages; solved_for_platforms }
 ;;
 

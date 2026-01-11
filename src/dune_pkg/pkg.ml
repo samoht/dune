@@ -983,9 +983,21 @@ let merge_conditionals a b =
       b.post_depends
   in
   let enabled_on_platforms = a.enabled_on_platforms @ b.enabled_on_platforms in
-  (* Set build_id to None for merged result - it will be recomputed after merging.
+  (* Merge build_ids by concatenating and re-hashing.
      build_id is platform-specific (depends on deps which can vary by platform),
      so we don't compare it when checking for non-platform-specific differences. *)
+  let build_id =
+    match a.build_id, b.build_id with
+    | Some id_a, Some id_b ->
+      (* Sort to ensure deterministic order *)
+      let ids =
+        [ Dune_digest.to_string id_a; Dune_digest.to_string id_b ]
+        |> List.sort ~compare:String.compare
+      in
+      Some (Dune_digest.generic ids)
+    | Some id, None | None, Some id -> Some id
+    | None, None -> None
+  in
   let ret =
     { a with
       build_command
@@ -993,7 +1005,7 @@ let merge_conditionals a b =
     ; depends
     ; post_depends
     ; enabled_on_platforms
-    ; build_id = None
+    ; build_id
     }
   in
   if

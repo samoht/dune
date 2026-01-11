@@ -1277,6 +1277,7 @@ module Vendor_status = struct
     | Not_vendored
     | Dune_native (* Built as vendored code in main dune context *)
     | Opam_sandboxed (* Built in opam sandbox with local source *)
+    | Workspace_package (* Built as workspace code, depends on @install alias *)
 end
 
 module rec Resolve : sig
@@ -1455,7 +1456,8 @@ end = struct
        | opam -> opam)
   ;;
 
-  (* Resolve dependencies from registry entries *)
+  (* Resolve dependencies from registry entries.
+     Also checks for workspace packages when a dependency is not found in the registry. *)
   let resolve_entry_deps registry (pkg : Pkg.t) =
     let* platform = Lock_dir.Sys_vars.solver_env in
     let deps =
@@ -1463,6 +1465,8 @@ end = struct
       |> Option.value ~default:[]
     in
     let system_provided = default_system_provided in
+    (* Get workspace packages for fallback lookup (via Source_tree to avoid cycle) *)
+    let* workspace_packages = Source_tree.all_workspace_packages () in
     let has_dune_dep, dep_entries =
       List.fold_right
         deps
@@ -1474,10 +1478,28 @@ end = struct
           then has_dune_dep, acc
           else (
             match Package_registry.find registry name with
+            | Some dep_entry -> has_dune_dep, dep_entry :: acc
             | None ->
-              (* Dependency not in registry - skip (might be optional) *)
-              has_dune_dep, acc
-            | Some dep_entry -> has_dune_dep, dep_entry :: acc))
+              (* Not in registry - check if it's a workspace package *)
+              (match Package.Name.Map.find workspace_packages name with
+               | Some (ws_pkg, source_dir) ->
+                 (* Found in workspace - create a From_workspace entry *)
+                 let version =
+                   Option.value
+                     (Package.version ws_pkg)
+                     ~default:(Package_version.of_string "dev")
+                 in
+                 let entry =
+                   { Package_registry.name
+                   ; version
+                   ; source =
+                       Package_registry.Source.From_workspace { pkg = ws_pkg; source_dir }
+                   }
+                 in
+                 has_dune_dep, entry :: acc
+               | None ->
+                 (* Not in registry or workspace - skip (might be optional) *)
+                 has_dune_dep, acc)))
     in
     Memo.return (has_dune_dep, dep_entries)
   ;;
@@ -1492,6 +1514,7 @@ end = struct
       match source with
       | Package_registry.Source.From_lock _ -> true
       | Package_registry.Source.From_vendor { stanza; _ } -> stanza.Vendor_stanza.install
+      | Package_registry.Source.From_workspace _ -> true
     in
     (* Get the Pkg.t from the source *)
     let* pkg_result =
@@ -1506,6 +1529,13 @@ end = struct
         let vendor_source = Source.external_copy (Loc.none, abs_path) in
         Dune_pkg.Pkg.of_opam_file ~name ~version ~source:vendor_source ~opam ()
         |> Memo.return
+      | Package_registry.Source.From_workspace _ ->
+        (* Workspace packages are built by dune's normal rules, not pkg rules.
+           They should not reach this point - they should be filtered out earlier
+           and added to vendored_depends. *)
+        Code_error.raise
+          "resolve_entry_impl called with workspace package"
+          [ "name", Package.Name.to_dyn name ]
     in
     match pkg_result with
     | Error msg -> User_error.raise (User_message.pp msg |> List.singleton)
@@ -1523,25 +1553,28 @@ end = struct
       (* Recursively resolve dep entries *)
       let* all_depends =
         Memo.parallel_map dep_entries ~f:(fun dep_entry ->
-          let vendor_path = Vendor.package_dir dep_entry.name dep_entry.version in
-          let* is_vendored =
-            Fs_memo.dir_exists (Path.Outside_build_dir.In_source_dir vendor_path)
-          in
-          match is_vendored with
-          | true ->
-            (* Check if it's dune-native vendored *)
-            (match dep_entry.source with
-             | Package_registry.Source.From_vendor { stanza; _ } ->
+          match dep_entry.source with
+          | Package_registry.Source.From_workspace { source_dir; _ } ->
+            (* Workspace packages are built as regular dune code - add to vendored_depends *)
+            Memo.return (Either.Left (dep_entry.name, source_dir))
+          | Package_registry.Source.From_vendor { source_dir = _; stanza } ->
+            let vendor_path = Vendor.package_dir dep_entry.name dep_entry.version in
+            let* is_vendored =
+              Fs_memo.dir_exists (Path.Outside_build_dir.In_source_dir vendor_path)
+            in
+            (match is_vendored with
+             | true ->
+               (* Check if it's dune-native vendored *)
                (match stanza.build_method with
                 | Some Vendor_stanza.Build_method.Dune_native | None ->
                   Memo.return (Either.Left (dep_entry.name, vendor_path))
                 | Some Opam_sandboxed ->
                   let+ resolved = resolve_entry registry dep_entry ~package_universe in
                   Either.Right resolved)
-             | From_lock _ ->
+             | false ->
                let+ resolved = resolve_entry registry dep_entry ~package_universe in
                Either.Right resolved)
-          | false ->
+          | Package_registry.Source.From_lock _ ->
             let+ resolved = resolve_entry registry dep_entry ~package_universe in
             Either.Right resolved)
       and+ files_dir = resolve_files_dir package_universe info in
@@ -2619,10 +2652,14 @@ let pkg_alias_disabled =
 (* Vendor build helpers - extracted from setup_pkg_install_alias for clarity *)
 module Vendor_build = struct
   (* Classify a registry entry's vendor status.
+     - From_workspace entries are built by dune's normal rules
      - From_vendor entries have vendor stanzas - check build method
      - From_lock entries need pkg rules (will be vendored by build rules) *)
   let classify_entry (entry : Package_registry.entry) =
     match entry.source with
+    | Package_registry.Source.From_workspace _ ->
+      (* Workspace packages are built as regular dune code, not pkg rules *)
+      Memo.return Vendor_status.Workspace_package
     | Package_registry.Source.From_lock { pkg = _ } ->
       (* Lock packages need pkg rules to fetch/build - they'll be vendored by the rules *)
       Memo.return Vendor_status.Not_vendored
@@ -2679,7 +2716,7 @@ module Vendor_build = struct
            Memo.parallel_map entries ~f:(fun entry ->
              let+ status = classify_entry entry in
              match status with
-             | Vendor_status.Dune_native -> None
+             | Vendor_status.Dune_native | Vendor_status.Workspace_package -> None
              | Vendor_status.Not_vendored | Vendor_status.Opam_sandboxed ->
                let pkg_id =
                  Pkg_id.create ~name:entry.Package_registry.name ~version:entry.version
@@ -2690,6 +2727,9 @@ module Vendor_build = struct
                  | Package_registry.Source.From_lock _ -> true
                  | Package_registry.Source.From_vendor { stanza; _ } ->
                    stanza.Vendor_stanza.install
+                 | Package_registry.Source.From_workspace _ ->
+                   (* Workspace packages are filtered above, but for completeness *)
+                   true
                in
                Some (pkg_id, install_to_prefix))
          in
@@ -2731,11 +2771,16 @@ module Vendor_build = struct
       | None -> Package_version.of_string "dev"
     in
     (* Marker is at _build/.pkgs/<ctx>/<name>/installed (root level, sibling of target/) *)
-    Vendor_rules.marker_for_package ~context:ctx_name pkg_name
-    >>| function
-    | Some marker -> marker
-    | None ->
-      (* Fallback: compute the path directly if not in vendored map yet *)
+    Package_registry.of_ctx ctx_name
+    >>| fun registry ->
+    match Package_registry.find registry pkg_name with
+    | Some entry when Package_registry.needs_marker entry ->
+      let root = Vendor_rules.pkg_build_dir ~context:ctx_name ~pkg_name in
+      if Package_registry.install_to_prefix entry
+      then Path.Build.relative root "installed"
+      else Path.Build.relative (Path.Build.relative root "target") "cookie"
+    | _ ->
+      (* Fallback: compute the path directly if not in registry yet *)
       let pkg_dir =
         sprintf
           "%s.%s"
@@ -2864,6 +2909,9 @@ let setup_package_rules_from_entry
   (* Check vendor status based on the entry source *)
   let* vendor_status =
     match entry.source with
+    | Package_registry.Source.From_workspace _ ->
+      (* Workspace packages are built as regular dune code, not pkg rules *)
+      Memo.return Vendor_status.Workspace_package
     | Package_registry.Source.From_vendor { stanza; _ } ->
       (match stanza.build_method with
        | Some Vendor_stanza.Build_method.Dune_native | None ->
@@ -2874,8 +2922,8 @@ let setup_package_rules_from_entry
       Memo.return Vendor_status.Not_vendored
   in
   match vendor_status with
-  | Vendor_status.Dune_native ->
-    (* Vendored dune packages are built as vendored code in the main context.
+  | Vendor_status.Dune_native | Vendor_status.Workspace_package ->
+    (* Vendored dune packages and workspace packages are built as regular code.
        They have NO pkg rules - the libraries/binaries come from normal dune build. *)
     Memo.return @@ Gen_rules.rules_here Gen_rules.Rules.empty
   | Vendor_status.Not_vendored | Vendor_status.Opam_sandboxed ->
@@ -3021,8 +3069,11 @@ let all_deps universe =
   let* registry = Package_registry.of_ctx ctx in
   Package_registry.to_list registry
   |> Memo.parallel_map ~f:(fun entry ->
-    (* Filter out vendored dune packages - they're built as vendored code *)
+    (* Filter out vendored dune packages and workspace packages - they're built as regular code *)
     match entry.Package_registry.source with
+    | Package_registry.Source.From_workspace _ ->
+      (* Workspace packages are built as regular dune code, not pkg dependencies *)
+      Memo.return None
     | Package_registry.Source.From_vendor { stanza; _ } ->
       (match stanza.build_method with
        | Some Vendor_stanza.Build_method.Dune_native | None -> Memo.return None
@@ -3139,4 +3190,122 @@ let pkg_id_of_project_dependency ctx package_name =
   | None -> None
   | Some entry ->
     Some (Pkg_id.create ~name:entry.Package_registry.name ~version:entry.version)
+;;
+
+(* Lib-cache rule: generates _build/.pkgs/lib-cache from lock file.
+   This enables eager package fetching and lazy library building. *)
+module Lib_cache_spec = struct
+  type ('path, 'target) t =
+    { target : 'target
+    ; lock_file : 'path
+    }
+
+  let name = "lib-cache"
+  let version = 1
+  let bimap t f g = { target = g t.target; lock_file = f t.lock_file }
+  let is_useful_to ~memoize = memoize
+
+  let encode { target; lock_file } encode_path encode_target =
+    Sexp.record [ "target", encode_target target; "lock_file", encode_path lock_file ]
+  ;;
+
+  let action { target = _; lock_file } ~ectx:_ ~eenv:{ Action.Ext.Exec.env; _ } =
+    let open Fiber.O in
+    let* () = Fiber.return () in
+    (* Read the lock file to get package list *)
+    let* solver_env =
+      let+ solver_env_from_current_system =
+        let sys_poll = Dune_pkg.Sys_poll.make ~path:(Env_path.path env) in
+        Dune_pkg.Sys_poll.solver_env_from_current_system sys_poll
+      in
+      Dune_pkg.Solver_env.extend
+        Dune_pkg.Solver_env.with_defaults
+        solver_env_from_current_system
+    in
+    let* lock_dir =
+      Dune_pkg.Lock_pkg.read_disk ~solver_env ~local_packages:[] lock_file
+    in
+    let pkgs = Dune_pkg.Lock.Packages.to_pkg_list lock_dir.packages in
+    (* Fetch all packages to duniverse/ *)
+    let* () =
+      Fiber.sequential_iter pkgs ~f:(fun (pkg : Dune_pkg.Pkg.t) ->
+        match pkg.info.source with
+        | None -> Fiber.return ()
+        | Some source ->
+          let pkg_dir = Dune_pkg.Vendor.package_dir pkg.info.name pkg.info.version in
+          let target = Path.source pkg_dir in
+          (* Skip if already fetched *)
+          if Path.Untracked.exists target
+          then Fiber.return ()
+          else (
+            let url = source.url in
+            let checksum = Option.map source.checksum ~f:snd in
+            Dune_pkg.Fetch.fetch ~unpack:true ~checksum ~target ~url
+            >>| function
+            | Ok () -> ()
+            | Error _ ->
+              (* Fetch failed - package won't be available but we continue *)
+              ()))
+    in
+    (* Collect library→package→directory mappings from the fetched packages *)
+    let entries =
+      List.concat_map pkgs ~f:(fun (pkg : Dune_pkg.Pkg.t) ->
+        let pkg_name = Package.Name.to_string pkg.info.name in
+        let version = Dune_pkg.Package_version.to_string pkg.info.version in
+        let dirname = sprintf "%s.%s" pkg_name version in
+        let pkg_dir = Dune_pkg.Vendor.package_dir pkg.info.name pkg.info.version in
+        if Path.Untracked.exists (Path.source pkg_dir)
+        then (
+          (* Scan fetched source for libraries *)
+          let libraries = Vendor_rules.scan_libraries pkg_dir ~pkg_name in
+          if List.is_empty libraries
+          then (* Fallback to package name as library *)
+            [ { Vendor_rules.lib_name = pkg_name; pkg_name; dirname } ]
+          else
+            List.map libraries ~f:(fun lib_name ->
+              { Vendor_rules.lib_name; pkg_name; dirname }))
+        else (* Package not fetched - use package name as fallback *)
+          [ { Vendor_rules.lib_name = pkg_name; pkg_name; dirname } ])
+    in
+    (* Write lib-cache file *)
+    Vendor_rules.write_lib_cache entries;
+    Fiber.return ()
+  ;;
+end
+
+module Lib_cache_action = Action_ext.Make (Lib_cache_spec)
+
+let lib_cache_action ~target ~lock_file =
+  Lib_cache_action.action { Lib_cache_spec.target; lock_file }
+;;
+
+(* Set up lib-cache rule at _build/.pkgs/ level *)
+let setup_lib_cache_rule () =
+  let target = Vendor_rules.lib_cache_path () in
+  let* workspace = Workspace.workspace () in
+  (* Get the primary lock dir path *)
+  let* lock_dirs = Lock_dir.lock_dirs_of_workspace workspace in
+  match Path.Source.Set.to_list lock_dirs with
+  | [] ->
+    (* No lock files - no lib-cache needed *)
+    Memo.return None
+  | lock_dir_path :: _ ->
+    let lock_file = Path.source lock_dir_path in
+    let+ () = Memo.return () in
+    let { Action_builder.With_targets.build; targets } =
+      (let open Action_builder.O in
+       (* Depend on the lock file *)
+       let deps =
+         Dep.Set.of_source_files
+           ~files:(Path.Set.singleton lock_file)
+           ~empty_directories:Path.Set.empty
+       in
+       Action_builder.deps deps
+       >>> (lib_cache_action ~target ~lock_file
+            |> Action.Full.make ~can_go_in_shared_cache:false
+            |> Action_builder.return))
+      |> Action_builder.with_no_targets
+      |> Action_builder.With_targets.add ~file_targets:[ target ]
+    in
+    Some (Rule.make ~targets build)
 ;;

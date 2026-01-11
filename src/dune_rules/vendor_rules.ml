@@ -2,15 +2,6 @@ open Import
 module Vendor = Dune_pkg.Vendor
 module Vendor_stanza = Dune_lang.Vendor_stanza
 
-(* Path to a package's build directory: _build/.pkgs/<ctx>/<name>/
-   Note: Path uses only package name (no version) to enable cleanup on upgrade. *)
-let pkg_build_root ~context ~pkg_name =
-  let ctx_dir =
-    Path.Build.relative Dpath.Build.pkgs_dir (Context_name.to_string context)
-  in
-  Path.Build.relative ctx_dir (Package.Name.to_string pkg_name)
-;;
-
 let extract_public_name_from_sexp sexp =
   let open Dune_sexp.Ast in
   let atom_to_string = function
@@ -133,15 +124,43 @@ let read_project_name dir =
   else None
 ;;
 
-(* Lib-cache for looking up library→directory mappings during dune pkg fetch.
-   The cache maps library names to directory names in duniverse/. *)
+(* Parse "name.version" strings into components. These are the canonical helpers
+   for parsing opam-style package directory names. *)
+let parse_name_version dir_name =
+  match OpamPackage.of_string_opt dir_name with
+  | Some pkg ->
+    let name = OpamPackage.Name.to_string (OpamPackage.name pkg) in
+    let version = OpamPackage.Version.to_string (OpamPackage.version pkg) in
+    Some (name, version)
+  | None -> None
+;;
+
+let parse_pkg_name_from_dir dir_name =
+  match parse_name_version dir_name with
+  | Some (name, _) -> name
+  | None -> dir_name
+;;
+
+(* Lib-cache for looking up library→package→directory mappings.
+   Format: lib_name:pkg_name:dirname
+   - lib_name: the library name (e.g., "cmdliner")
+   - pkg_name: the package name (e.g., "cmdliner")
+   - dirname: the directory name in duniverse (e.g., "cmdliner.1.2.0") *)
+
+type lib_cache_entry =
+  { lib_name : string
+  ; pkg_name : string
+  ; dirname : string
+  }
+
 let lib_cache_file =
   lazy
     (let pkg_dir = Path.build Dpath.Build.pkgs_dir in
      Path.relative pkg_dir "lib-cache")
 ;;
 
-let lib_cache : string String.Table.t option ref = ref None
+(* Internal cache indexed by lib_name for fast lookup *)
+let lib_cache : lib_cache_entry String.Table.t option ref = ref None
 
 let load_lib_cache () =
   let cache_file = Lazy.force lib_cache_file in
@@ -151,12 +170,37 @@ let load_lib_cache () =
     let tbl = String.Table.create 256 in
     List.iter lines ~f:(fun line ->
       match String.lsplit2 line ~on:':' with
-      | Some (lib, dir) -> String.Table.set tbl lib dir
+      | Some (lib_name, rest) ->
+        (match String.lsplit2 rest ~on:':' with
+         | Some (pkg_name, dirname) ->
+           String.Table.set tbl lib_name { lib_name; pkg_name; dirname }
+         | None -> ())
       | None -> ());
     Some tbl)
   else None
 ;;
 
+(* Find the package that provides a given library.
+   Uses the lib-cache file written by dune pkg fetch. *)
+let find_pkg_for_library lib_name =
+  let cache =
+    match !lib_cache with
+    | Some c -> Some c
+    | None ->
+      let c = load_lib_cache () in
+      lib_cache := c;
+      c
+  in
+  match cache with
+  | None -> None
+  | Some tbl ->
+    (match String.Table.find tbl lib_name with
+     | Some entry -> Some entry.pkg_name
+     | None -> None)
+;;
+
+(* Find the directory that contains a given library.
+   Uses the lib-cache file written by dune pkg fetch. *)
 let find_dir_for_library lib_name =
   let cache =
     match !lib_cache with
@@ -168,10 +212,45 @@ let find_dir_for_library lib_name =
   in
   match cache with
   | None -> None
-  | Some tbl -> String.Table.find tbl lib_name
+  | Some tbl ->
+    (match String.Table.find tbl lib_name with
+     | Some entry -> Some entry.dirname
+     | None -> None)
 ;;
 
 let invalidate_lib_cache () = lib_cache := None
+
+(* Get all entries from lib-cache as (lib_name, pkg_name) pairs *)
+let lib_cache_entries () =
+  let cache =
+    match !lib_cache with
+    | Some c -> Some c
+    | None ->
+      let c = load_lib_cache () in
+      lib_cache := c;
+      c
+  in
+  match cache with
+  | None -> []
+  | Some tbl ->
+    String.Table.to_list tbl |> List.map ~f:(fun (lib, entry) -> lib, entry.pkg_name)
+;;
+
+(* Return the path to the lib-cache file as a build path *)
+let lib_cache_path () = Path.Build.relative Dpath.Build.pkgs_dir "lib-cache"
+
+(* Write lib-cache entries to file. *)
+let write_lib_cache entries =
+  let cache_path = Path.build (lib_cache_path ()) in
+  let parent = Path.parent_exn cache_path in
+  Path.mkdir_p parent;
+  let lines =
+    List.map entries ~f:(fun { lib_name; pkg_name; dirname } ->
+      sprintf "%s:%s:%s" lib_name pkg_name dirname)
+  in
+  Io.write_lines cache_path lines;
+  invalidate_lib_cache ()
+;;
 
 module Vendored_map = struct
   type package_info =
@@ -281,25 +360,6 @@ let scan_vendor_dir vendor_dir =
         | _ -> map))
 ;;
 
-(* Parse "name.version" strings into components. These are the canonical helpers
-   for parsing opam-style package directory names. Used by package_registry.ml
-   and pkg_rules.ml (via Pkg_id). *)
-
-let parse_name_version dir_name =
-  match OpamPackage.of_string_opt dir_name with
-  | Some pkg ->
-    let name = OpamPackage.Name.to_string (OpamPackage.name pkg) in
-    let version = OpamPackage.Version.to_string (OpamPackage.version pkg) in
-    Some (name, version)
-  | None -> None
-;;
-
-let parse_pkg_name_from_dir dir_name =
-  match parse_name_version dir_name with
-  | Some (name, _) -> name
-  | None -> dir_name
-;;
-
 (* Try to read package name from opam file in directory *)
 let read_pkg_name_from_opam pkg_dir =
   let full_path = Path.source pkg_dir in
@@ -407,29 +467,12 @@ module Paths = struct
   let install_paths t = Lazy.force t.install_paths
 end
 
-let marker_for_package ~context pkg_name =
-  let open Memo.O in
-  let+ map = get_vendored_map () in
-  if Vendored_map.needs_marker map pkg_name
-  then (
-    let root = pkg_build_root ~context ~pkg_name in
-    if Vendored_map.install_to_prefix map pkg_name
-    then
-      (* _build/.pkgs/<ctx>/<name>/installed (in shared prefix) *)
-      Some (Path.Build.relative root "installed")
-    else
-      (* _build/.pkgs/<ctx>/<name>/target/cookie (build completed, not promoted) *)
-      Some (Path.Build.relative (Path.Build.relative root "target") "cookie"))
-  else None
-;;
-
-(** Given a library name, find the vendor package that provides it and return
-    the marker file needed to trigger that package's build.
-    Returns None if the library is not from a vendor package. *)
-let marker_for_library ~context lib_name =
-  let open Memo.O in
-  let* map = get_vendored_map () in
-  match Vendored_map.package_for_library map lib_name with
-  | None -> Memo.return None
-  | Some pkg_name -> marker_for_package ~context pkg_name
+(* Path to a package's build directory: _build/.pkgs/<ctx>/<name>/
+   Note: Path uses only package name (no version) to enable cleanup on upgrade.
+   Exposed for use by callers that need to compute marker paths. *)
+let pkg_build_dir ~context ~pkg_name =
+  let ctx_dir =
+    Path.Build.relative Dpath.Build.pkgs_dir (Context_name.to_string context)
+  in
+  Path.Build.relative ctx_dir (Package.Name.to_string pkg_name)
 ;;

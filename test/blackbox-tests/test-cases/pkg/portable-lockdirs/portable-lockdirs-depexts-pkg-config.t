@@ -59,14 +59,18 @@ correct depext names can be chosen for the current distro at build time.
 
 Print the name of the depext on a variety of os/distro/versions:
   $ DUNE_CONFIG__OS=macos DUNE_CONFIG__OS_FAMILY=homebrew DUNE_CONFIG__OS_DISTRIBUTION=homebrew dune show depexts
-  Error: dune.lock/lock.dune: Not a directory
+  File "dune.lock", line 1, characters 0-0:
+  Error: Package conf-pkg-config.0.0.1 not found in any repository
   [1]
   $ DUNE_CONFIG__OS=linux DUNE_CONFIG__OS_FAMILY=debian dune show depexts
-  Error: dune.lock/lock.dune: Not a directory
+  File "dune.lock", line 1, characters 0-0:
+  Error: Package conf-pkg-config.0.0.1 not found in any repository
   [1]
   $ DUNE_CONFIG__OS=linux DUNE_CONFIG__OS_FAMILY=centos DUNE_CONFIG__OS_DISTRIBUTION=centos DUNE_CONFIG__OS_VERSION=6 dune show depexts
-  Error: dune.lock/lock.dune: Not a directory
+  File "dune.lock", line 1, characters 0-0:
+  Error: Package conf-pkg-config.0.0.1 not found in any repository
   [1]
   $ DUNE_CONFIG__OS=linux DUNE_CONFIG__OS_FAMILY=centos DUNE_CONFIG__OS_DISTRIBUTION=centos DUNE_CONFIG__OS_VERSION=9 dune show depexts
-  Error: dune.lock/lock.dune: Not a directory
+  File "dune.lock", line 1, characters 0-0:
+  Error: Package conf-pkg-config.0.0.1 not found in any repository
   [1]

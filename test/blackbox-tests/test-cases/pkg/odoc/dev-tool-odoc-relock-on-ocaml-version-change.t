@@ -25,15 +25,42 @@ same version of the ocaml compiler as the code that it's analyzing.
 
 Initially odoc will depend on ocaml-base-compiler.5.2.0 to match the project.
   $ DUNE_CONFIG__LOCK_DEV_TOOL=enabled dune ocaml doc
-  Error: dune.lock/lock.dune: Not a directory
+  Solution for _build/.locks/tools-odoc (4 packages)
+  opam:
+  - ocaml.5.2.0
+  - ocaml-base-compiler.5.2.0
+  - ocaml-compiler.5.2.0
+  - odoc.0.0.1
+  hello from fake odoc
+  hello from fake odoc
+  File "_doc/_html/_unknown_", line 1, characters 0-0:
+  Error: Rule failed to produce directory "_doc/_html/odoc.support"
+  File "_doc/_odoc/pkg/foo/_unknown_", line 1, characters 0-0:
+  Error: Rule failed to generate the following targets:
+  - _doc/_odoc/pkg/foo/page-index.odoc
   [1]
   $ grep "version" "${dev_tool_lock_dir}"/ocaml-base-compiler.pkg
-  grep: _build/.locks/tools-odoc/ocaml-base-compiler.pkg: No such file or directory
-  [2]
+  (version 5.2.0)
 
 We can re-run "dune ocaml doc" without relocking or rebuilding.
   $ DUNE_CONFIG__LOCK_DEV_TOOL=enabled dune ocaml doc
-  Error: dune.lock/lock.dune: Not a directory
+  The version of the compiler package ("ocaml-base-compiler") in this project's
+  lockdir has changed to 5.2.0 (formerly the compiler version was 5.2.0). The
+  dev-tool "odoc" will be re-locked and rebuilt with this version of the
+  compiler.
+  Solution for _build/.locks/tools-odoc (4 packages)
+  opam:
+  - ocaml.5.2.0
+  - ocaml-base-compiler.5.2.0
+  - ocaml-compiler.5.2.0
+  - odoc.0.0.1
+  hello from fake odoc
+  hello from fake odoc
+  File "_doc/_html/_unknown_", line 1, characters 0-0:
+  Error: Rule failed to produce directory "_doc/_html/odoc.support"
+  File "_doc/_odoc/pkg/foo/_unknown_", line 1, characters 0-0:
+  Error: Rule failed to generate the following targets:
+  - _doc/_odoc/pkg/foo/page-index.odoc
   [1]
 
 Change the version of ocaml that the project depends on.
@@ -48,14 +75,31 @@ Change the version of ocaml that the project depends on.
   > EOF
 
   $ dune build
-  Error: dune.lock/lock.dune: Not a directory
+  File "dune.lock/pkgs/lock.dune", line 1, characters 0-0:
+  Error: Lock dir out of sync with dune-project
+  Hint: Run 'dune pkg lock' to regenerate
+  Hint: Or use '--lock=always' or set '(lock always)' in ~/.config/dune/config
+  for automatic re-locking
   [1]
 
 Running "dune ocaml doc" causes odoc to be relocked and rebuilt
 before running. Odoc now depends on ocaml.5.1.0.
   $ DUNE_CONFIG__LOCK_DEV_TOOL=enabled dune ocaml doc
-  Error: dune.lock/lock.dune: Not a directory
+  The version of the compiler package ("ocaml-base-compiler") in this project's
+  lockdir has changed to 5.2.0 (formerly the compiler version was 5.2.0). The
+  dev-tool "odoc" will be re-locked and rebuilt with this version of the
+  compiler.
+  Solution for _build/.locks/tools-odoc (4 packages)
+  opam:
+  - ocaml.5.2.0
+  - ocaml-base-compiler.5.2.0
+  - ocaml-compiler.5.2.0
+  - odoc.0.0.1
+  File "dune.lock/pkgs/lock.dune", line 1, characters 0-0:
+  Error: Lock dir out of sync with dune-project
+  Hint: Run 'dune pkg lock' to regenerate
+  Hint: Or use '--lock=always' or set '(lock always)' in ~/.config/dune/config
+  for automatic re-locking
   [1]
   $ grep "version" "${dev_tool_lock_dir}"/ocaml-base-compiler.pkg
-  grep: _build/.locks/tools-odoc/ocaml-base-compiler.pkg: No such file or directory
-  [2]
+  (version 5.2.0)

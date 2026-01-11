@@ -45,8 +45,10 @@ Create a package that writes a different value to some files depending on the os
   (dependency_hash 36e640fbcda71963e7e2f689f6c96c3e)
   
   (repositories
-   (complete false)
-   (used))
+   (complete true)
+   (used
+    ((source
+      $SANDBOX/default/test/blackbox-tests/test-cases/pkg/portable-lockdirs/mock-opam-repository#HASH))))
   
   (solved_for_platforms
    ((arch x86_64)
@@ -95,7 +97,7 @@ Create a package that writes a different value to some files depending on the os
         (run sh -c "echo Darwin > %{share}/kernel")
         (run sh -c "echo arm64 > %{share}/machine")))))))
   
-  (build_id 5e27d13fee96f58e7e42d014cefe73f0)
+  (build_id fab143f2bfbf9183041a2cb11082e1bd)
 
   $ DUNE_CONFIG__ARCH=arm64 dune build
   File "dune", line 3, characters 12-15:

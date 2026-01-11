@@ -38,7 +38,7 @@ The lockfile should contain the patch action with the appropriate filter.
     ((action
       (progn (when (= %{switch} foobar) (patch foo.patch)) (run cat foo.ml))))))
   
-  (build_id 2dab669c62387e7c5a8dd319821957b8)
+  (build_id 7ca891ec3d74300a9265afcb8d8a484e)
   (source (copy $TESTCASE_ROOT/source))
 
   $ mkdir source

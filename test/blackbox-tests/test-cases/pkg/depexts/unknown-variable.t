@@ -45,5 +45,5 @@ With directory format, the unknown variable is preserved in the pkg file:
   (depexts
    ((unzip) %{pkg-self:foobar}))
   
-  (build_id 3b9ce106061cfffc9b56249364ebda84)
+  (build_id 01e06d995f62ae29a2518019cfa6cfa0)
 

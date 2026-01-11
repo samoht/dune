@@ -127,7 +127,9 @@ Both `<lib-spec>` and `<pkg-spec>` use the standard ordered set language (like `
 All fields are optional. When omitted:
 - `(libraries ...)` and `(packages ...)` should be auto-detected by scanning the directory
 - `(mode ...)` should be auto-detected: `dune` if dune files exist, `opam` otherwise
-- `(install ...)` defaults to `true`
+- `(install ...)` defaults to `true`, except when `:as` aliasing is used (then `false`)
+- `(compiler ...)` defaults to none, unless the package provides an OCaml compiler
+- `(toolchain ...)` defaults to none, unless the package provides a cross-compilation toolchain
 
 ### Examples
 
@@ -163,6 +165,20 @@ Dune detects the opam file and runs its build commands.
  (mode opam))
 ```
 
+**Compiler provider:**
+```dune
+(vendor vendor/ocaml.5.2.0
+ (compiler ocaml.5.2.0))
+```
+Makes `ocaml.5.2.0` available for `(context (workspace (compiler ocaml.5.2.0)))`.
+
+**Cross-compilation toolchain:**
+```dune
+(vendor vendor/ocaml-windows.5.2.0
+ (toolchain windows))
+```
+Provides the `windows` toolchain for `(targets native windows)`.
+
 ### Semantics
 
 **Library filtering:**
@@ -186,6 +202,16 @@ This only becomes an issue when a vendored opam package depends on a package tha
 multiple versions in the workspace. In this case, dune should error if two packages with
 the same name both have `(install true)` in the same context, with a message suggesting
 to set `(install false)` on one of them.
+
+**Compiler declaration:**
+- `(compiler <name>)` marks the package as providing an OCaml compiler
+- The compiler name can be referenced by `(context (workspace (compiler ...)))` in dune-workspace
+- Dune builds this package first to get `ocamlc`, `ocamlopt`, etc.
+
+**Toolchain declaration:**
+- `(toolchain <name>)` marks the package as providing a findlib toolchain for cross-compilation
+- The toolchain name matches what `(targets ...)` references (e.g., `windows`)
+- Dune sets `OCAMLFIND_TOOLCHAIN=<name>` for the target context
 
 **Error handling:**
 - If `(libraries foo)` lists a library not found in the directory → should error at parse time

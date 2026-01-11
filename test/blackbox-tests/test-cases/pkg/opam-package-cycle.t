@@ -21,13 +21,13 @@ Solver doesn't complain about cycles.
   Raised at Stdune__Code_error.raise in file
     "otherlibs/stdune/src/code_error.ml", line 10, characters 30-62
   Called from Dune_pkg__Lock.compute_build_ids in file "src/dune_pkg/lock.ml",
-    lines 258-260, characters 6-55
+    lines 261-263, characters 6-55
   Called from Dune_pkg__Lock.create_latest_version in file
-    "src/dune_pkg/lock.ml", line 299, characters 17-43
+    "src/dune_pkg/lock.ml", line 302, characters 17-43
   Called from Stdune__Result.map in file "otherlibs/stdune/src/result.ml", line
     45, characters 15-20
   Called from Dune_pkg__Opam_solver.solve_lock_dir.(fun) in file
-    "src/dune_pkg/opam_solver.ml", lines 1951-1995, characters 9-29
+    "src/dune_pkg/opam_solver.ml", lines 1951-1981, characters 9-29
   Called from Fiber__Scheduler.exec in file "src/fiber/src/scheduler.ml", line
     76, characters 8-11
   
@@ -42,13 +42,13 @@ Solver doesn't complain about cycles.
   Raised at Stdune__Code_error.raise in file
     "otherlibs/stdune/src/code_error.ml", line 10, characters 30-62
   Called from Dune_pkg__Lock.compute_build_ids in file "src/dune_pkg/lock.ml",
-    lines 258-260, characters 6-55
+    lines 261-263, characters 6-55
   Called from Dune_pkg__Lock.create_latest_version in file
-    "src/dune_pkg/lock.ml", line 299, characters 17-43
+    "src/dune_pkg/lock.ml", line 302, characters 17-43
   Called from Stdune__Result.map in file "otherlibs/stdune/src/result.ml", line
     45, characters 15-20
   Called from Dune_pkg__Opam_solver.solve_lock_dir.(fun) in file
-    "src/dune_pkg/opam_solver.ml", lines 1951-1995, characters 9-29
+    "src/dune_pkg/opam_solver.ml", lines 1951-1981, characters 9-29
   Called from Fiber__Scheduler.exec in file "src/fiber/src/scheduler.ml", line
     76, characters 8-11
   Internal error, please report upstream including the contents of _build/log.
@@ -57,13 +57,13 @@ Solver doesn't complain about cycles.
   Raised at Stdune__Code_error.raise in file
     "otherlibs/stdune/src/code_error.ml", line 10, characters 30-62
   Called from Dune_pkg__Lock.compute_build_ids in file "src/dune_pkg/lock.ml",
-    lines 258-260, characters 6-55
+    lines 261-263, characters 6-55
   Called from Dune_pkg__Lock.create_latest_version in file
-    "src/dune_pkg/lock.ml", line 299, characters 17-43
+    "src/dune_pkg/lock.ml", line 302, characters 17-43
   Called from Stdune__Result.map in file "otherlibs/stdune/src/result.ml", line
     45, characters 15-20
   Called from Dune_pkg__Opam_solver.solve_lock_dir.(fun) in file
-    "src/dune_pkg/opam_solver.ml", lines 1951-1995, characters 9-29
+    "src/dune_pkg/opam_solver.ml", lines 1951-1981, characters 9-29
   Called from Fiber__Scheduler.exec in file "src/fiber/src/scheduler.ml", line
     76, characters 8-11
   Internal error, please report upstream including the contents of _build/log.
@@ -72,13 +72,13 @@ Solver doesn't complain about cycles.
   Raised at Stdune__Code_error.raise in file
     "otherlibs/stdune/src/code_error.ml", line 10, characters 30-62
   Called from Dune_pkg__Lock.compute_build_ids in file "src/dune_pkg/lock.ml",
-    lines 258-260, characters 6-55
+    lines 261-263, characters 6-55
   Called from Dune_pkg__Lock.create_latest_version in file
-    "src/dune_pkg/lock.ml", line 299, characters 17-43
+    "src/dune_pkg/lock.ml", line 302, characters 17-43
   Called from Stdune__Result.map in file "otherlibs/stdune/src/result.ml", line
     45, characters 15-20
   Called from Dune_pkg__Opam_solver.solve_lock_dir.(fun) in file
-    "src/dune_pkg/opam_solver.ml", lines 1951-1995, characters 9-29
+    "src/dune_pkg/opam_solver.ml", lines 1951-1981, characters 9-29
   Called from Fiber__Scheduler.exec in file "src/fiber/src/scheduler.ml", line
     76, characters 8-11
   [1]
@@ -89,13 +89,13 @@ Solver doesn't complain about cycles.
   Raised at Stdune__Code_error.raise in file
     "otherlibs/stdune/src/code_error.ml", line 10, characters 30-62
   Called from Dune_pkg__Lock.compute_build_ids in file "src/dune_pkg/lock.ml",
-    lines 258-260, characters 6-55
+    lines 261-263, characters 6-55
   Called from Dune_pkg__Lock.create_latest_version in file
-    "src/dune_pkg/lock.ml", line 299, characters 17-43
+    "src/dune_pkg/lock.ml", line 302, characters 17-43
   Called from Stdune__Result.map in file "otherlibs/stdune/src/result.ml", line
     45, characters 15-20
   Called from Dune_pkg__Opam_solver.solve_lock_dir.(fun) in file
-    "src/dune_pkg/opam_solver.ml", lines 1951-1995, characters 9-29
+    "src/dune_pkg/opam_solver.ml", lines 1951-1981, characters 9-29
   Called from Fiber__Scheduler.exec in file "src/fiber/src/scheduler.ml", line
     76, characters 8-11
   
@@ -110,13 +110,13 @@ Solver doesn't complain about cycles.
   Raised at Stdune__Code_error.raise in file
     "otherlibs/stdune/src/code_error.ml", line 10, characters 30-62
   Called from Dune_pkg__Lock.compute_build_ids in file "src/dune_pkg/lock.ml",
-    lines 258-260, characters 6-55
+    lines 261-263, characters 6-55
   Called from Dune_pkg__Lock.create_latest_version in file
-    "src/dune_pkg/lock.ml", line 299, characters 17-43
+    "src/dune_pkg/lock.ml", line 302, characters 17-43
   Called from Stdune__Result.map in file "otherlibs/stdune/src/result.ml", line
     45, characters 15-20
   Called from Dune_pkg__Opam_solver.solve_lock_dir.(fun) in file
-    "src/dune_pkg/opam_solver.ml", lines 1951-1995, characters 9-29
+    "src/dune_pkg/opam_solver.ml", lines 1951-1981, characters 9-29
   Called from Fiber__Scheduler.exec in file "src/fiber/src/scheduler.ml", line
     76, characters 8-11
   Internal error, please report upstream including the contents of _build/log.
@@ -125,13 +125,13 @@ Solver doesn't complain about cycles.
   Raised at Stdune__Code_error.raise in file
     "otherlibs/stdune/src/code_error.ml", line 10, characters 30-62
   Called from Dune_pkg__Lock.compute_build_ids in file "src/dune_pkg/lock.ml",
-    lines 258-260, characters 6-55
+    lines 261-263, characters 6-55
   Called from Dune_pkg__Lock.create_latest_version in file
-    "src/dune_pkg/lock.ml", line 299, characters 17-43
+    "src/dune_pkg/lock.ml", line 302, characters 17-43
   Called from Stdune__Result.map in file "otherlibs/stdune/src/result.ml", line
     45, characters 15-20
   Called from Dune_pkg__Opam_solver.solve_lock_dir.(fun) in file
-    "src/dune_pkg/opam_solver.ml", lines 1951-1995, characters 9-29
+    "src/dune_pkg/opam_solver.ml", lines 1951-1981, characters 9-29
   Called from Fiber__Scheduler.exec in file "src/fiber/src/scheduler.ml", line
     76, characters 8-11
   Internal error, please report upstream including the contents of _build/log.
@@ -140,13 +140,13 @@ Solver doesn't complain about cycles.
   Raised at Stdune__Code_error.raise in file
     "otherlibs/stdune/src/code_error.ml", line 10, characters 30-62
   Called from Dune_pkg__Lock.compute_build_ids in file "src/dune_pkg/lock.ml",
-    lines 258-260, characters 6-55
+    lines 261-263, characters 6-55
   Called from Dune_pkg__Lock.create_latest_version in file
-    "src/dune_pkg/lock.ml", line 299, characters 17-43
+    "src/dune_pkg/lock.ml", line 302, characters 17-43
   Called from Stdune__Result.map in file "otherlibs/stdune/src/result.ml", line
     45, characters 15-20
   Called from Dune_pkg__Opam_solver.solve_lock_dir.(fun) in file
-    "src/dune_pkg/opam_solver.ml", lines 1951-1995, characters 9-29
+    "src/dune_pkg/opam_solver.ml", lines 1951-1981, characters 9-29
   Called from Fiber__Scheduler.exec in file "src/fiber/src/scheduler.ml", line
     76, characters 8-11
   [1]
@@ -157,13 +157,13 @@ Solver doesn't complain about cycles.
   Raised at Stdune__Code_error.raise in file
     "otherlibs/stdune/src/code_error.ml", line 10, characters 30-62
   Called from Dune_pkg__Lock.compute_build_ids in file "src/dune_pkg/lock.ml",
-    lines 258-260, characters 6-55
+    lines 261-263, characters 6-55
   Called from Dune_pkg__Lock.create_latest_version in file
-    "src/dune_pkg/lock.ml", line 299, characters 17-43
+    "src/dune_pkg/lock.ml", line 302, characters 17-43
   Called from Stdune__Result.map in file "otherlibs/stdune/src/result.ml", line
     45, characters 15-20
   Called from Dune_pkg__Opam_solver.solve_lock_dir.(fun) in file
-    "src/dune_pkg/opam_solver.ml", lines 1951-1995, characters 9-29
+    "src/dune_pkg/opam_solver.ml", lines 1951-1981, characters 9-29
   Called from Fiber__Scheduler.exec in file "src/fiber/src/scheduler.ml", line
     76, characters 8-11
   
@@ -178,13 +178,13 @@ Solver doesn't complain about cycles.
   Raised at Stdune__Code_error.raise in file
     "otherlibs/stdune/src/code_error.ml", line 10, characters 30-62
   Called from Dune_pkg__Lock.compute_build_ids in file "src/dune_pkg/lock.ml",
-    lines 258-260, characters 6-55
+    lines 261-263, characters 6-55
   Called from Dune_pkg__Lock.create_latest_version in file
-    "src/dune_pkg/lock.ml", line 299, characters 17-43
+    "src/dune_pkg/lock.ml", line 302, characters 17-43
   Called from Stdune__Result.map in file "otherlibs/stdune/src/result.ml", line
     45, characters 15-20
   Called from Dune_pkg__Opam_solver.solve_lock_dir.(fun) in file
-    "src/dune_pkg/opam_solver.ml", lines 1951-1995, characters 9-29
+    "src/dune_pkg/opam_solver.ml", lines 1951-1981, characters 9-29
   Called from Fiber__Scheduler.exec in file "src/fiber/src/scheduler.ml", line
     76, characters 8-11
   Internal error, please report upstream including the contents of _build/log.
@@ -193,13 +193,13 @@ Solver doesn't complain about cycles.
   Raised at Stdune__Code_error.raise in file
     "otherlibs/stdune/src/code_error.ml", line 10, characters 30-62
   Called from Dune_pkg__Lock.compute_build_ids in file "src/dune_pkg/lock.ml",
-    lines 258-260, characters 6-55
+    lines 261-263, characters 6-55
   Called from Dune_pkg__Lock.create_latest_version in file
-    "src/dune_pkg/lock.ml", line 299, characters 17-43
+    "src/dune_pkg/lock.ml", line 302, characters 17-43
   Called from Stdune__Result.map in file "otherlibs/stdune/src/result.ml", line
     45, characters 15-20
   Called from Dune_pkg__Opam_solver.solve_lock_dir.(fun) in file
-    "src/dune_pkg/opam_solver.ml", lines 1951-1995, characters 9-29
+    "src/dune_pkg/opam_solver.ml", lines 1951-1981, characters 9-29
   Called from Fiber__Scheduler.exec in file "src/fiber/src/scheduler.ml", line
     76, characters 8-11
   Internal error, please report upstream including the contents of _build/log.
@@ -208,13 +208,13 @@ Solver doesn't complain about cycles.
   Raised at Stdune__Code_error.raise in file
     "otherlibs/stdune/src/code_error.ml", line 10, characters 30-62
   Called from Dune_pkg__Lock.compute_build_ids in file "src/dune_pkg/lock.ml",
-    lines 258-260, characters 6-55
+    lines 261-263, characters 6-55
   Called from Dune_pkg__Lock.create_latest_version in file
-    "src/dune_pkg/lock.ml", line 299, characters 17-43
+    "src/dune_pkg/lock.ml", line 302, characters 17-43
   Called from Stdune__Result.map in file "otherlibs/stdune/src/result.ml", line
     45, characters 15-20
   Called from Dune_pkg__Opam_solver.solve_lock_dir.(fun) in file
-    "src/dune_pkg/opam_solver.ml", lines 1951-1995, characters 9-29
+    "src/dune_pkg/opam_solver.ml", lines 1951-1981, characters 9-29
   Called from Fiber__Scheduler.exec in file "src/fiber/src/scheduler.ml", line
     76, characters 8-11
   [1]

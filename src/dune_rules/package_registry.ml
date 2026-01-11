@@ -7,6 +7,10 @@ module Source = struct
         ; stanza : Dune_lang.Vendor_stanza.t
         }
     | From_lock of { pkg : Dune_pkg.Pkg.t }
+    | From_workspace of
+        { pkg : Package.t
+        ; source_dir : Path.Source.t
+        }
 end
 
 type entry =
@@ -39,25 +43,54 @@ let version t name =
 
 let package_for_library t lib_name = String.Map.find t.lib_to_package lib_name
 
+(* Check if a package needs a marker file for dependency tracking.
+   Lock packages and opam-sandboxed vendor packages need markers. *)
+let needs_marker entry =
+  match entry.source with
+  | Source.From_lock _ -> true
+  | Source.From_vendor { stanza; _ } ->
+    (match stanza.build_method with
+     | Some Dune_lang.Vendor_stanza.Build_method.Opam_sandboxed -> true
+     | Some Dune_native | None -> false)
+  | Source.From_workspace _ -> false
+;;
+
+(* Check if a package should install to the shared prefix.
+   Most packages do, except vendor packages with install=false. *)
+let install_to_prefix entry =
+  match entry.source with
+  | Source.From_lock _ -> true
+  | Source.From_vendor { stanza; _ } -> stanza.install
+  | Source.From_workspace _ -> true
+;;
+
 let of_lock_packages pkgs =
   let entries =
     Package.Name.Map.mapi pkgs ~f:(fun name pkg ->
       { name; version = pkg.Dune_pkg.Pkg.info.version; source = Source.From_lock { pkg } })
   in
-  { entries; lib_to_package = String.Map.empty }
+  (* For lock packages, assume each package provides a library with the same name.
+     This is a reasonable default; the lib-cache can provide more accurate mappings
+     once packages are fetched and scanned. *)
+  let lib_to_package =
+    Package.Name.Map.fold pkgs ~init:String.Map.empty ~f:(fun pkg acc ->
+      let name = pkg.Dune_pkg.Pkg.info.name in
+      let lib_name = Package.Name.to_string name in
+      String.Map.set acc lib_name name)
+  in
+  { entries; lib_to_package }
 ;;
 
-(* Lock files compile to the vendor registry with vendor stanzas taking precedence.
+(* Package registry merges vendor stanzas and lock files.
 
-   Resolution order:
+   Resolution order (vendor > lock):
    1. First, scan all (vendor ...) stanzas → add as From_vendor
-   2. Then, load lock file and for each package:
-      - If already in registry from vendor stanza, skip (vendor takes precedence)
-      - Otherwise add as From_lock
+   2. Then, load lock file packages → add as From_lock
+      (skip if already provided by vendor)
 
-   This ensures vendor stanzas can override lock file packages, allowing users
-   to manually vendor specific packages while still using the lock file for
-   the rest of their dependencies. *)
+   Note: Workspace packages are handled separately in pkg_rules.ml to avoid
+   dependency cycles. When resolving dependencies, pkg_rules checks if a package
+   name matches a workspace package and treats it as a From_workspace dependency. *)
 let of_ctx =
   let impl_workspace ctx =
     let open Memo.O in
@@ -109,29 +142,58 @@ let of_ctx =
           entries, libs)
     in
     (* Step 2: Load lock file packages - skip those already provided by vendor *)
-    let+ lock_entries =
+    let+ lock_entries, lock_lib_to_package =
       Lock_dir.lock_dir_active ctx
       >>= function
-      | false -> Memo.return Package.Name.Map.empty
+      | false -> Memo.return (Package.Name.Map.empty, String.Map.empty)
       | true ->
         let* lock_dir = Lock_dir.get_exn ctx
         and* platform = Lock_dir.Sys_vars.solver_env in
         let pkgs = Dune_pkg.Lock.packages_on_platform lock_dir ~platform in
-        Package.Name.Map.foldi pkgs ~init:Package.Name.Map.empty ~f:(fun name pkg acc ->
-          if Package.Name.Map.mem vendor_entries name
-          then acc (* Vendor takes precedence *)
-          else (
-            let entry =
-              { name
-              ; version = pkg.Dune_pkg.Pkg.info.version
-              ; source = Source.From_lock { pkg }
-              }
-            in
-            Package.Name.Map.set acc name entry))
-        |> Memo.return
+        let entries =
+          Package.Name.Map.foldi pkgs ~init:Package.Name.Map.empty ~f:(fun name pkg acc ->
+            if Package.Name.Map.mem vendor_entries name
+            then acc (* Vendor takes precedence *)
+            else (
+              let entry =
+                { name
+                ; version = pkg.Dune_pkg.Pkg.info.version
+                ; source = Source.From_lock { pkg }
+                }
+              in
+              Package.Name.Map.set acc name entry))
+        in
+        (* Build lib_to_package for lock entries.
+           First use default (package provides library with same name),
+           then merge with lib-cache which has accurate mappings. *)
+        let libs =
+          Package.Name.Map.fold entries ~init:String.Map.empty ~f:(fun entry acc ->
+            let pkg_name_str = Package.Name.to_string entry.name in
+            (* Default: assume package provides library with same name *)
+            String.Map.set acc pkg_name_str entry.name)
+        in
+        (* The lib-cache (populated by dune pkg fetch) provides accurate mappings
+           from library names to package names. Merge these in. *)
+        let libs =
+          List.fold_left
+            (Vendor_rules.lib_cache_entries ())
+            ~init:libs
+            ~f:(fun acc (lib_name, pkg_name) ->
+              let name = Package.Name.of_string pkg_name in
+              (* Only add if this package is in our lock entries *)
+              if Package.Name.Map.mem entries name
+              then String.Map.set acc lib_name name
+              else acc)
+        in
+        Memo.return (entries, libs)
     in
     let entries =
       Package.Name.Map.union vendor_entries lock_entries ~f:(fun _ vendor _lock ->
+        Some vendor)
+    in
+    (* Merge lib_to_package: vendor entries take precedence *)
+    let lib_to_package =
+      String.Map.union lib_to_package lock_lib_to_package ~f:(fun _ vendor _lock ->
         Some vendor)
     in
     { entries; lib_to_package }

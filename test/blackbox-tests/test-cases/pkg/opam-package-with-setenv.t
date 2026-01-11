@@ -42,7 +42,7 @@ The exported env from the first package should be in the lock dir.
    (=+ append_without_leading_sep "Appended without leading sep")
    (=: append_with_leading_sep "Appended with leading sep"))
   
-  (build_id e235377bd3979e4208dd2dc1a90767e4)
+  (build_id 7f2a7f7339fc5e2d86a9645dec430b39)
   $ cat ${default_lock_dir}/deps-on-with-setenv.0.0.1.pkg
   (version 0.0.1)
   
@@ -59,7 +59,7 @@ The exported env from the first package should be in the lock dir.
   (depends
    (all_platforms (with-setenv)))
   
-  (build_id c067dc1eeae8ed42323e4467489796a7)
+  (build_id 0ab14c15ff77031f9d4ee913922610f4)
 
 When building the second package the exported env vars from the first package should be
 available and all the env updates should be applied correctly.

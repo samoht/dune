@@ -54,3 +54,7 @@ val pkg_id_of_project_dependency
   :  Context_name.t
   -> Package.Name.t
   -> Pkg_id.t option Memo.t
+
+(** Set up rule to generate lib-cache file at _build/.pkgs/lib-cache.
+    Returns Some rule if a lock file exists, None otherwise. *)
+val setup_lib_cache_rule : unit -> Rule.t option Memo.t

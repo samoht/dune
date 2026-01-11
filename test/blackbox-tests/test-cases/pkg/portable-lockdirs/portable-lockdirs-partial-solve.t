@@ -93,8 +93,10 @@ The lockdir will contain a list of the platforms where solving succeeded.
   (dependency_hash 36e640fbcda71963e7e2f689f6c96c3e)
   
   (repositories
-   (complete false)
-   (used))
+   (complete true)
+   (used
+    ((source
+      $SANDBOX/default/test/blackbox-tests/test-cases/pkg/portable-lockdirs/mock-opam-repository#HASH))))
   
   (solved_for_platforms
    ((arch x86_64)
@@ -119,11 +121,11 @@ No errors when you try to build the platform on macos.
 
 Building on linux fails because the lockdir doesn't contain a compatible solution.
   $ DUNE_CONFIG__OS=linux DUNE_CONFIG__ARCH=arm64 DUNE_CONFIG__OS_FAMILY=debian DUNE_CONFIG__OS_DISTRIBUTION=ubuntu DUNE_CONFIG__OS_VERSION=24.11 dune build
-  File "dune.lock/lock.dune", lines 10-13, characters 1-58:
-  10 |  ((arch x86_64)
-  11 |   (os macos))
-  12 |  ((arch arm64)
-  13 |   (os macos)))
+  File "dune.lock/lock.dune", lines 12-15, characters 1-58:
+  12 |  ((arch x86_64)
+  13 |   (os macos))
+  14 |  ((arch arm64)
+  15 |   (os macos)))
   Error: The lockdir does not contain a solution compatible with the current
   platform.
   The current platform is:

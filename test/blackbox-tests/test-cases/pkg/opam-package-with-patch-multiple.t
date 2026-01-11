@@ -71,7 +71,7 @@ The lockfile should contain the patch action.
        (patch dir/bar.patch)
        (run cat foo.ml bar.ml dir/baz.ml))))))
   
-  (build_id b050fac26d1e863b62565f31afdd9e73)
+  (build_id dcd40ad02095e66432617647aecbfe26)
   (source (copy $TESTCASE_ROOT/source))
 
   $ mkdir -p source/dir

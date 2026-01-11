@@ -73,10 +73,14 @@ Depend on these new packages in a random order
   > EOF
 
   $ dune build
-  Error: dune.lock/lock.dune: Not a directory
-  [1]
 
 The order should of dependencies should be non-random:
 
   $ dune trace cat \
   > | jq 'include "dune"; logs("Dependency solution") | del(.lock_dir)'
+  {
+    "message": "Dependency solution",
+    "packages": [
+      "foo.0.0.2"
+    ]
+  }

@@ -111,7 +111,7 @@ Package which has boolean where string was expected. This should be caught while
        (when %{pkg-self:dev} (run dune subst))
        (run dune build -p %{pkg-self:name} -j %{jobs} @install))))))
   
-  (build_id 44b0a9fb1cc318c344b3697540eb0462)
+  (build_id bc6647f9aa5e02e45f87bf11d774ffbc)
 
   $ cat ${default_lock_dir}/with-interpolation.0.0.1.pkg
   (version 0.0.1)
@@ -127,7 +127,7 @@ Package which has boolean where string was expected. This should be caught while
        (run ./configure --prefix=%{prefix} --docdir=%{doc}/ocaml)
        (run %{make} -j%{jobs}))))))
   
-  (build_id 74e0c7bdf4eb570a645f4a77224e4a11)
+  (build_id f188145da1ab58087a839931602d6b59)
 
   $ cat ${default_lock_dir}/with-percent-sign.0.0.1.pkg
   (version 0.0.1)
@@ -135,7 +135,7 @@ Package which has boolean where string was expected. This should be caught while
   (build
    (all_platforms ((action (run printf %d 42)))))
   
-  (build_id 814d59390605dfce421adad55a97dc8a)
+  (build_id 22c2fa0587dd36756bb6d1d6dbdcda1b)
 
   $ cat ${default_lock_dir}/variable-types.0.0.1.pkg
   (version 0.0.1)
@@ -149,7 +149,7 @@ Package which has boolean where string was expected. This should be caught while
        (run echo %{pkg:foo:package_var})
        (run echo %{os_family}))))))
   
-  (build_id 4f54bd07c75d9472ae3b041be4568380)
+  (build_id a3e3383fde978f6e5dd9132c1daa38c0)
 
   $ solve with-malformed-interpolation
   File "$TESTCASE_ROOT/mock-opam-repository/packages/with-malformed-interpolation/with-malformed-interpolation.0.0.1/opam", line 1, characters 0-0:
@@ -204,7 +204,7 @@ Package which has boolean where string was expected. This should be caught while
         (and %{pkg:foo:installed} %{pkg:bar:installed} %{pkg:baz:installed})
         (run echo m)))))))
   
-  (build_id 17288d0c63dd562657a592e9cf59913e)
+  (build_id 386160b9e006131d467bd64bcd9ad32b)
 
 
 
@@ -253,7 +253,7 @@ Test that if opam filter translation is disabled the output doesn't contain any 
         (and %{pkg:foo:installed} %{pkg:bar:installed} %{pkg:baz:installed})
         (run echo m)))))))
   
-  (build_id 17288d0c63dd562657a592e9cf59913e)
+  (build_id 386160b9e006131d467bd64bcd9ad32b)
 
   $ solve --format=directory exercise-term-filters
   Solution for dune.lock (1 package):
@@ -275,7 +275,7 @@ Test that if opam filter translation is disabled the output doesn't contain any 
          false)
         c))))))
   
-  (build_id a7743359c287d1576d22f35dcf6b81b8)
+  (build_id 2062a794bb674c206602689d759d96d8)
 
   $ solve filter-error-bool-where-string-expected
   File "$TESTCASE_ROOT/mock-opam-repository/packages/filter-error-bool-where-string-expected/filter-error-bool-where-string-expected.0.0.1/opam", line 3, characters 33-34:
@@ -381,4 +381,4 @@ preserved between opam and dune.
           y)
          -feature)))))))
   
-  (build_id c8ff56957c090b70ad146587d1386d3e)
+  (build_id 600cc2a3c69680439d88ca9dac36dc77)

@@ -20,5 +20,17 @@ a lockdir containing an "ocaml" lockfile.
   $ dune build
 
   $ DUNE_CONFIG__LOCK_DEV_TOOL=enabled dune ocaml doc
-  Error: dune.lock/lock.dune: Not a directory
+  Solution for _build/.locks/tools-odoc (4 packages)
+  opam:
+  - ocaml.5.2.0
+  - ocaml-base-compiler.5.2.0
+  - ocaml-compiler.5.2.0
+  - odoc.0.0.1
+  hello from fake odoc
+  hello from fake odoc
+  File "_doc/_html/_unknown_", line 1, characters 0-0:
+  Error: Rule failed to produce directory "_doc/_html/odoc.support"
+  File "_doc/_odoc/pkg/foo/_unknown_", line 1, characters 0-0:
+  Error: Rule failed to generate the following targets:
+  - _doc/_odoc/pkg/foo/page-index.odoc
   [1]

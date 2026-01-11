@@ -741,8 +741,8 @@ let raise_on_lock_dir_out_of_sync =
 let pkg_context_rules ~dir components =
   match components with
   | [] ->
-    (* _build/.pkgs/ - list all contexts (workspace contexts + dev tool contexts) *)
-    let+ context_dirs =
+    (* _build/.pkgs/ - list all contexts and set up lib-cache rule *)
+    let* context_dirs =
       let+ workspace = Workspace.workspace () in
       let workspace_ctxs =
         Workspace.build_contexts workspace
@@ -757,7 +757,14 @@ let pkg_context_rules ~dir components =
     let build_dir_only_sub_dirs =
       Gen_rules.Build_only_sub_dirs.singleton ~dir context_dirs
     in
-    Gen_rules.make ~build_dir_only_sub_dirs (Memo.return Rules.empty)
+    (* Set up lib-cache rule if a lock file exists *)
+    let+ lib_cache_rule = Pkg_rules.setup_lib_cache_rule () in
+    let rules =
+      match lib_cache_rule with
+      | None -> Rules.empty
+      | Some rule -> Rules.of_rules [ rule ]
+    in
+    Gen_rules.make ~build_dir_only_sub_dirs (Memo.return rules)
   | ctx_name :: rest ->
     (* _build/.pkgs/<ctx>/... *)
     let ctx = Context_name.of_string ctx_name in

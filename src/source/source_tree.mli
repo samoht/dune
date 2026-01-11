@@ -74,3 +74,11 @@ val all_vendor_stanzas : unit -> (Path.Source.t * Vendor_stanza.t) list Memo.t
 (** [nearest_vcs t fn] returns the version control system with the longest root
     path that is an ancestor of [fn]. *)
 val nearest_vcs : Path.Source.t -> Vcs.t option Memo.t
+
+(** [all_workspace_packages ()] returns all packages defined in the workspace
+    via (package ...) stanzas in dune-project files. Returns a map from package
+    name to (package, source_dir) pairs. This function is designed to be called
+    from Package_registry without creating dependency cycles. *)
+val all_workspace_packages
+  :  unit
+  -> (Dune_lang.Package.t * Path.Source.t) Dune_lang.Package.Name.Map.t Memo.t

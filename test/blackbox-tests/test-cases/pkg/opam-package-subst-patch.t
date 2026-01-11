@@ -34,7 +34,7 @@ The lockfile should contain the substitute and patch actions.
        (patch foo.patch)
        (run sh -c "[ -e foo.ml ] && cat foo.ml"))))))
   
-  (build_id d980d857b3f1318819fc5096aa784737)
+  (build_id 969551be658e0c0ffd709725fa742b51)
   (source (copy $TESTCASE_ROOT/source))
 
   $ mkdir source

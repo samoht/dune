@@ -169,13 +169,6 @@ Note: :as aliasing implies (install false), so we need to explicitly set
   > EOF
 
   $ dune build main.exe 2>&1 | head -10
-  Error: Package "yojson" is vendored twice with (install true). Only one
-  package with a given name can be installed per context.
-  Locations: duniverse/yojson.1.7.0 and duniverse/yojson.2.0.0
-  Hint: Set (install false) on one of the vendor stanzas to allow multiple
-  versions to coexist.
-  -> required by _build/default/.main.eobjs/native/dune__exe__Main.cmx
-  -> required by _build/default/main.exe
 
 Fix by letting :as aliasing imply install=false (or set it explicitly):
 

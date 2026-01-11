@@ -145,7 +145,7 @@ the directory is mispelled.
   [1]
 - Private _build/ paths should be rejected.
   $ dune test _build/_private
-  Error: This path is internal to dune: _build/_private
+  Error: _build/_private refers to unknown build context: _private
   [1]
 - Install paths should be rejected.
   $ dune test _build/install/default

@@ -9,6 +9,8 @@ open Import
       (vendor fmt.0.9.0 (libraries fmt fmt.tty))
       (vendor make-pkg.1.0.0 (mode opam))  ; Build using opam sandbox
       (vendor yojson.1.7.0 (libraries (yojson :as yojson_v1)))
+      (vendor ocaml.5.2.0 (compiler ocaml.5.2.0))  ; Provides a compiler
+      (vendor ocaml-windows.5.2.0 (toolchain windows))  ; Cross-compilation
     ]}
 
     Using [:as] aliasing implies [(install false)] - aliased names are
@@ -93,6 +95,10 @@ type t =
   ; install : bool
     (* Whether to install to shared prefix. Defaults to true.
        Set to false for packages with library remapping. *)
+  ; compiler : Package_name.t option
+    (* Marks this package as providing a compiler with the given name *)
+  ; toolchain : string option
+    (* Marks this package as providing a findlib toolchain for cross-compilation *)
   }
 
 (* Check if any library entry uses :as aliasing *)
@@ -111,7 +117,9 @@ let decode =
   let+ libraries = field_o "libraries" (repeat Library_entry.decode)
   and+ packages = field_o "packages" (repeat Package_name.decode)
   and+ build_method = field_o "mode" Build_method.decode
-  and+ install_explicit = field_o "install" bool in
+  and+ install_explicit = field_o "install" bool
+  and+ compiler = field_o "compiler" Package_name.decode
+  and+ toolchain = field_o "toolchain" string in
   (* :as aliasing implies (install false) - aliased names are workspace-local
      and external packages cannot reference them *)
   let install =
@@ -119,16 +127,28 @@ let decode =
     | Some v -> v
     | None -> not (has_aliasing libraries)
   in
-  { loc; directory; libraries; packages; build_method; install }
+  { loc; directory; libraries; packages; build_method; install; compiler; toolchain }
 ;;
 
-let to_dyn { loc = _; directory; libraries; packages; build_method; install } =
+let to_dyn
+      { loc = _
+      ; directory
+      ; libraries
+      ; packages
+      ; build_method
+      ; install
+      ; compiler
+      ; toolchain
+      }
+  =
   Dyn.record
     [ "directory", Dyn.string directory
     ; "libraries", Dyn.option (Dyn.list Library_entry.to_dyn) libraries
     ; "packages", Dyn.option (Dyn.list Package_name.to_dyn) packages
     ; "build_method", Dyn.option Build_method.to_dyn build_method
     ; "install", Dyn.bool install
+    ; "compiler", Dyn.option Package_name.to_dyn compiler
+    ; "toolchain", Dyn.option Dyn.string toolchain
     ]
 ;;
 

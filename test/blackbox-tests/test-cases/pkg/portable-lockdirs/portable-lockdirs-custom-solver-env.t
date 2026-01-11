@@ -66,7 +66,7 @@ Confirming that the build action creates the conditional file:
        (run touch %{lib}/%{pkg-self:name}/META)
        (run sh -c "echo %{sys_ocaml_version} > %{share}/sys-ocaml-version"))))))
   
-  (build_id aab59148f446e7f0a56407b000352739)
+  (build_id 62c013411dd7c3bbde0ef3f9863460e4)
 
 Build and print the file that was conditionally added. Note that the value of
 "sys-ocaml-version" at solve-time may be different from "sys-ocaml-version" at

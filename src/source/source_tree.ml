@@ -478,6 +478,47 @@ let all_vendor_stanzas =
 
 let all_vendor_stanzas () = Memo.Lazy.force all_vendor_stanzas
 
+(* Collect workspace packages as a list, then convert to map *)
+module Workspace_packages_list = Monoid.Appendable_list (struct
+    type t = Dune_lang.Package.Name.t * Dune_lang.Package.t * Path.Source.t
+  end)
+
+module All_workspace_packages_map_reduce =
+  Make_map_reduce_with_progress (Memo) (Workspace_packages_list)
+
+(* Track project roots we've seen to avoid processing the same project multiple times *)
+let all_workspace_packages =
+  Memo.lazy_ ~name:"all-workspace-packages" (fun () ->
+    let seen_roots = ref Path.Source.Set.empty in
+    All_workspace_packages_map_reduce.map_reduce
+      ~traverse:Source_dir_status.Set.all
+      ~trace_event_name:"find all workspace packages"
+      ~f:(fun dir ->
+        let project = Dir.project dir in
+        let root = Dune_project.root project in
+        (* Only process each project root once *)
+        if Path.Source.Set.mem !seen_roots root
+        then Memo.return Workspace_packages_list.empty
+        else (
+          seen_roots := Path.Source.Set.add !seen_roots root;
+          let packages = Dune_project.packages project in
+          let result =
+            Dune_lang.Package.Name.Map.to_list packages
+            |> List.map ~f:(fun (name, pkg) ->
+              let source_dir = Dune_lang.Package.dir pkg in
+              name, pkg, source_dir)
+            |> Appendable_list.of_list
+          in
+          Memo.return result))
+    >>| Appendable_list.to_list
+    >>| List.fold_left
+          ~init:Dune_lang.Package.Name.Map.empty
+          ~f:(fun acc (name, pkg, source_dir) ->
+            Dune_lang.Package.Name.Map.set acc name (pkg, source_dir)))
+;;
+
+let all_workspace_packages () = Memo.Lazy.force all_workspace_packages
+
 let ancestor_vcs =
   Memo.lazy_ ~name:"ancestor_vcs" (fun () ->
     if Execution_env.inside_dune

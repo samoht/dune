@@ -48,5 +48,5 @@ With directory format, the opam 'depext' field is stored in foo.pkg:
   (depexts
    (unzip gnupg))
   
-  (build_id d02be6eb931ef23ac1387e84e26af03a)
+  (build_id 0b88bf484185391c75e1c82fce8ff8b5)
 

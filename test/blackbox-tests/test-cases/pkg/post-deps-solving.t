@@ -29,7 +29,7 @@ We don't need bar, so we skip it
   (post_depends
    (all_platforms (bar)))
   
-  (build_id b40612f3a54419c1c534b8a5568bf1b7)
+  (build_id 12bd011c41e719f1ad5f2bd34ce714c6)
 
 
 We should also skip any artifacts that bar references:
@@ -54,7 +54,7 @@ Self dependency
   (post_depends
    (all_platforms (foo)))
   
-  (build_id d7ea9e3607757fc161a1557912c98bec)
+  (build_id 5c672787c23b791898c43beb762b20e2)
 
 
 Using post to break cycle:
@@ -79,13 +79,13 @@ Using post to break cycle:
   (post_depends
    (all_platforms (bar)))
   
-  (build_id b40612f3a54419c1c534b8a5568bf1b7)
+  (build_id 12bd011c41e719f1ad5f2bd34ce714c6)
   (version 0.0.1)
   
   (depends
    (all_platforms (foo)))
   
-  (build_id c049ada97085567bba52dd3bdf1ad876)
+  (build_id 980153696bad96063a93cae8561cdf1e)
 
 
 
@@ -111,7 +111,7 @@ post "cycle":
   (post_depends
    (all_platforms (bar)))
   
-  (build_id b40612f3a54419c1c534b8a5568bf1b7)
+  (build_id 12bd011c41e719f1ad5f2bd34ce714c6)
 
 
 In depopts:

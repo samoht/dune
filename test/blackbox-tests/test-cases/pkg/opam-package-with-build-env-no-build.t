@@ -19,4 +19,4 @@ file.
   $ cat ${default_lock_dir}/with-build-env.0.0.1.pkg
   (version 0.0.1)
   
-  (build_id 808c690be36dae99eb50d9e35b856429)
+  (build_id 7936eaf0734c289a55c052301a07b846)

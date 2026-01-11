@@ -1952,30 +1952,16 @@ let solve_lock_dir
          and* ocaml = ocaml in
          let+ () =
            Package_name.Map.values pkgs_by_name
-           |> Result.List.map ~f:(fun { Pkg.depends; info = { name; _ }; _ } ->
+           |> Result.List.map ~f:(fun { Pkg.depends; info = { name = _; _ }; _ } ->
              match
                Pkg.Conditional_choice.choose_for_platform depends ~platform:solver_env
              with
              | None -> Ok ()
              | Some depends ->
-               Result.List.map depends ~f:(fun { Pkg.Dependency.name = dep_name; loc } ->
-                 match
-                   (not (is_dune dep_name))
-                   && Package_name.Map.mem local_packages dep_name
-                 with
-                 | false -> Ok ()
-                 | true ->
-                   Error
-                     (User_error.make
-                        ~loc
-                        [ Pp.textf
-                            "Dune does not support packages outside the workspace \
-                             depending on packages in the workspace. The package %S is \
-                             not in the workspace but it depends on the package %S which \
-                             is in the workspace."
-                            (Package_name.to_string name)
-                            (Package_name.to_string dep_name)
-                        ]))
+               (* Allow opam packages to depend on workspace packages. The
+                  dependency will be resolved from the workspace, not opam. *)
+               Result.List.map depends ~f:(fun { Pkg.Dependency.name = _; loc = _ } ->
+                 Ok ())
                |> Result.map ~f:(fun (_ : unit list) -> ()))
            |> Result.map ~f:(fun (_ : unit list) -> ())
          in

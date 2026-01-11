@@ -266,7 +266,8 @@ let%expect_test "raise inside callback" =
   [%expect
     {|
     [EXIT]
-    exiting. |}]
+    exiting.
+    |}]
 ;;
 
 let%expect_test "set exclusion paths" =

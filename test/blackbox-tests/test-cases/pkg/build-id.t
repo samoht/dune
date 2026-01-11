@@ -38,9 +38,9 @@ Solve and check that build_id is stored in the .pkg files.
 Check that each package has a build_id field:
 
   $ grep build_id dune.lock/*.pkg
-  dune.lock/bar.0.0.1.pkg:(build_id c9968762c541b6ce79781be30e7b2826)
-  dune.lock/baz.0.0.1.pkg:(build_id 07880970fac78b92ce546681a4be2f46)
-  dune.lock/foo.0.0.1.pkg:(build_id 386979f1769f82fc34ca1a9323aa68c8)
+  dune.lock/bar.0.0.1.pkg:(build_id 6ba195e908e74df8f53e9db7ae6f069e)
+  dune.lock/baz.0.0.1.pkg:(build_id 9869f704586c2d97766b11b576377899)
+  dune.lock/foo.0.0.1.pkg:(build_id c747ded7217926a59925a8f17949a2d4)
 
 Save the build_ids for comparison:
 

@@ -37,12 +37,12 @@ Run the solver and generate a lock directory.
   Please make sure you have the correct access rights
   and the repository exists.
   File "dune-workspace", line 6, characters 6-176:
-  6 |  (url "git+file:///Users/samoht/git/dune/_build/.sandbox/fc7654fc9d9df9ab8e4140dac8923f9a/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"))
+  6 |  (url "git+file:///Users/samoht/git/dune/_build/.sandbox/da1268f68d17ef40b6da706f210178e4/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"))
             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   Error: Failed to run external command:
-  'git ls-remote "file:///Users/samoht/git/dune/_build/.sandbox/fc7654fc9d9df9ab8e4140dac8923f9a/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"'
+  'git ls-remote "file:///Users/samoht/git/dune/_build/.sandbox/da1268f68d17ef40b6da706f210178e4/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"'
   Hint: Check that this Git URL in the project configuration is correct:
-  "file:///Users/samoht/git/dune/_build/.sandbox/fc7654fc9d9df9ab8e4140dac8923f9a/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"
+  "file:///Users/samoht/git/dune/_build/.sandbox/da1268f68d17ef40b6da706f210178e4/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"
   [1]
 
 Helper to the name and contents of each file in the lock directory separated by
@@ -61,12 +61,12 @@ Run the solver again preferring oldest versions of dependencies:
   Please make sure you have the correct access rights
   and the repository exists.
   File "dune-workspace", line 6, characters 6-176:
-  6 |  (url "git+file:///Users/samoht/git/dune/_build/.sandbox/fc7654fc9d9df9ab8e4140dac8923f9a/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"))
+  6 |  (url "git+file:///Users/samoht/git/dune/_build/.sandbox/da1268f68d17ef40b6da706f210178e4/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"))
             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   Error: Failed to run external command:
-  'git ls-remote "file:///Users/samoht/git/dune/_build/.sandbox/fc7654fc9d9df9ab8e4140dac8923f9a/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"'
+  'git ls-remote "file:///Users/samoht/git/dune/_build/.sandbox/da1268f68d17ef40b6da706f210178e4/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"'
   Hint: Check that this Git URL in the project configuration is correct:
-  "file:///Users/samoht/git/dune/_build/.sandbox/fc7654fc9d9df9ab8e4140dac8923f9a/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"
+  "file:///Users/samoht/git/dune/_build/.sandbox/da1268f68d17ef40b6da706f210178e4/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"
   [1]
 
   $ print_all
@@ -90,12 +90,12 @@ Run the solver again. This time it will fail.
   Please make sure you have the correct access rights
   and the repository exists.
   File "dune-workspace", line 6, characters 6-176:
-  6 |  (url "git+file:///Users/samoht/git/dune/_build/.sandbox/fc7654fc9d9df9ab8e4140dac8923f9a/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"))
+  6 |  (url "git+file:///Users/samoht/git/dune/_build/.sandbox/da1268f68d17ef40b6da706f210178e4/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"))
             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   Error: Failed to run external command:
-  'git ls-remote "file:///Users/samoht/git/dune/_build/.sandbox/fc7654fc9d9df9ab8e4140dac8923f9a/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"'
+  'git ls-remote "file:///Users/samoht/git/dune/_build/.sandbox/da1268f68d17ef40b6da706f210178e4/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"'
   Hint: Check that this Git URL in the project configuration is correct:
-  "file:///Users/samoht/git/dune/_build/.sandbox/fc7654fc9d9df9ab8e4140dac8923f9a/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"
+  "file:///Users/samoht/git/dune/_build/.sandbox/da1268f68d17ef40b6da706f210178e4/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"
   [1]
 
 We'll also test how the lockfile generation works with alternate solutions.
@@ -122,12 +122,12 @@ both.
   Please make sure you have the correct access rights
   and the repository exists.
   File "dune-workspace", line 6, characters 6-176:
-  6 |  (url "git+file:///Users/samoht/git/dune/_build/.sandbox/fc7654fc9d9df9ab8e4140dac8923f9a/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"))
+  6 |  (url "git+file:///Users/samoht/git/dune/_build/.sandbox/da1268f68d17ef40b6da706f210178e4/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"))
             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   Error: Failed to run external command:
-  'git ls-remote "file:///Users/samoht/git/dune/_build/.sandbox/fc7654fc9d9df9ab8e4140dac8923f9a/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"'
+  'git ls-remote "file:///Users/samoht/git/dune/_build/.sandbox/da1268f68d17ef40b6da706f210178e4/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"'
   Hint: Check that this Git URL in the project configuration is correct:
-  "file:///Users/samoht/git/dune/_build/.sandbox/fc7654fc9d9df9ab8e4140dac8923f9a/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"
+  "file:///Users/samoht/git/dune/_build/.sandbox/da1268f68d17ef40b6da706f210178e4/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"
   [1]
 Top level or is simple, but does nested or work? nested-r defines nested or
 patterns that can't be simplified
@@ -156,12 +156,12 @@ well as bar or qux.
   Please make sure you have the correct access rights
   and the repository exists.
   File "dune-workspace", line 6, characters 6-176:
-  6 |  (url "git+file:///Users/samoht/git/dune/_build/.sandbox/fc7654fc9d9df9ab8e4140dac8923f9a/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"))
+  6 |  (url "git+file:///Users/samoht/git/dune/_build/.sandbox/da1268f68d17ef40b6da706f210178e4/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"))
             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   Error: Failed to run external command:
-  'git ls-remote "file:///Users/samoht/git/dune/_build/.sandbox/fc7654fc9d9df9ab8e4140dac8923f9a/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"'
+  'git ls-remote "file:///Users/samoht/git/dune/_build/.sandbox/da1268f68d17ef40b6da706f210178e4/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"'
   Hint: Check that this Git URL in the project configuration is correct:
-  "file:///Users/samoht/git/dune/_build/.sandbox/fc7654fc9d9df9ab8e4140dac8923f9a/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"
+  "file:///Users/samoht/git/dune/_build/.sandbox/da1268f68d17ef40b6da706f210178e4/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"
   [1]
 In the dependency formulas, & should bind stronger than | so if we depend on
 bar and quux or baz, it should pick the first two or the last one, but nothing
@@ -184,12 +184,12 @@ in between.
   Please make sure you have the correct access rights
   and the repository exists.
   File "dune-workspace", line 6, characters 6-176:
-  6 |  (url "git+file:///Users/samoht/git/dune/_build/.sandbox/fc7654fc9d9df9ab8e4140dac8923f9a/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"))
+  6 |  (url "git+file:///Users/samoht/git/dune/_build/.sandbox/da1268f68d17ef40b6da706f210178e4/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"))
             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   Error: Failed to run external command:
-  'git ls-remote "file:///Users/samoht/git/dune/_build/.sandbox/fc7654fc9d9df9ab8e4140dac8923f9a/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"'
+  'git ls-remote "file:///Users/samoht/git/dune/_build/.sandbox/da1268f68d17ef40b6da706f210178e4/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"'
   Hint: Check that this Git URL in the project configuration is correct:
-  "file:///Users/samoht/git/dune/_build/.sandbox/fc7654fc9d9df9ab8e4140dac8923f9a/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"
+  "file:///Users/samoht/git/dune/_build/.sandbox/da1268f68d17ef40b6da706f210178e4/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"
   [1]
  
 We also want to make sure nested negation in versions work fine. For this we
@@ -220,10 +220,10 @@ we'd expect version 2 to be chosen:
   Please make sure you have the correct access rights
   and the repository exists.
   File "dune-workspace", line 6, characters 6-176:
-  6 |  (url "git+file:///Users/samoht/git/dune/_build/.sandbox/fc7654fc9d9df9ab8e4140dac8923f9a/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"))
+  6 |  (url "git+file:///Users/samoht/git/dune/_build/.sandbox/da1268f68d17ef40b6da706f210178e4/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"))
             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   Error: Failed to run external command:
-  'git ls-remote "file:///Users/samoht/git/dune/_build/.sandbox/fc7654fc9d9df9ab8e4140dac8923f9a/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"'
+  'git ls-remote "file:///Users/samoht/git/dune/_build/.sandbox/da1268f68d17ef40b6da706f210178e4/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"'
   Hint: Check that this Git URL in the project configuration is correct:
-  "file:///Users/samoht/git/dune/_build/.sandbox/fc7654fc9d9df9ab8e4140dac8923f9a/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"
+  "file:///Users/samoht/git/dune/_build/.sandbox/da1268f68d17ef40b6da706f210178e4/default/test/blackbox-tests/test-cases/pkg/lockfile-generation.t/mock-opam-repository"
   [1]

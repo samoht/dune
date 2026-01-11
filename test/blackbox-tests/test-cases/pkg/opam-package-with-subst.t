@@ -27,7 +27,7 @@ The lockfile should contain the substitute action.
        (substitute foo.ml.in foo.ml)
        (run sh -c "[ -e foo.ml ] && cat foo.ml"))))))
   
-  (build_id ec5f6b065e4f1d9fa1e8a38e0ff9ea07)
+  (build_id e16099a3dcfeff9b8b3205367e96c038)
   (source (copy $TESTCASE_ROOT/source))
 
   $ mkdir source

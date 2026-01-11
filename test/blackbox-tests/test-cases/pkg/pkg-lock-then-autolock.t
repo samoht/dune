@@ -85,9 +85,11 @@ Build again - should auto-lock internally and NOT rebuild foo:
   no rebuilds
 
   $ dune exec bar
-  Error: dune.lock/lock.dune: Not a directory
-  -> required by lock directory environment for context "default"
-  -> required by base environment for context "default"
-  -> required by loading findlib for context "default"
-  -> required by creating installed environment for "default"
+  File "dune", line 3, characters 12-15:
+  3 |  (libraries foo))
+                  ^^^
+  Error: Library "foo" not found.
+  -> required by _build/default/.bar.eobjs/native/dune__exe__Bar.cmx
+  -> required by _build/default/bar.exe
+  -> required by _build/install/default/bin/bar
   [1]

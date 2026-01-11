@@ -121,15 +121,16 @@ let of_git_repo loc url =
     >>| User_error.ok_exn
   in
   let base_url = OpamUrl.base_url url in
-  (* Don't serialize local file:// URLs as they contain machine-specific paths *)
+  (* Serialize all URLs including local file:// URLs.
+     While local paths are machine-specific, they're needed for:
+     - Single-file lock format derivation
+     - Development and testing with local repos
+     Note: Lock files with local repos should not be committed to version control. *)
   let serializable =
-    if String.is_prefix base_url ~prefix:"file://"
-    then None
-    else
-      Some
-        (sprintf "%s#%s" base_url (Rev_store.Object.to_hex (Rev_store.At_rev.rev at_rev))
-         |> OpamUrl.of_string
-         |> OpamUrl.to_string)
+    Some
+      (sprintf "%s#%s" base_url (Rev_store.Object.to_hex (Rev_store.At_rev.rev at_rev))
+       |> OpamUrl.of_string
+       |> OpamUrl.to_string)
   in
   { source = Repo at_rev; serializable; loc }
 ;;

@@ -39,10 +39,32 @@ val read_project_name : Path.Source.t -> string option
 val find_opam_file : pkg_name:string -> pkg_dir:Path.Source.t -> Path.Source.t option
 
 (** {2 Library Cache}
-    Maps library names to directory names in duniverse/. Used by dune pkg fetch. *)
+    Maps library names to package names and directories. Used by dune pkg fetch
+    to record which libraries are provided by which packages. *)
 
+(** A lib-cache entry maps a library to its package and directory. *)
+type lib_cache_entry =
+  { lib_name : string
+  ; pkg_name : string
+  ; dirname : string
+  }
+
+(** Find the package name that provides a given library.
+    Uses the lib-cache file written by dune pkg fetch. *)
+val find_pkg_for_library : string -> string option
+
+(** Find the directory that contains a given library.
+    Uses the lib-cache file written by dune pkg fetch. *)
 val find_dir_for_library : string -> string option
+
+(** Get all lib-cache entries as (lib_name, pkg_name) pairs. *)
+val lib_cache_entries : unit -> (string * string) list
+
 val invalidate_lib_cache : unit -> unit
+val lib_cache_path : unit -> Path.Build.t
+
+(** Write lib-cache entries to file. *)
+val write_lib_cache : lib_cache_entry list -> unit
 
 (** {2 Vendored Package Map}
 
@@ -85,24 +107,12 @@ end
 val scan_vendor_dir : Path.Source.t -> Vendored_map.t
 val get_vendored_map : unit -> Vendored_map.t Memo.t
 
-(** {2 On-demand Build Triggers}
+(** {2 Package Build Directory}
 
-    These functions support on-demand vendor package building.
-    When a library is requested, callers can check if it comes from a
-    vendor package and add a dependency on the marker file to ensure
-    the package is built first. *)
+    Path to a package's build directory: _build/.pkgs/<ctx>/<name>/
+    Used by callers that need to compute marker paths. *)
 
-(** Get the marker file for a vendor package. Returns None if the package
-    doesn't exist or isn't an opam vendor package. *)
-val marker_for_package
-  :  context:Context_name.t
-  -> Package.Name.t
-  -> Path.Build.t option Memo.t
-
-(** Given a library name, find the vendor package that provides it and return
-    the marker file needed to trigger that package's build.
-    Returns None if the library is not from a vendor package. *)
-val marker_for_library : context:Context_name.t -> string -> Path.Build.t option Memo.t
+val pkg_build_dir : context:Context_name.t -> pkg_name:Package.Name.t -> Path.Build.t
 
 (** {2 Package Paths}
 

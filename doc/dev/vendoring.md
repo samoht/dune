@@ -155,10 +155,26 @@ The `vendor` stanza declares a vendored dependency directory:
  (toolchain <name>))          ; optional: marks this as providing a findlib toolchain
 ```
 
+Both `<lib-name>` and `<pkg-name>` use the standard ordered set language (like `(modules ...)`) with:
+- `:standard` — all libraries/packages found in the directory
+- `<name>` — expose with its original name
+- `(<name> :as <alias>)` — expose under a different name
+
+All fields are optional. When omitted:
+- `(libraries ...)` and `(packages ...)` should be auto-detected by scanning the directory
+- `(mode ...)` should be auto-detected: `dune` if dune files exist, `opam` otherwise
+- `(install ...)` defaults to `true`, except when `:as` aliasing is used (then `false`)
+- `(compiler ...)` defaults to none, unless the package provides an OCaml compiler
+- `(toolchain ...)` defaults to none, unless the package provides a cross-compilation toolchain
+
 ### Compiler and Toolchain Declaration
 
 The `(compiler ...)` and `(toolchain ...)` fields mark vendored packages as providing
-compilers or cross-compilation toolchains:
+compilers or cross-compilation toolchains. These are auto-detected when omitted:
+- A package is detected as a compiler if it provides `ocaml`, `ocamlc`, or `ocamlopt`
+- A package is detected as a toolchain if it provides cross-compilation binaries
+
+Explicit declaration:
 
 ```lisp
 ; Native compilers - used by (context (workspace (compiler ...)))
