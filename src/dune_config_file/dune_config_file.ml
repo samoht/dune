@@ -287,6 +287,7 @@ module Dune_config = struct
       [ "auto", Dune_engine.Display.Quiet
       ; "default", Dune_engine.Display.Quiet
       ; "quiet", Dune_engine.Display.Quiet
+      ; "progress", Dune_engine.Display.Short
       ; "short", Dune_engine.Display.Short
       ; "verbose", Dune_engine.Display.Verbose
       ]
