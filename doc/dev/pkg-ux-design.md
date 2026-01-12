@@ -520,25 +520,38 @@ Error: The lock file is not in sync with your dune-project
 Hint: run dune pkg lock
 ```
 
-**Proposal:** Add opt-in auto-lock via CLI flag and config file.
+**Proposal:** Add opt-in auto-lock and auto-fetch via CLI flags and config.
 
-**Option 1: CLI flag (one-time)**
+**CLI flags:**
 ```bash
-dune build --lock        # One-time auto-lock
+# High-level convenience flag
+dune build --pkg=enabled     # Auto-lock + auto-fetch
+dune build --pkg=portable    # Auto-lock for all platforms + auto-fetch
+
+# Granular control
+dune build --lock=enabled    # Auto-lock if missing
+dune build --lock=always     # Re-solve even if lock exists
+dune build --fetch=enabled   # Auto-fetch sources
 ```
 
-**Option 2: Global config (user preference)**
+**Global config (user preference):**
 ```lisp
 ; ~/.config/dune/config
 (lang dune 3.18)
-(auto_lock enabled)           ; Auto-lock when out of sync
+(pkg enabled)                 ; Auto-lock + auto-fetch
 ```
 
-**Option 3: dune-workspace (per-workspace override)**
+Or with granular control:
+```lisp
+(lock enabled)                ; Auto-lock when out of sync
+(fetch enabled)               ; Auto-fetch sources
+```
+
+**dune-workspace (per-workspace override):**
 ```lisp
 ; dune-workspace
 (lang dune 3.18)
-(auto_lock enabled)           ; Override for this workspace
+(pkg enabled)                 ; Override for this workspace
 ```
 
 **NOT in dune-project** — this is a user preference, not a project policy.
@@ -548,23 +561,24 @@ All contributors shouldn't be forced into automatic behavior.
 ```
 Error: Lock dir out of sync with dune-project
 Hint: Run `dune pkg lock` to regenerate
-      Or use `dune build --lock` for one-time auto-lock
-      Or add (auto_lock enabled) to ~/.config/dune/config
+      Or use `dune build --pkg=enabled` for auto-lock + auto-fetch
+      Or add (pkg enabled) to ~/.config/dune/config
 ```
 
 **Rationale:**
 - Default remains explicit (lock changes are VCS-significant)
 - Power users can opt-in to npm/yarn-like automatic behavior
+- `--pkg` is the simple high-level flag for most users
+- `--lock` and `--fetch` provide granular control when needed
 - Global config = user preference across all projects
 - dune-workspace = per-workspace override (e.g., for CI)
-- CLI flag = one-time convenience
 
 **Implementation:**
-- `src/dune_config_file/dune_config.ml` — add `auto_lock` field
-- `src/dune_rules/workspace.ml` — add `auto_lock` field (optional override)
-- `bin/common.ml` — add `--lock` flag
-- `src/dune_pkg/package_universe.ml` — check flag in `validate_dependency_hash`
-- If enabled, call lock regeneration instead of erroring
+- `src/dune_config_file/dune_config.ml` — add `pkg`, `lock`, `fetch` fields
+- `src/dune_rules/workspace.ml` — add same fields (optional override)
+- `bin/common.ml` — add `--pkg`, `--lock`, `--fetch` flags
+- `src/dune_pkg/package_universe.ml` — check flags in `validate_dependency_hash`
+- If enabled, call lock/fetch instead of erroring
 
 ---
 

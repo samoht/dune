@@ -115,9 +115,10 @@ vendor/
 
 ```dune
 (vendor <directory>
- (libraries <lib-spec>...)    ; optional
- (packages <pkg-spec>...)     ; optional
- (mode <build-mode>)          ; optional: dune | opam
+ (package <name>)             ; optional: inferred from opam file
+ (version <version>)          ; optional: inferred from opam file
+ (libraries <lib-spec>...)    ; optional: inferred by scanning directory
+ (mode <build-mode>)          ; optional: dune | opam (inferred from contents)
  (install <bool>)             ; optional: promote artifacts to shared install path
  (toolchain <name>))          ; optional: marks this as providing a compiler/toolchain
 ```
@@ -128,10 +129,13 @@ Both `<lib-spec>` and `<pkg-spec>` use the standard ordered set language (like `
 - `(<name> :as <alias>)` — expose under a different name
 
 All fields are optional. When omitted:
-- `(libraries ...)` and `(packages ...)` should be auto-detected by scanning the directory
-- `(mode ...)` should be auto-detected: `dune` if dune files exist, `opam` otherwise
+- `(package ...)` and `(version ...)` are inferred from the opam file in the directory
+- `(libraries ...)` is inferred by scanning the directory
+- `(mode ...)` is inferred: `dune` if dune files exist, `opam` otherwise
 - `(install ...)` defaults to `true`, except when `:as` aliasing is used (then `false`)
-- `(toolchain ...)` defaults to none, unless the package provides a compiler
+- `(toolchain ...)` defaults to none
+
+Explicit fields override inferred values.
 
 ### Examples
 
@@ -187,12 +191,6 @@ Provides the `windows` toolchain for `(targets native windows)`.
 1. Scan directory for libraries (existing behavior)
 2. If `(libraries ...)` specified, expose only those listed
 3. Unlisted libraries should not be built and cannot be used as dependencies
-
-**Package filtering:**
-The `(packages ...)` field filters opam package definitions (same meaning as in other
-dune stanzas like `(package ...)`). When specified, only the listed packages are
-considered for opam-mode builds. This allows vendoring OCaml compilers and
-cross-compilation toolchains.
 
 **Library aliasing:**
 - `(<name> :as <alias>)` should change the public name used in `(libraries ...)` stanzas

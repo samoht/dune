@@ -82,11 +82,11 @@ dune pkg update && dune build
 
 ### Build Flags
 
-Three flags control package management behavior:
+Four flags control package management behavior:
 
 ```bash
-# High-level convenience flag (combines --lock and --fetch)
-dune build --pkg=enabled     # Auto-lock if missing + auto-fetch
+# High-level convenience flag (combines --lock, --fetch, --vendor)
+dune build --pkg=enabled     # Auto-lock if missing + auto-fetch (to _build/.pkgs/)
 dune build --pkg=portable    # Auto-lock for all platforms + auto-fetch
 dune build --pkg=disabled    # No package management (default)
 
@@ -96,18 +96,26 @@ dune build --lock=always     # Always re-solve with latest opam repo
 dune build --lock=portable   # Solve for all platforms
 dune build --lock=disabled   # Don't auto-lock (default)
 
-dune build --fetch=enabled   # Auto-fetch sources
+dune build --fetch=enabled   # Auto-fetch sources to _build/.pkgs/
 dune build --fetch=disabled  # Don't auto-fetch (default)
+
+dune build --vendor=enabled  # Copy fetched sources to duniverse/
+dune build --vendor=disabled # Keep sources in _build/.pkgs/ only (default)
 ```
 
 `--pkg=enabled` is shorthand for `--lock=enabled --fetch=enabled`.
 
-| `--pkg` | `--lock` | `--fetch` | Use case |
-|---------|----------|-----------|----------|
-| `disabled` | `disabled` | `disabled` | Traditional workflow (default) |
-| `enabled` | `enabled` | `enabled` | Dev with pkg management |
-| `portable` | `portable` | `enabled` | Cross-platform projects |
-| - | `always` | - | CI compat testing |
+**Source locations:**
+- `_build/.pkgs/<context>/<name>/source/` - default fetch location (transient, not version controlled)
+- `duniverse/<name>/` - vendored location (version controlled, enables offline builds)
+
+| `--pkg` | `--lock` | `--fetch` | `--vendor` | Use case |
+|---------|----------|-----------|------------|----------|
+| `disabled` | `disabled` | `disabled` | `disabled` | Traditional workflow (default) |
+| `enabled` | `enabled` | `enabled` | `disabled` | Dev with pkg management |
+| `portable` | `portable` | `enabled` | `disabled` | Cross-platform projects |
+| - | - | `enabled` | `enabled` | Vendored dependencies (duniverse/) |
+| - | `always` | - | - | CI compat testing |
 
 ### CI Workflow Example
 
@@ -145,7 +153,10 @@ Or with granular control:
 (lock portable)        ; Solve for all platforms
 
 (fetch disabled)       ; No auto-fetching (current default)
-(fetch enabled)        ; Auto-fetch sources
+(fetch enabled)        ; Auto-fetch sources to _build/.pkgs/
+
+(vendor disabled)      ; Keep sources in _build/.pkgs/ only (default)
+(vendor enabled)       ; Copy fetched sources to duniverse/
 ```
 
 **Environment variable** (useful for CI):
@@ -154,6 +165,7 @@ Or with granular control:
 DUNE_CONFIG__PKG=enabled dune build
 DUNE_CONFIG__LOCK=always dune build
 DUNE_CONFIG__FETCH=enabled dune build
+DUNE_CONFIG__VENDOR=enabled dune build
 ```
 
 **Precedence:** CLI flag > environment variable > config file > default (`disabled`)

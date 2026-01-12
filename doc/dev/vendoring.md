@@ -147,9 +147,10 @@ The `vendor` stanza declares a vendored dependency directory:
 
 ```lisp
 (vendor <directory>           ; required: path to vendored source (relative to dune file)
- (libraries <lib-name> ...)   ; optional: libraries to expose (all if omitted)
- (packages <pkg-name> ...)    ; optional: packages to expose (all if omitted)
- (mode <method>)              ; optional: build mode (dune or opam, default: dune)
+ (package <name>)             ; optional: inferred from opam file
+ (version <version>)          ; optional: inferred from opam file
+ (libraries <lib-name> ...)   ; optional: inferred by scanning directory
+ (mode <method>)              ; optional: dune | opam (inferred from contents)
  (install <bool>)             ; optional: promote to shared install path (default: true)
  (toolchain <name>))          ; optional: marks this as providing a toolchain
 ```
@@ -160,10 +161,13 @@ Both `<lib-name>` and `<pkg-name>` use the standard ordered set language (like `
 - `(<name> :as <alias>)` — expose under a different name
 
 All fields are optional. When omitted:
-- `(libraries ...)` and `(packages ...)` should be auto-detected by scanning the directory
-- `(mode ...)` should be auto-detected: `dune` if dune files exist, `opam` otherwise
+- `(package ...)` and `(version ...)` are inferred from the opam file in the directory
+- `(libraries ...)` is inferred by scanning the directory
+- `(mode ...)` is inferred: `dune` if dune files exist, `opam` otherwise
 - `(install ...)` defaults to `true`, except when `:as` aliasing is used (then `false`)
 - `(toolchain ...)` defaults to none
+
+Explicit fields override inferred values.
 
 ### Toolchain Declaration
 
@@ -601,7 +605,7 @@ duniverse/
 
 For directory lock format (`dune.lock/` directory):
 - Opam files are not generated (metadata is already in .pkg files)
-- The directory lock format is being deprecated in favor of single-file
+- See [lock-file-format.md](lock-file-format.md) for when to use each format
 
 ### Build Behavior
 
