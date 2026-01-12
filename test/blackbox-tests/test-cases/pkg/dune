@@ -14,21 +14,21 @@
 
 (cram
  (deps %{bin:patch})
- (applies_to patch opam-package-with-patch extra-sources))
+ (applies_to build/opam/patch build/opam/opam-package-with-patch fetch/extra-sources))
 
 (cram
- (applies_to rev-store-lock-linux)
+ (applies_to fetch/rev-store-lock-linux)
  (enabled_if
   (= %{system} linux))
  (deps %{bin:strace}))
 
 (cram
  (deps %{bin:awk} %{bin:cmp})
- (applies_to git-repo))
+ (applies_to fetch/git-repo))
 
 (cram
  (deps %{bin:make})
- (applies_to make rule-deps duniverse duniverse/non-dune-pkg))
+ (applies_to build/opam/make rule-deps vendor/duniverse vendor/duniverse/non-dune-pkg))
 
 (cram
  (deps %{bin:which})
@@ -37,44 +37,44 @@
 (cram
  (deps %{bin:curl})
  (applies_to
-  unavailable-source-package
-  compute-checksums-when-missing
+  unavailable-package-source
+  lock/compute-checksums-when-missing
   e2e
-  ocamlformat-dev-tool
-  source-caching
-  tarball
-  pin-depends
-  extra-sources
+  dev-tools/ocamlformat
+  fetch/source-caching
+  fetch/tarball
+  lock/pin-depends
+  fetch/extra-sources
   broken-symlink-in-dependency
-  duniverse
-  duniverse/non-dune-pkg))
+  vendor/duniverse
+  vendor/duniverse/non-dune-pkg))
 
 (cram
  (deps %{bin:md5sum})
  (applies_to
-  source-caching
-  extra-sources
-  ocamlformat-dev-tool
-  dev-tool-conflict-test
+  fetch/source-caching
+  fetch/extra-sources
+  dev-tools/ocamlformat
+  dev-tools/ocamlformat
   broken-symlink-in-dependency
-  install-file-tracking
-  package-upgrade-cleanup
-  duniverse
-  duniverse/non-dune-pkg))
+  build/install-file-tracking
+  build/package-upgrade-cleanup
+  vendor/duniverse
+  vendor/duniverse/non-dune-pkg))
 
 (cram
  (deps %{bin:tar})
  (applies_to
-  source-caching
-  tarball
-  pin-depends
-  extra-sources
-  pkg-extract-fail
+  fetch/source-caching
+  fetch/tarball
+  lock/pin-depends
+  fetch/extra-sources
+  fetch/pkg-extract-fail
   broken-symlink-in-dependency
-  install-file-tracking
-  package-upgrade-cleanup
-  duniverse
-  duniverse/non-dune-pkg))
+  build/install-file-tracking
+  build/package-upgrade-cleanup
+  vendor/duniverse
+  vendor/duniverse/non-dune-pkg))
 
 (cram
  (deps %{bin:ocaml_index})
@@ -82,7 +82,7 @@
 
 (cram
  (deps %{bin:unzip})
- (applies_to pkg-extract-fail))
+ (applies_to fetch/pkg-extract-fail fetch/zip-extract-fail))
 
 ;; disabled for flakiness
 
