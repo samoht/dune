@@ -13,6 +13,83 @@ module Package_version = Dune_pkg.Package_version
 (* Default patches directory for user patches *)
 let default_patches_dir = Path.Source.of_string "patches"
 
+(* Source marker file to track what was fetched.
+   This allows detecting stale directories when re-locking. *)
+let source_marker_filename = ".dune-source-url"
+
+(* Write marker for non-git sources (URL + checksum) *)
+let write_source_marker ~target_dir (source : Source.t) =
+  let marker_path = Path.relative target_dir source_marker_filename in
+  let _, url = source.url in
+  let url_str = OpamUrl.to_string url in
+  let content =
+    match source.checksum with
+    | None -> url_str
+    | Some (_, checksum) ->
+      sprintf "%s\n%s" url_str (Dune_pkg.Checksum.to_string checksum)
+  in
+  Io.write_file marker_path content
+;;
+
+(* Write marker for git sources (URL + commit hash) *)
+let write_git_source_marker ~target_dir (source : Source.t) ~commit =
+  let marker_path = Path.relative target_dir source_marker_filename in
+  let _, url = source.url in
+  let url_str = OpamUrl.to_string url in
+  let content = sprintf "%s\n%s" url_str commit in
+  Io.write_file marker_path content
+;;
+
+let read_source_marker target_dir =
+  let marker_path = Path.relative target_dir source_marker_filename in
+  if Path.exists marker_path then Some (Io.read_file marker_path) else None
+;;
+
+(* For git sources, we need to resolve to check if there's a new commit.
+   This is called when checking staleness. *)
+let resolve_git_head rev_store ~url:(url_loc, url) =
+  let open Fiber.O in
+  OpamUrl.resolve url ~loc:url_loc rev_store
+  >>| function
+  | Error _ -> None
+  | Ok r ->
+    let obj =
+      match r with
+      | OpamUrl.Resolved obj -> (obj :> Dune_pkg.Rev_store.Object.t)
+      | OpamUrl.Unresolved obj -> obj
+    in
+    Some (Dune_pkg.Rev_store.Object.to_hex obj)
+;;
+
+(* Check if the marker matches the source.
+   For git sources, we compare against what would be fetched (current HEAD). *)
+let source_matches_marker_fiber rev_store target_dir (source : Source.t) =
+  let open Fiber.O in
+  match read_source_marker target_dir with
+  | None -> Fiber.return false (* No marker = stale or never fetched properly *)
+  | Some content ->
+    let _, url = source.url in
+    let url_str = OpamUrl.to_string url in
+    if OpamUrl.is_version_control url
+    then
+      (* Git source - resolve current HEAD and compare *)
+      let+ current_head_opt = resolve_git_head rev_store ~url:source.url in
+      match current_head_opt with
+      | None -> false (* Can't resolve, consider stale *)
+      | Some current_head ->
+        let expected = sprintf "%s\n%s" url_str current_head in
+        String.equal content expected
+    else (
+      (* Non-git source - compare URL + checksum *)
+      let expected =
+        match source.checksum with
+        | None -> url_str
+        | Some (_, checksum) ->
+          sprintf "%s\n%s" url_str (Dune_pkg.Checksum.to_string checksum)
+      in
+      Fiber.return (String.equal content expected))
+;;
+
 (* Get the user patch file path for a package *)
 let user_patch_path ~patches_dir name version =
   let filename =
@@ -28,7 +105,7 @@ let user_patch_path ~patches_dir name version =
 let get_default_lock_dir_path () = Dune_rules.Lock_dir.default_source_path |> Path.source
 
 let handle_fetch_error ~name ~version = function
-  | Ok () -> Fiber.return ()
+  | Ok commit_opt -> Fiber.return commit_opt
   | Error (Dune_pkg.Fetch.Unavailable msg) ->
     let msg =
       match msg with
@@ -83,7 +160,9 @@ let copy_directory ~src ~dst =
   Fiber.return (Ok ())
 ;;
 
+(* Returns (commit_hash option, error) - commit_hash is Some for git sources *)
 let do_fetch ~rev_store ~source ~target =
+  let open Fiber.O in
   (* Convert target string to a Path.t, handling both absolute and relative paths *)
   let target_path =
     if Filename.is_relative target
@@ -99,22 +178,28 @@ let do_fetch ~rev_store ~source ~target =
       | _ -> false
     in
     if is_dir
-    then copy_directory ~src:src_path ~dst:(Path.Source.of_string target)
+    then
+      copy_directory ~src:src_path ~dst:(Path.Source.of_string target)
+      >>| Result.map ~f:(fun () -> None)
     else (
       (* Local archive file - extract it *)
       let { Source.url; checksum } = source in
       let checksum_opt = Option.map checksum ~f:snd in
-      Dune_pkg.Fetch.fetch ~unpack:true ~checksum:checksum_opt ~target:target_path ~url)
+      Dune_pkg.Fetch.fetch ~unpack:true ~checksum:checksum_opt ~target:target_path ~url
+      >>| Result.map ~f:(fun () -> None))
   | `Fetch ->
     let { Source.url; checksum } = source in
     let _, opam_url = url in
     let checksum_opt = Option.map checksum ~f:snd in
     (* Check if this is a git URL *)
     if OpamUrl.is_version_control opam_url
-    then Dune_pkg.Fetch.fetch_git rev_store ~target:target_path ~url
+    then
+      Dune_pkg.Fetch.fetch_git_with_rev rev_store ~target:target_path ~url
+      >>| Result.map ~f:Option.some
     else
       (* HTTP archive fetch - use Fetch.fetch directly *)
       Dune_pkg.Fetch.fetch ~unpack:true ~checksum:checksum_opt ~target:target_path ~url
+      >>| Result.map ~f:(fun () -> None)
 ;;
 
 (* Fetch a single extra source file to the target directory *)
@@ -221,6 +306,33 @@ let determine_dirname group fetched_dir =
   | None -> Package_name.to_string primary_name, primary_version
 ;;
 
+(* Check if a directory exists and has a matching source marker.
+   Returns Some path if fresh, None if missing or stale.
+   For git sources, this resolves the current HEAD to check freshness. *)
+let find_fresh_dir ~rev_store ~source initial_target primary_name =
+  let open Fiber.O in
+  (* First check the initial target *)
+  let check_dir dir_path =
+    if not (Path.exists dir_path)
+    then Fiber.return None
+    else
+      let+ is_fresh = source_matches_marker_fiber rev_store dir_path source in
+      if is_fresh then Some dir_path else None
+  in
+  check_dir initial_target
+  >>= function
+  | Some _ as result -> Fiber.return result
+  | None ->
+    (* Look up in duniverse/dune's library->directory mapping.
+       Use the primary package name as the expected library name. *)
+    let pkg_name = Package_name.to_string primary_name in
+    (match Vendor_rules.find_dir_for_library pkg_name with
+     | Some dirname ->
+       let dir_path = Path.source (Path.Source.relative Vendor.default_dir dirname) in
+       check_dir dir_path
+     | None -> Fiber.return None)
+;;
+
 (* Fetch a source group - packages sharing the same source are fetched once.
    Returns (was_fetched, final_dirname) where final_dirname is based on the
    project name from dune-project if available. *)
@@ -229,32 +341,25 @@ let fetch_source_group ~rev_store ~platform ~patches_dir ~pkgs_by_name group =
   let { Vendor.packages; source; primary_name; primary_version } = group in
   let initial_target = Vendor.source_group_dir group |> Path.source in
   let initial_target_path = Path.to_string initial_target in
-  (* Check for existing directory by looking up in duniverse/dune cache *)
-  let find_existing_dir () =
-    (* First check the initial target *)
-    if Path.exists initial_target
-    then Some initial_target
-    else (
-      (* Look up in duniverse/dune's library->directory mapping.
-         Use the primary package name as the expected library name. *)
-      let pkg_name = Package_name.to_string primary_name in
-      match Vendor_rules.find_dir_for_library pkg_name with
-      | Some dirname ->
-        let dir_path = Path.source (Path.Source.relative Vendor.default_dir dirname) in
-        if Path.exists dir_path then Some dir_path else None
-      | None -> None)
-  in
-  match find_existing_dir () with
+  find_fresh_dir ~rev_store ~source initial_target primary_name
+  >>= function
   | Some existing ->
-    (* Already fetched - count all packages as cached *)
+    (* Already fetched with matching source - count all packages as cached *)
     let dirname = Path.basename existing in
     status (sprintf "Cached %s" dirname);
     List.iter packages ~f:(fun _ -> Dune_engine.Progress.incr_cached ());
     Fiber.return (false, dirname)
   | None ->
+    (* Remove stale directory if it exists but source changed *)
+    if Path.exists initial_target
+    then (
+      verbose (sprintf "  source changed, re-fetching %s" (Path.to_string initial_target));
+      Path.rm_rf initial_target);
     let pkg_str = start_fetch ~name:primary_name ~version:primary_version in
     let* result = do_fetch ~rev_store ~source ~target:initial_target_path in
-    let* () = handle_fetch_error ~name:primary_name ~version:primary_version result in
+    let* commit_opt =
+      handle_fetch_error ~name:primary_name ~version:primary_version result
+    in
     (* Determine the final dirname based on dune-project *)
     let final_name, final_version = determine_dirname group initial_target in
     let final_dirname =
@@ -328,6 +433,10 @@ let fetch_source_group ~rev_store ~platform ~patches_dir ~pkgs_by_name group =
           let user_patch = user_patch_path ~patches_dir name version in
           apply_user_patch ~verbose ~target_dir:target ~patch_source_path:user_patch)
     in
+    (* Write source marker so we can detect stale directories on re-lock *)
+    (match commit_opt with
+     | Some commit -> write_git_source_marker ~target_dir:target source ~commit
+     | None -> write_source_marker ~target_dir:target source);
     Dune_engine.Progress.finish_target ~name:pkg_str;
     Fiber.return (true, final_dirname)
 ;;
@@ -498,14 +607,19 @@ let auto_fetch_missing ~lock_dir_path ~solver_env ~local_packages () =
   let fetchable_pkgs =
     List.filter all_pkgs ~f:(fun (pkg : Pkg.t) -> Option.is_some pkg.info.source)
   in
-  (* Group by source and filter to groups whose directory is missing *)
+  (* Group by source and filter to groups that need fetching (missing or stale) *)
   let source_groups = Vendor.group_by_source fetchable_pkgs in
-  let missing_groups =
-    List.filter source_groups ~f:(fun group ->
-      let target = Vendor.source_group_dir group in
-      not (Path.exists (Path.source target)))
+  let* rev_store = Rev_store.get in
+  let* groups_to_fetch =
+    Fiber.parallel_map source_groups ~f:(fun group ->
+      let { Vendor.source; primary_name; _ } = group in
+      let initial_target = Vendor.source_group_dir group |> Path.source in
+      (* Use find_fresh_dir to check if directory is fresh - if None, needs fetch *)
+      let+ fresh_dir = find_fresh_dir ~rev_store ~source initial_target primary_name in
+      if Option.is_none fresh_dir then Some group else None)
+    >>| List.filter_map ~f:Fun.id
   in
-  if List.is_empty missing_groups
+  if List.is_empty groups_to_fetch
   then Fiber.return ()
   else (
     let duniverse_path = Path.source Vendor.default_dir in
@@ -527,18 +641,18 @@ let auto_fetch_missing ~lock_dir_path ~solver_env ~local_packages () =
         Package_name.Map.add_exn acc pkg.Pkg.info.name pkg)
     in
     Dune_engine.Progress.reset ();
-    Dune_engine.Progress.set_total (List.length missing_groups);
+    Dune_engine.Progress.set_total (List.length groups_to_fetch);
     let* rev_store = Rev_store.get in
     let* platform = Pkg_common.poll_solver_env_from_current_system () in
     let patches_dir = default_patches_dir in
     let* fetch_results =
-      Fiber.parallel_map missing_groups ~f:(fun group ->
+      Fiber.parallel_map groups_to_fetch ~f:(fun group ->
         fetch_source_group ~rev_store ~platform ~patches_dir ~pkgs_by_name group)
     in
     (* Build a map from fetched groups to their actual directory names *)
     let fetched_dirnames =
       List.fold_left2
-        missing_groups
+        groups_to_fetch
         fetch_results
         ~init:[]
         ~f:(fun acc group (_was_fetched, dirname) ->
@@ -572,20 +686,25 @@ let auto_fetch_missing ~lock_dir_path ~solver_env ~local_packages () =
               else initial_dirname
           in
           let pkg_dir = Path.Source.relative Vendor.default_dir dirname in
-          (* Check if this is an opam package (needs sandbox) *)
+          (* Check if this is an opam package (needs sandbox) AND has an opam file.
+             Without an opam file, we can't build in opam mode. *)
+          let pkg_name =
+            match packages with
+            | (name, _) :: _ -> Package_name.to_string name
+            | [] -> dirname
+          in
+          let has_opam_file =
+            Option.is_some (Vendor_rules.find_opam_file ~pkg_name ~pkg_dir)
+          in
           let is_opam =
-            List.for_all packages ~f:(fun (name, _) ->
+            has_opam_file
+            && List.for_all packages ~f:(fun (name, _) ->
               match Package_name.Map.find pkg_classifications name with
               | Some Vendor.Opam_sandboxed -> true
               | _ -> false)
           in
           (* Scan for libraries using cascading strategy:
              dune files -> META files -> opam files *)
-          let pkg_name =
-            match packages with
-            | (name, _) :: _ -> Package_name.to_string name
-            | [] -> dirname
-          in
           let libs = Vendor_rules.scan_libraries pkg_dir ~pkg_name in
           if is_opam
           then
@@ -610,6 +729,23 @@ let auto_fetch_missing ~lock_dir_path ~solver_env ~local_packages () =
     if (not (Path.exists marker_path)) || Io.read_file marker_path <> dune_content
     then Io.write_file marker_path dune_content;
     Fiber.return ())
+;;
+
+(** Wrapper for auto_fetch_missing that avoids the Source_tree caching issue.
+
+    IMPORTANT: This passes ~local_packages:[] to avoid triggering a Source_tree
+    scan before the fetch creates duniverse. The local_packages parameter
+    is only used for dependency hash computation in Lock_pkg.read_disk,
+    not for fetching. If we scan Source_tree here, it gets cached without
+    duniverse, and subsequent builds won't see the newly created directory. *)
+let do_auto_fetch () =
+  let open Fiber.O in
+  let lock_dir_path = Dune_rules.Lock_dir.default_source_path in
+  if Path.exists (Path.source lock_dir_path)
+  then
+    let* solver_env = Pkg_common.poll_solver_env_from_current_system () in
+    auto_fetch_missing ~lock_dir_path ~solver_env ~local_packages:[] ()
+  else Fiber.return ()
 ;;
 
 let term =

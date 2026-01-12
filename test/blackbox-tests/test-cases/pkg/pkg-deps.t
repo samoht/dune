@@ -57,12 +57,5 @@ Now we define the external package using a dune project:
   > (build (run dune build @install --promote-install-files))
   > EOF
   $ dune build @foo 2>&1 | sanitize_pkg_digest foo.0.0.1
-  File "dune", lines 2-8, characters 0-101:
-  2 | (rule
-  3 |  (alias foo)
-  4 |  (action
-  5 |   (progn
-  6 |    (run which foo)
-  7 |    (echo %{bin:foo})))
-  8 |  (deps (package foo)))
-  Command exited with code 1.
+  $TESTCASE_ROOT/_build/install/default/bin/foo
+  ../install/default/bin/foo

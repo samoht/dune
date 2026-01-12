@@ -3257,45 +3257,33 @@ module Lib_cache_spec = struct
       Dune_pkg.Lock_pkg.read_disk ~solver_env ~local_packages:[] lock_file
     in
     let pkgs = Dune_pkg.Lock.Packages.to_pkg_list lock_dir.packages in
-    (* Fetch all packages to duniverse/ *)
-    let* () =
-      Fiber.sequential_iter pkgs ~f:(fun (pkg : Dune_pkg.Pkg.t) ->
-        match pkg.info.source with
-        | None -> Fiber.return ()
-        | Some source ->
-          let pkg_dir = Dune_pkg.Vendor.package_dir pkg.info.name pkg.info.version in
-          let target = Path.source pkg_dir in
-          (* Skip if already fetched *)
-          if Path.Untracked.exists target
-          then Fiber.return ()
-          else (
-            let url = source.url in
-            let checksum = Option.map source.checksum ~f:snd in
-            Dune_pkg.Fetch.fetch ~unpack:true ~checksum ~target ~url
-            >>| function
-            | Ok () -> ()
-            | Error _ ->
-              (* Fetch failed - package won't be available but we continue *)
-              ()))
-    in
-    (* Collect library→package→directory mappings from the fetched packages *)
+    (* Collect library→package→directory mappings from the lock file.
+       Scan _build/.pkgs/default/<pkg>/source/ for libraries if fetched,
+       otherwise fall back to package name. *)
     let entries =
       List.concat_map pkgs ~f:(fun (pkg : Dune_pkg.Pkg.t) ->
         let pkg_name = Package.Name.to_string pkg.info.name in
         let version = Dune_pkg.Package_version.to_string pkg.info.version in
         let dirname = sprintf "%s.%s" pkg_name version in
-        let pkg_dir = Dune_pkg.Vendor.package_dir pkg.info.name pkg.info.version in
-        if Path.Untracked.exists (Path.source pkg_dir)
+        (* Check _build/.pkgs/default/<pkg>/source/ for fetched source *)
+        let pkg_source_dir =
+          Path.Build.relative
+            (Path.Build.relative Dpath.Build.pkgs_dir "default")
+            (sprintf "%s/source" dirname)
+        in
+        let source_path = Path.build pkg_source_dir in
+        if Path.Untracked.exists source_path
         then (
           (* Scan fetched source for libraries *)
-          let libraries = Vendor_rules.scan_libraries pkg_dir ~pkg_name in
+          let source_dir = Path.Build.drop_build_context_exn pkg_source_dir in
+          let libraries = Vendor_rules.scan_libraries source_dir ~pkg_name in
           if List.is_empty libraries
           then (* Fallback to package name as library *)
             [ { Vendor_rules.lib_name = pkg_name; pkg_name; dirname } ]
           else
             List.map libraries ~f:(fun lib_name ->
               { Vendor_rules.lib_name; pkg_name; dirname }))
-        else (* Package not fetched - use package name as fallback *)
+        else (* Source not fetched yet - use package name as library name *)
           [ { Vendor_rules.lib_name = pkg_name; pkg_name; dirname } ])
     in
     (* Write lib-cache file *)

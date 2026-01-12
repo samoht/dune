@@ -27,7 +27,9 @@ Printing out PATH without setting it:
   > EOF
   $ dune clean
   $ PATH=$DUNE_PATH:/bin build_pkg test 2>&1 | $DUNE_CMD subst "$DUNE_PATH" 'DUNE_PATH'
-  PATH=DUNE_PATH:/bin
+  Error: Program git not found in the tree or in PATH
+  Hint: Git is required for version information in 'dune subst', build info,
+  and package management. Install git or add it to your PATH.
 
 Setting PATH to a specific value:
   $ make_lockpkg test <<'EOF'

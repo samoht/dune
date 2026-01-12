@@ -48,13 +48,7 @@ Lock and build the second package to demonstrate that everything works so far:
   dune:
   - foo.dev
   $ dune exec ./bar.exe
-  File "dune", line 3, characters 12-15:
-  3 |  (libraries foo))
-                  ^^^
-  Error: Library "foo" not found.
-  -> required by _build/default/.bar.eobjs/native/dune__exe__Bar.cmx
-  -> required by _build/default/bar.exe
-  [1]
+  foo
 
 Now change the pin to use a relative path:
   $ cat > dune-project <<EOF

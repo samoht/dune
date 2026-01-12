@@ -224,6 +224,19 @@ let fetch_git rev_store ~target ~url:(url_loc, url) =
     Ok res
 ;;
 
+let fetch_git_with_rev rev_store ~target ~url:(url_loc, url) =
+  OpamUrl.resolve url ~loc:url_loc rev_store
+  >>= (function
+   | Error _ as e -> Fiber.return e
+   | Ok r -> OpamUrl.fetch_revision url ~loc:url_loc r rev_store)
+  >>= function
+  | Error msg -> Fiber.return @@ Error (Unavailable (Some msg))
+  | Ok at_rev ->
+    let rev = Rev_store.At_rev.rev at_rev in
+    let+ () = Rev_store.At_rev.check_out at_rev ~target in
+    Ok (Rev_store.Object.to_hex rev)
+;;
+
 let fetch_local ~checksum ~target (url, url_loc) =
   if not (OpamUrl.is_local url)
   then Code_error.raise "fetch_local: url should be file://" [ "url", OpamUrl.to_dyn url ];

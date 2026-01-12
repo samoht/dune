@@ -91,9 +91,6 @@ Call Dune with an absolute PATH as argv[0]:
 
   $ PATH=$fakepath $DUNE build "$pkg_root/$foo_digest/target/"
   $ PATH=$fakepath $DUNE build "$pkg_root/$bar_digest/target/"
-  Error: No opam file found for vendored package bar in duniverse/bar.0.0.1
-  -> required by - package bar
-  [1]
 
 argv[0] is set by the calling program (like a shell or cram test runner) and
 could be wrong, hence it cannot always be trusted. In the examples above we

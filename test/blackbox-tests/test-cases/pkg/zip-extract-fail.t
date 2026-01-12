@@ -90,6 +90,11 @@ Build with bsdtar that can extract ZIP archives, without unzip. It should work:
   $ show_path
   cp dune sh tar
   $ (PATH=.fakebin build_pkg foo)
+  File ".", line 1, characters 0-0:
+  Warning: No dune-project file has been found in directory ".". A default one
+  is assumed but the project might break when dune is upgraded. Please create a
+  dune-project file.
+  Hint: generate the project file with: $ dune init project <name>
 
 Build the package with bsdtar and tar. Now our fake bsdtar will get picked up
 and used to extract:
@@ -110,9 +115,6 @@ and used to extract:
   is assumed but the project might break when dune is upgraded. Please create a
   dune-project file.
   Hint: generate the project file with: $ dune init project <name>
-  Error: No opam file found for vendored package foo in duniverse/foo.dev
-  -> required by - package foo
-  [1]
 
 Build with unzip only:
 
@@ -131,6 +133,3 @@ Build with unzip only:
   is assumed but the project might break when dune is upgraded. Please create a
   dune-project file.
   Hint: generate the project file with: $ dune init project <name>
-  Error: No opam file found for vendored package foo in duniverse/foo.dev
-  -> required by - package foo
-  [1]

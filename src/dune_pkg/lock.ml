@@ -908,11 +908,21 @@ module File = struct
         ; platforms = None
         })
     in
-    (* Pins should not be inferred from dev packages.
-       The single-file format doesn't currently support pins - they would need
-       to be tracked separately from the solver result. For now, pins are empty.
-       Regular opam packages (even with dev=true) should be derived from repos. *)
-    let pins = [] in
+    (* Extract pins from dev packages that have a source URL.
+       These are packages that came from pin stanzas in dune-project. *)
+    let pins =
+      Packages.to_pkg_list lck.packages
+      |> List.filter_map ~f:(fun (pkg : Pkg.t) ->
+        if pkg.info.dev
+        then
+          Option.map pkg.info.source ~f:(fun source ->
+            let _, url = source.Source.url in
+            { Pin_entry.name = pkg.info.name
+            ; version = pkg.info.version
+            ; url = OpamUrl.to_string url
+            })
+        else None)
+    in
     let _loc, solved_for_platforms = lck.solved_for_platforms in
     (* Group solver envs by OS, collecting archs for each OS *)
     let platforms =

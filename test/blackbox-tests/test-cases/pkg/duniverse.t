@@ -123,7 +123,9 @@ Verify the duniverse directory structure:
   $ find duniverse -type f | sort
   duniverse/.gitignore
   duniverse/dune
+  duniverse/makelib.1.0.0/.dune-source-url
   duniverse/makelib.1.0.0/Makefile
+  duniverse/mylib.1.0.0/.dune-source-url
   duniverse/mylib.1.0.0/dune
   duniverse/mylib.1.0.0/dune-project
   duniverse/mylib.1.0.0/mylib.ml

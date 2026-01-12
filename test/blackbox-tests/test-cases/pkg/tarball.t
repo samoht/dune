@@ -31,5 +31,8 @@ Demonstrate that we should support tarballs with and without a root directory
   Error: Download failed with code 404
          
   $ runtest 2
-  Error: No opam file found for vendored package foo in duniverse/foo.0.1.0
-  -> required by - package foo
+  File "dune.lock/foo.pkg", line 2, characters 20-36:
+  2 | (source (fetch (url http://0.0.0.0:2)))
+                          ^^^^^^^^^^^^^^^^
+  Error: Download failed with code 404
+         

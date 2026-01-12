@@ -267,21 +267,6 @@ let exec_building_via_rpc_server ~common ~prog ~args ~no_rebuild builder lock_he
   restore_cwd_and_execve (Common.root common) prog args Env.initial
 ;;
 
-let do_auto_fetch () =
-  let open Fiber.O in
-  let lock_dir_path = Dune_rules.Lock_dir.default_source_path in
-  if Path.exists (Path.source lock_dir_path)
-  then
-    let* solver_env = Pkg.Pkg_common.poll_solver_env_from_current_system ()
-    and* local_packages = Memo.run Pkg.Pkg_common.find_local_packages in
-    let local_packages =
-      Package_name.Map.values local_packages
-      |> List.map ~f:Dune_pkg.Local_package.for_solver
-    in
-    Pkg.Fetch.auto_fetch_missing ~lock_dir_path ~solver_env ~local_packages ()
-  else Fiber.return ()
-;;
-
 let exec_building_directly ~common ~config ~context ~prog ~args ~no_rebuild ~auto_fetch =
   match Common.watch common with
   | Yes Passive ->
@@ -294,13 +279,13 @@ let exec_building_directly ~common ~config ~context ~prog ~args ~no_rebuild ~aut
     Dune_engine.Scheduler.Run.poll
     @@
     let* () = Fiber.return @@ Scheduler.maybe_clear_screen ~details_hum:[] config in
-    let* () = if auto_fetch then do_auto_fetch () else Fiber.return () in
+    let* () = if auto_fetch then Pkg.Fetch.do_auto_fetch () else Fiber.return () in
     build @@ step ~prog ~args ~common ~no_rebuild ~context ~on_exit
   | No ->
     Scheduler.go_with_rpc_server ~common ~config
     @@ fun () ->
     let open Fiber.O in
-    let* () = if auto_fetch then do_auto_fetch () else Fiber.return () in
+    let* () = if auto_fetch then Pkg.Fetch.do_auto_fetch () else Fiber.return () in
     let* setup = Import.Main.setup () in
     build_exn (fun () ->
       let open Memo.O in

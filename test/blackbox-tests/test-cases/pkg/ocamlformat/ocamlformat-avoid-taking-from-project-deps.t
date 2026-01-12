@@ -33,6 +33,9 @@ Lock and build the project to make OCamlFormat from the project dependencies ava
 Run "dune fmt" without the dev-tools feature enabled. This should invoke the ocamlformat
 executable from the package dependencies (ie., 'ocamlformat.0.26.2').
   $ dune fmt --preview
+  File "duniverse/dune", line 1, characters 0-0:
+  Error: Files _build/default/duniverse/dune and
+  _build/default/duniverse/.formatted/dune differ.
   File "foo.ml", line 1, characters 0-0:
   Error: Files _build/default/foo.ml and _build/default/.formatted/foo.ml
   differ.

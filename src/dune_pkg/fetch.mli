@@ -30,3 +30,10 @@ val fetch_git
   -> target:Path.t
   -> url:Loc.t * OpamUrl.t
   -> (unit, failure) result Fiber.t
+
+(** Like [fetch_git] but returns the commit hash that was fetched *)
+val fetch_git_with_rev
+  :  Rev_store.t
+  -> target:Path.t
+  -> url:Loc.t * OpamUrl.t
+  -> (string, failure) result Fiber.t

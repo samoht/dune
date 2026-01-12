@@ -1,5 +1,7 @@
 When a package fails to build, dune will print opam depexts warning.
 
+Disable auto_fetch to test sandboxed build error messages with depexts:
+  $ export DUNE_CONFIG__AUTO_FETCH=disabled
   $ export DUNE_PKG_PLATFORM=brew
   $ mkrepo
   $ add_mock_repo_if_needed

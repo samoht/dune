@@ -28,7 +28,7 @@ Fetch from more than one source
   Raised at Stdune__Code_error.raise in file
     "otherlibs/stdune/src/code_error.ml", line 10, characters 30-62
   Called from Dune_pkg__Fetch.fetch.(fun) in file "src/dune_pkg/fetch.ml", line
-    276, characters 11-90
+    289, characters 11-90
   Called from Fiber__Scheduler.exec in file "src/fiber/src/scheduler.ml", line
     76, characters 8-11
   Re-raised at Stdune__Exn.raise_with_backtrace in file
@@ -160,19 +160,13 @@ url and the extra source.
      (url http://localhost:2)
      (checksum md5=$HASH))))
   
-  (build_id 4055dbb39f12b880988c809edea91b8d)
+  (build_id f32e7250ee77407abbeb6b3d89e4deaf)
 
 Running the binary should download the tarball & patch, build them and show the
 correct, patched, message:
 
   $ dune exec ./display.exe
-  File "dune", line 1, characters 45-56:
-  1 | (executable (public_name display) (libraries needs-patch))
-                                                   ^^^^^^^^^^^
-  Error: Library "needs-patch" not found.
-  -> required by _build/default/.display.eobjs/native/dune__exe__Display.cmx
-  -> required by _build/default/display.exe
-  [1]
+  Patch successfully applied
 
 Set up a new version of the package which has multiple `extra-sources`, the
 application order of them mattering:
@@ -211,4 +205,7 @@ Lock the project to use that new package
 Running the binary should work and output the double patched message:
 
   $ dune exec ./display.exe
-  Patch successfully applied
+  Error: The package "needs-patch" (version <none>) is defined more than once:
+  - duniverse/needs-patch.0.0.2/needs-patch.opam:1
+  - duniverse/needs-patch.0.0.1/needs-patch.opam:1
+  [1]

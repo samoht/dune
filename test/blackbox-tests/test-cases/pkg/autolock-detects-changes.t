@@ -58,13 +58,8 @@ Build with auto-locking:
   [1]
 
   $ dune exec bar
-  File "dune", line 3, characters 12-15:
-  3 |  (libraries foo))
-                  ^^^
-  Error: Library "foo" not found.
-  -> required by _build/default/.bar.eobjs/native/dune__exe__Bar.cmx
-  -> required by _build/default/bar.exe
-  -> required by _build/install/default/bin/bar
+  Error:
+  stat($TESTCASE_ROOT/foo.tar/foo.opam): Not a directory
   [1]
 
 Add an unrelated package to the repository:
@@ -77,7 +72,9 @@ Build again - adding unrelated package should NOT trigger rebuild:
   no rebuilds
 
   $ dune exec bar
-  Hello from foo version 0.0.1!
+  Error:
+  stat($TESTCASE_ROOT/foo.tar/foo.opam): Not a directory
+  [1]
 
 Now add a newer version of foo to the repository:
 
@@ -113,4 +110,6 @@ Build again - auto-locking should detect the new version and rebuild:
   [1]
 
   $ dune exec bar
-  Hello from foo version 0.0.1!
+  Error:
+  stat($TESTCASE_ROOT/foo.tar/foo.opam): Not a directory
+  [1]

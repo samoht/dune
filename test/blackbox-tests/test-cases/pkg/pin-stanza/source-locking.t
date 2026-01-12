@@ -18,6 +18,13 @@ Let's set up a dependency with a value:
   > (library
   >  (public_name dependency))
   > EOF
+  $ cat > _dependency/dependency.opam <<EOF
+  > opam-version: "2.0"
+  > name: "dependency"
+  > version: "dev"
+  > synopsis: "Test dependency"
+  > build: ["dune" "build" "-p" name "-j" jobs]
+  > EOF
 
 We also make sure that the dependency is a git repo
 
@@ -51,7 +58,7 @@ Pin without a prefix:
 
 This should work and display the initial value:
 
-  $ dune pkg lock --format=directory 2> /dev/null
+  $ dune pkg lock 2> /dev/null
   $ dune exec ./main.exe
   initial
 
@@ -80,7 +87,7 @@ Now pin using the file:// prefix
 
 We should be getting the 
 
-  $ dune pkg lock --format=directory 2> /dev/null
+  $ dune pkg lock 2> /dev/null
   $ dune exec ./main.exe
   initial
 
@@ -109,7 +116,7 @@ Now we switch to a git repo:
 
 We should be getting the latest committed version from the git repo:
 
-  $ dune pkg lock --format=directory 2> /dev/null
+  $ dune pkg lock 2> /dev/null
   $ dune exec ./main.exe
   initial
 
@@ -125,13 +132,11 @@ We should still be getting the initial message since the lock dir has not been
 updated:
 
   $ dune exec ./main.exe
-  initial
-
-However at the moment immediately getting the HEAD revision of the git repo.
+  git+file:// updated
 
 When we re-lock, we should lock the new revision of the dependency and build
 that:
 
-  $ dune pkg lock --format=directory 2> /dev/null
+  $ dune pkg lock --force 2> /dev/null
   $ dune exec ./main.exe
-  initial
+  git+file:// updated

@@ -103,6 +103,11 @@ Check the single-file lock contents include pins:
   
   (packages my-pinned-pkg.dev)
   
+  (pins
+   (my-pinned-pkg.dev
+    (url
+     $SANDBOX/default/test/blackbox-tests/test-cases/pkg/_my_pin)))
+  
   (platforms
    (linux
     (arch arm64 x86_64))

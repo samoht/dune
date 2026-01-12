@@ -35,7 +35,7 @@ file in the package's source.
   Raised at Stdune__Code_error.raise in file
     "otherlibs/stdune/src/code_error.ml", line 10, characters 30-62
   Called from Dune_pkg__Fetch.fetch.(fun) in file "src/dune_pkg/fetch.ml", line
-    276, characters 11-90
+    289, characters 11-90
   Called from Fiber__Scheduler.exec in file "src/fiber/src/scheduler.ml", line
     76, characters 8-11
   Re-raised at Stdune__Exn.raise_with_backtrace in file
