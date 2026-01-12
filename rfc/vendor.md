@@ -140,12 +140,14 @@ Dune sets `OCAMLFIND_TOOLCHAIN=<name>` and builds toolchain packages first.
 
 ## Compatibility
 
-`(vendored_dirs)` continues to work. These are equivalent:
+`(vendored_dirs)` continues to work. In `vendor/dune`, these are equivalent:
 
 ```dune
-(vendored_dirs vendor/foo.1.0.0)
-(vendor vendor/foo.1.0.0)
+(vendored_dirs foo.1.0.0)
+(vendor foo.1.0.0)
 ```
+
+Note: `vendored_dirs` only matches directories at the current level (no paths with `/`).
 
 ## Open Questions
 

@@ -160,7 +160,7 @@ url and the extra source.
      (url http://localhost:2)
      (checksum md5=$HASH))))
   
-  (build_id f32e7250ee77407abbeb6b3d89e4deaf)
+  (build_id 849ed356f71adeb5321be92bd0ef25a6)
 
 Running the binary should download the tarball & patch, build them and show the
 correct, patched, message:

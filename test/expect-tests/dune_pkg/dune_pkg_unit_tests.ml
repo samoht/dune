@@ -379,7 +379,7 @@ let%expect_test "encode/decode round trip test for lockdir with complex deps" =
                         }
                     ; exported_env = [ { op = "="; var = "foo"; value = "bar" } ]
                     ; enabled_on_platforms = []
-                    ; build_id = Some "d46989e7dbf559225e97f124a582a4c3"
+                    ; build_id = Some "d37d3b9743767e7b0893b8c77768bdd2"
                     }
                 }
           ; "b" :
@@ -412,7 +412,7 @@ let%expect_test "encode/decode round trip test for lockdir with complex deps" =
                         }
                     ; exported_env = []
                     ; enabled_on_platforms = []
-                    ; build_id = Some "45c8a72e988bf57a9a56f292feef392b"
+                    ; build_id = Some "55151f7b27b25dcdc9404ef6f3099321"
                     }
                 }
           ; "c" :
@@ -444,7 +444,7 @@ let%expect_test "encode/decode round trip test for lockdir with complex deps" =
                         }
                     ; exported_env = []
                     ; enabled_on_platforms = []
-                    ; build_id = Some "cb762e35898518b977cf0eb491872b77"
+                    ; build_id = Some "fef367168e770ea14ecb3123b44f0d79"
                     }
                 }
           }
