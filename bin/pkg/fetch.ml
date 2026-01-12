@@ -598,9 +598,10 @@ let fetch_duniverse ~lock_dir_path ~solver_env ~local_packages () =
     Fiber.return ())
 ;;
 
-(* Auto-fetch missing packages to _build/.pkgs/ for builds.
-   This is called during builds when packages haven't been fetched yet. *)
-let auto_fetch_missing ~lock_dir_path ~solver_env ~local_packages () =
+(* NOTE: This function is currently unused. Auto-fetch is now a no-op because
+   the build system handles fetching through fetch_rules.ml. Keeping this code
+   for reference in case we need pre-fetching to _build/.pkgs/ in the future. *)
+let _auto_fetch_missing ~lock_dir_path ~solver_env ~local_packages () =
   let open Fiber.O in
   let lock_path = Path.source lock_dir_path in
   let* lock_dir = Lock_pkg.read_disk ~solver_env ~local_packages lock_path in
@@ -747,20 +748,14 @@ let auto_fetch_missing ~lock_dir_path ~solver_env ~local_packages () =
       Fiber.return ()))
 ;;
 
-(** Wrapper for auto_fetch_missing.
+(** Auto-fetch is now a no-op.
 
-    IMPORTANT: This passes ~local_packages:[] to avoid triggering a Source_tree
-    scan. The local_packages parameter is only used for dependency hash
-    computation in Lock_pkg.read_disk, not for fetching. *)
-let do_auto_fetch () =
-  let open Fiber.O in
-  let lock_dir_path = Dune_rules.Lock_dir.default_source_path in
-  if Path.exists (Path.source lock_dir_path)
-  then
-    let* solver_env = Pkg_common.poll_solver_env_from_current_system () in
-    auto_fetch_missing ~lock_dir_path ~solver_env ~local_packages:[] ()
-  else Fiber.return ()
-;;
+    For non-vendored builds, the build system fetches sources on-demand through
+    fetch_rules.ml. Auto-fetch was designed for vendoring to duniverse/, which
+    should now be done explicitly with 'dune pkg vendor'.
+
+    If you want to pre-fetch for offline builds, use 'dune pkg fetch'. *)
+let do_auto_fetch () = Fiber.return ()
 
 (* Fetch command: pre-fetch package sources to _build for offline builds *)
 let fetch_term =

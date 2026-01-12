@@ -277,11 +277,30 @@ module Dune_config = struct
     let decode = enum all
   end
 
+  module Verbose = struct
+    type t = Dune_engine.Display.t
+
+    let equal = Dune_engine.Display.equal
+    let to_dyn = Dune_engine.Display.to_dyn
+
+    let all =
+      [ "auto", Dune_engine.Display.Quiet
+      ; "default", Dune_engine.Display.Quiet
+      ; "quiet", Dune_engine.Display.Quiet
+      ; "short", Dune_engine.Display.Short
+      ; "verbose", Dune_engine.Display.Verbose
+      ]
+    ;;
+
+    let decode = enum all
+  end
+
   module type S = sig
     type 'a field
 
     type t =
       { display : Display.t field
+      ; verbose : Verbose.t field
       ; concurrency : Concurrency.t field
       ; terminal_persistence : Terminal_persistence.t field
       ; sandboxing_preference : Sandboxing_preference.t field
@@ -309,6 +328,7 @@ module Dune_config = struct
     let equal
           (t : M.t)
           { M.display
+          ; verbose
           ; concurrency
           ; terminal_persistence
           ; sandboxing_preference
@@ -325,6 +345,7 @@ module Dune_config = struct
           }
       =
       field Display.equal t.display display
+      && field Verbose.equal t.verbose verbose
       && field Concurrency.equal t.concurrency concurrency
       && field Terminal_persistence.equal t.terminal_persistence terminal_persistence
       && field Sandboxing_preference.equal t.sandboxing_preference sandboxing_preference
@@ -366,6 +387,7 @@ module Dune_config = struct
 
     let superpose (a : A.t) (b : B.t) : C.t =
       { display = field a.display b.display
+      ; verbose = field a.verbose b.verbose
       ; concurrency = field a.concurrency b.concurrency
       ; terminal_persistence = field a.terminal_persistence b.terminal_persistence
       ; sandboxing_preference = field a.sandboxing_preference b.sandboxing_preference
@@ -396,6 +418,7 @@ module Dune_config = struct
 
     let to_dyn
           { M.display
+          ; verbose
           ; concurrency
           ; terminal_persistence
           ; sandboxing_preference
@@ -413,6 +436,7 @@ module Dune_config = struct
       =
       Dyn.record
         [ "display", field Display.to_dyn display
+        ; "verbose", field Verbose.to_dyn verbose
         ; "concurrency", field Concurrency.to_dyn concurrency
         ; "terminal_persistence", field Terminal_persistence.to_dyn terminal_persistence
         ; ( "sandboxing_preference"
@@ -446,6 +470,7 @@ module Dune_config = struct
 
     let empty =
       { display = None
+      ; verbose = None
       ; concurrency = None
       ; terminal_persistence = None
       ; sandboxing_preference = None
@@ -529,6 +554,7 @@ module Dune_config = struct
 
   let default =
     { display = Simple { verbosity = Quiet; status_line = not Execution_env.inside_dune }
+    ; verbose = Dune_engine.Display.Quiet
     ; concurrency = Auto
     ; terminal_persistence = Clear_on_rebuild
     ; sandboxing_preference = []
@@ -559,6 +585,7 @@ module Dune_config = struct
     in
     let field_o n v d = field_o n (check v >>> d) in
     let+ display = field_o "display" (1, 0) (enum Display.all)
+    and+ verbose = field_o "verbose" (3, 20) Verbose.decode
     and+ concurrency = field_o "jobs" (1, 0) Concurrency.decode
     and+ terminal_persistence =
       field_o "terminal-persistence" (1, 0) Terminal_persistence.decode
@@ -628,6 +655,7 @@ module Dune_config = struct
         Dune_cache.Config.Reproducibility_check.check_with_probability ~loc p)
     in
     { Partial.display
+    ; verbose
     ; concurrency
     ; terminal_persistence
     ; sandboxing_preference

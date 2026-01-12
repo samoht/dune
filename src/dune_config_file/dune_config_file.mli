@@ -98,11 +98,20 @@ module Dune_config : sig
     val to_dyn : t -> Dyn.t
   end
 
+  module Verbose : sig
+    type t = Dune_engine.Display.t
+
+    val all : (string * t) list
+    val equal : t -> t -> bool
+    val to_dyn : t -> Dyn.t
+  end
+
   module type S = sig
     type 'a field
 
     type t =
       { display : Display.t field
+      ; verbose : Verbose.t field
       ; concurrency : Concurrency.t field
       ; terminal_persistence : Terminal_persistence.t field
       ; sandboxing_preference : Sandboxing_preference.t field

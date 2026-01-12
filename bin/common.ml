@@ -597,6 +597,7 @@ let shared_with_config_file =
                 successful build has a \"clean\" empty output."))
   in
   { Dune_config.Partial.display
+  ; verbose = None
   ; concurrency
   ; sandboxing_preference = Option.map sandboxing_preference ~f:(fun x -> [ x ])
   ; terminal_persistence
