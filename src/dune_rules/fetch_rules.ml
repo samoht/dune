@@ -99,6 +99,17 @@ module Spec = struct
   let action { target; url = loc_url, url; checksum; kind } ~ectx:_ ~eenv:_ =
     let open Fiber.O in
     let* () = Fiber.return () in
+    (* Check if network fetching is allowed *)
+    if not !Clflags.auto_fetch
+    then
+      User_error.raise
+        ~loc:loc_url
+        [ Pp.textf
+            "Package source not cached and network access is disabled (--fetch=disabled)."
+        ; Pp.textf
+            "Run 'dune pkg fetch' first to download package sources, or use \
+             --fetch=enabled."
+        ];
     let target = Path.build target in
     (let checksum = Option.map checksum ~f:snd in
      Dune_pkg.Fetch.fetch

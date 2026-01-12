@@ -1590,7 +1590,10 @@ let fetch_term =
   let toggle = [ "enabled", true; "disabled", false ] in
   let doc =
     Printf.sprintf
-      "Enable or disable automatic fetching of missing dune packages to duniverse (%s)."
+      "Control network access for fetching package sources (%s). When $(b,enabled), dune \
+       may fetch package sources from the network during builds. When $(b,disabled), \
+       builds fail if package sources are not already cached; use 'dune pkg fetch' to \
+       pre-fetch."
       (Arg.doc_alts_enum toggle)
   in
   Arg.(

@@ -31,6 +31,8 @@ let with_metrics ~common f =
 ;;
 
 let run_build_system ~common ~auto_fetch ~request =
+  (* Set the auto_fetch flag so fetch_rules.ml can check it *)
+  Dune_rules.Clflags.auto_fetch := auto_fetch;
   let run ~(toplevel : unit Memo.Lazy.t) =
     with_metrics ~common (fun () -> build (fun () -> Memo.Lazy.force toplevel))
   in

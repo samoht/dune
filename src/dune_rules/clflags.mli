@@ -25,4 +25,9 @@ val debug_package_logs : bool ref
     - Always: always re-solve *)
 val auto_lock : Dune_config_file.Dune_config.Auto_lock.t ref
 
+(** Controls network access for fetching packages:
+    - true: allow on-demand fetching via fetch_rules.ml
+    - false: fail if packages not already cached *)
+val auto_fetch : bool ref
+
 val concurrency : int ref

@@ -53,12 +53,12 @@ git commit -m "Update fmt"
 ### Editing a Dependency (with vendoring)
 
 ```bash
-dune pkg fetch --vendor     # Vendor sources to duniverse/
+dune pkg vendor             # Vendor sources to duniverse/
 vim duniverse/fmt.0.9.0/src/fmt.ml
 dune build                  # Builds with your changes
 ```
 
-Your edits are protected — `dune pkg fetch --vendor` won't overwrite them
+Your edits are protected — `dune pkg vendor` won't overwrite them
 without `--force`.
 
 ## The Lock File
@@ -147,8 +147,8 @@ For HTTP sources or local pins, use `--format=directory`.
 |---------|--------------|
 | `dune pkg lock` | Solve dependencies, write `dune.lock` |
 | `dune pkg lock --portable` | Solve for all platforms at once |
-| `dune pkg fetch` | Download sources to `_build/.pkgs/` |
-| `dune pkg fetch --vendor` | Download sources and copy to `duniverse/` |
+| `dune pkg fetch` | Pre-fetch sources to `_build/.pkgs/` for offline builds |
+| `dune pkg vendor` | Copy sources to `duniverse/` for editing |
 | `dune pkg update` | Re-solve with latest versions |
 | `dune pkg update PKG` | Update specific package |
 
@@ -156,18 +156,18 @@ For HTTP sources or local pins, use `--format=directory`.
 
 | Flag | Effect |
 |------|--------|
-| `--pkg=enabled` | Auto-lock if missing + auto-fetch |
-| `--pkg=portable` | Auto-lock for all platforms + auto-fetch |
+| `--pkg=enabled` | Auto-lock if missing + network fetching allowed |
+| `--pkg=portable` | Auto-lock for all platforms + network fetching allowed |
 | `--pkg=disabled` | No package management (default) |
 | `--lock=enabled` | Auto-lock if missing |
 | `--lock=always` | Re-solve even if lock exists |
 | `--lock=disabled` | Don't auto-lock |
-| `--fetch=enabled` | Auto-fetch sources to `_build/.pkgs/` |
-| `--fetch=disabled` | Don't auto-fetch |
-| `--vendor=enabled` | Copy fetched sources to `duniverse/` |
-| `--vendor=disabled` | Keep sources in `_build/.pkgs/` only (default) |
+| `--fetch=enabled` | Allow network fetching during builds (default) |
+| `--fetch=disabled` | Block network access; fail if sources not cached |
 
 `--pkg=enabled` is shorthand for `--lock=enabled --fetch=enabled`.
+
+Use `dune pkg fetch` to pre-fetch sources for offline builds with `--fetch=disabled`.
 
 ## CI Setup
 
@@ -203,6 +203,9 @@ Hint: Run 'dune pkg lock' to update.
 
 Error: Checksum mismatch for fmt.0.9.0
 This may indicate a corrupted download.
+
+Error: Package source not cached and network access is disabled (--fetch=disabled).
+Hint: Run 'dune pkg fetch' first to download package sources, or use --fetch=enabled.
 ```
 
 ## References
