@@ -347,12 +347,18 @@ dependency solution. The formats differ only in efficiency for different use cas
 | Format | Optimized For |
 |--------|---------------|
 | Single-file (`dune.lock`) | Human review, VCS, source tree |
-| Directory (`pkgs/`) | Machine processing, incremental updates, network resilience |
+| Directory (`dune.lock/`) | Reproducibility without access to a remote repo, HTTP sources without consistent hashes |
 
-More expanded formats contain more information locally, making them more isolated
-from network errors and external dependencies. The single-file format is the
-**canonical** representation that users interact with. The directory format is
-**derived** for efficient and resilient package building.
+The single-file format requires content-addressable sources (git repos with commit
+hashes). For HTTP sources that can't be content-addressed, use directory format:
+
+```bash
+dune pkg lock --format=directory   # Force directory format
+dune pkg lock --format=auto        # Auto-select based on sources
+```
+
+The `_build/.locks/<ctx>/<lock>/pkgs/` directory (derived .pkg files) is for machine
+processing and is always generated from whichever source lock format is used.
 
 ## What About Offline Builds?
 
@@ -364,10 +370,10 @@ Two modes:
 - Sources fetched on demand to `_build/.pkgs/<context>/<name>/source/`
 
 ### Optional: Full Vendor (Approach 3)
-- Run `dune pkg fetch` to download sources to `duniverse/`
+- Run `dune pkg fetch --vendor` to download sources to `duniverse/`
 - Commit `duniverse/` to version control
 - Works fully offline, no network needed
-- **Requires**: patching workflow from `duniverse-patching.md`
+- **Requires**: patching workflow from `patching.md`
 
 Most users should use approach 2. Approach 3 is for those who want to:
 - Commit dependencies to their repo
