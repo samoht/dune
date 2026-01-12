@@ -10,24 +10,38 @@ of the main project, with selective library exposure and sandbox modes.
 
 ## Overview
 
-**All locked dependencies are fetched to `duniverse/`** - both dune-buildable and
-non-dune packages. Non-dune packages are built in a sandbox under `_build/.pkgs/`.
+By default, locked dependencies are fetched to `_build/.pkgs/<context>/<name>/source/`
+(transient, not version controlled). With `--vendor`, sources are copied to `duniverse/`
+for version control and editing.
 
+**Default (no vendoring):**
 ```
 project/
   dune.lock                   # Lock file (single-file or directory format)
-  duniverse/                  # ALL package sources (editable)
-    ppxlib.0.33.0/            # Dune package → built in main context
-    zarith.1.14/              # Non-dune package → built in pkg sandbox
-    dune                      # Generated vendor stanzas
   _build/
-    .pkgs/default/            # Package builds
-      zarith/                 # <name> when install=true (supports upgrade/uninstall)
-        source/               # Linked/copied from duniverse/ (rule inputs)
-        target/               # Build artifacts (rule outputs)
-      yojson-<build-id>/      # <name>-<build-id> when install=false (multi-version)
+    .pkgs/default/            # Package sources and builds
+      fmt/
+        source/               # Fetched source (transient)
+        target/               # Build artifacts
+      zarith/
         source/
         target/
+    install/default/          # Shared install prefix
+```
+
+**With vendoring (`dune pkg fetch --vendor`):**
+```
+project/
+  dune.lock                   # Lock file
+  duniverse/                  # Vendored sources (editable, version controlled)
+    fmt.0.9.0/
+    zarith.1.14/
+    dune                      # Generated vendor stanzas
+  _build/
+    .pkgs/default/            # Package builds (source linked from duniverse/)
+      zarith/
+        source/               # Linked from duniverse/zarith.1.14/
+        target/               # Build artifacts
     install/default/          # Shared install prefix
 ```
 
@@ -35,25 +49,34 @@ Build paths depend on the `(install ...)` setting:
 - `(install true)`: `_build/.pkgs/<ctx>/<name>/` - supports clean upgrade/uninstall
 - `(install false)`: `_build/.pkgs/<ctx>/<name>-<build-id>/` - allows multiple versions
 
-For vendored packages, source is linked from `duniverse/`.
-
 ### Library Cache
 
-The `_build/.pkgs/lib-cache` file maps library names to their source directories
-in `duniverse/`. This is the key mechanism for triggering automatic package fetching:
+The `_build/.pkgs/lib-cache` file maps library names to packages and source directories.
+This is the key mechanism for triggering automatic package fetching:
 
 ```
 # _build/.pkgs/lib-cache (auto-generated)
-fmt:fmt.0.9.0
-fmt.tty:fmt.0.9.0
-cmdliner:cmdliner.1.3.0
-zarith:zarith.1.14
+# library:package:path
+fmt:fmt:_build/.pkgs/default/fmt/source
+fmt.tty:fmt:_build/.pkgs/default/fmt/source
+fmt.cli:fmt:_build/.pkgs/default/fmt/source
+cmdliner:cmdliner:_build/.pkgs/default/cmdliner/source
+zarith:zarith:_build/.pkgs/default/zarith/source
+```
+
+Or with vendoring:
+```
+fmt:fmt:duniverse/fmt.0.9.0
+fmt.tty:fmt:duniverse/fmt.0.9.0
+fmt.cli:fmt:duniverse/fmt.0.9.0
+cmdliner:cmdliner:duniverse/cmdliner.1.3.0
+zarith:zarith:duniverse/zarith.1.14
 ```
 
 **Purpose:**
 - Triggers eager fetching: all locked packages are fetched when lib-cache is generated
 - Enables lazy building: packages are only built when their libraries are actually needed
-- Provides fast library→directory lookup without scanning duniverse/ on every build
+- Provides fast library→directory lookup without scanning source directories on every build
 - Acts as the dependency edge between lock file and library resolution
 
 **Implementation:**
@@ -65,7 +88,7 @@ Rule: _build/.pkgs/lib-cache
   Depends: dune.lock
   Action:
     1. Read package list from dune.lock
-    2. For each package, fetch source to duniverse/<name>.<version>/
+    2. For each package, fetch source to _build/.pkgs/ (or duniverse/ with --vendor)
     3. Scan each directory for libraries (dune files, META, opam files)
     4. Write library:directory mappings to lib-cache
 ```
@@ -77,7 +100,7 @@ dune exec ./main.exe
   → needs library "fmt"
   → library resolution depends on lib-cache
   → lib-cache rule runs (fetches packages, scans libraries)
-  → library resolution finds fmt in duniverse/fmt.0.9.0/
+  → library resolution finds fmt source directory
   → build proceeds
 ```
 
@@ -87,9 +110,9 @@ dune exec ./main.exe
 
 This enables:
 
-- **Editable dependencies**: All sources in duniverse/, edit and rebuild
-- **Full editor tooling**: Merlin/LSP works into dependency code
-- **Unified view**: One place for all dependency sources
+- **Fast builds**: Sources cached in `_build/.pkgs/`, no download on rebuild
+- **Editable dependencies** (with `--vendor`): Sources in `duniverse/`, edit and rebuild
+- **Full editor tooling** (with `--vendor`): Merlin/LSP works into dependency code
 - **Appropriate build method**: Dune packages in main context, others sandboxed
 
 ## Architecture

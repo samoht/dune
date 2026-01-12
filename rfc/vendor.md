@@ -293,59 +293,9 @@ In `dune` mode, the vendored directory is built like normal dune code, with libr
 filtering and aliasing applied. This is equivalent to `(vendored_dirs)` plus the
 ability to hide or rename libraries.
 
-In `opam` mode, dune should provide full compatibility with opam's build semantics:
-
-**Variable expansion:**
-All opam variables should be supported, including:
-- Global: `%{make}%`, `%{jobs}%`, `%{arch}%`, `%{os}%`, `%{os-family}%`, `%{os-distribution}%`, `%{os-version}%`
-- Directories: `%{prefix}%`, `%{lib}%`, `%{bin}%`, `%{share}%`, `%{etc}%`, `%{doc}%`, `%{man}%`, `%{stublibs}%`
-- Package: `%{name}%`, `%{version}%`, `%{build}%`, `%{build-id}%`
-- Cross-package: `%{pkg:var}%`, `%{pkg:installed}%`, `%{pkg:enable}%`
-
-**Filters:**
-Conditional commands should be evaluated: `[make] {os = "linux"}`, `[nmake] {os = "win32"}`
-
-**Substs:**
-Files listed in `substs:` should be processed (e.g., `config.ml.in` → `config.ml`)
-
-**Patches:**
-Patches listed in `patches:` should be applied, including conditional patches
-
-**Environment:**
-- `build-env:` should set environment for build commands
-- `setenv:` should export variables to dependent packages
-
-**Build location:**
-- When `(install true)`: build in `_build/.pkgs/<context>/<name>/`
-- When `(install false)`: build in `_build/.pkgs/<context>/<name>-<build-id>/`
-- Should install to `_build/install/<context>/`
-
-When `install=true`, the path uses `<name>` (without version or build-id) to support clean
-uninstall and upgrade: when a package version changes, the same directory is reused rather
-than accumulating stale directories. When `install=false`, the build-id is included to
-allow multiple versions of the same package to coexist.
-
-**Build-id computation:**
-The `build-id` is a content-addressable hash computed at lock time for deterministic caching.
-It forms a Merkle tree over the dependency graph:
-
-```
-build_id(pkg) = hash(
-  pkg_content_hash,      # hash of package definition (version, build commands, etc.)
-  sorted(deps_build_ids), # build_ids of all dependencies
-  platforms_hash         # set of platforms the package is enabled on
-)
-```
-
-Any change to a package or its transitive dependencies produces a new build-id, enabling:
-- Deterministic toolchain caching (same inputs → same build-id → cache hit)
-- Dev tool caching across projects
-- Precise cache invalidation when dependencies change
-
-**Cross-compilation:**
-When building for cross-compilation targets (`-x windows`, MirageOS, etc.), the opam
-build-mode context should set up proper `OCAMLFIND_TOOLCHAIN`, sysroot paths, and
-cross-compiler variables so that non-dune packages "just work".
+In `opam` mode, dune builds the package using its opam file's build instructions.
+See [RFC: Opam Build Mode](opam-mode.md) for full details on variable expansion,
+filters, patches, and cross-compilation support.
 
 ## Use Cases
 
@@ -508,6 +458,8 @@ and dune resolves them directly. The question is specific to opam-mode packages.
 
 ## References
 
+- [RFC: Opam Build Mode](opam-mode.md) — Full opam compatibility details
+- [RFC: Lock Files](lock.md) — Lock file format and commands
 - [dune#8652](https://github.com/ocaml/dune/issues/8652) — Package management: build non-dune packages
 - [opam-monorepo](https://github.com/tarides/opam-monorepo)
 - [opam-monorepo #145](https://github.com/tarides/opam-monorepo/issues/145)

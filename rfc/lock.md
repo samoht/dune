@@ -208,4 +208,5 @@ This may indicate a corrupted download.
 ## References
 
 - [RFC: Extended Vendor Stanza](vendor.md)
+- [RFC: Opam Build Mode](opam-mode.md)
 - [dune#8652](https://github.com/ocaml/dune/issues/8652)
