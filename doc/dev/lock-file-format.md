@@ -80,21 +80,34 @@ For CI pipelines that want to test compatibility with the latest opam packages:
 dune pkg update && dune build
 ```
 
-### The `--lock` Flag
+### Build Flags
 
-A single flag controls locking behavior:
+Three flags control package management behavior:
 
 ```bash
-dune build --lock=disabled   # No pkg management, use system/opam (default)
-dune build --lock=enabled    # Auto-lock if missing, use existing if present
+# High-level convenience flag (combines --lock and --fetch)
+dune build --pkg=enabled     # Auto-lock if missing + auto-fetch
+dune build --pkg=portable    # Auto-lock for all platforms + auto-fetch
+dune build --pkg=disabled    # No package management (default)
+
+# Granular control
+dune build --lock=enabled    # Auto-lock if missing
 dune build --lock=always     # Always re-solve with latest opam repo
+dune build --lock=portable   # Solve for all platforms
+dune build --lock=disabled   # Don't auto-lock (default)
+
+dune build --fetch=enabled   # Auto-fetch sources
+dune build --fetch=disabled  # Don't auto-fetch (default)
 ```
 
-| Mode | Lock file | Dependencies from | Use case |
-|------|-----------|-------------------|----------|
-| `disabled` | Ignored | System findlib/opam | Traditional workflow (default) |
-| `enabled` | Create if missing | Lock or fresh solve | Dev with pkg management |
-| `always` | Overwritten | Fresh solve | CI compat testing |
+`--pkg=enabled` is shorthand for `--lock=enabled --fetch=enabled`.
+
+| `--pkg` | `--lock` | `--fetch` | Use case |
+|---------|----------|-----------|----------|
+| `disabled` | `disabled` | `disabled` | Traditional workflow (default) |
+| `enabled` | `enabled` | `enabled` | Dev with pkg management |
+| `portable` | `portable` | `enabled` | Cross-platform projects |
+| - | `always` | - | CI compat testing |
 
 ### CI Workflow Example
 
@@ -110,7 +123,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: dune build --lock=always
+      - run: dune build --lock=always --fetch=enabled
 ```
 
 ### Global Configuration
@@ -118,18 +131,32 @@ jobs:
 Set default in `~/.config/dune/config`:
 
 ```lisp
-(auto_lock disabled)   ; No pkg management, use system/opam (current default)
-(auto_lock enabled)    ; Auto-lock if missing, use existing if present
-(auto_lock always)     ; Always re-solve (CI mode)
+(pkg disabled)         ; No pkg management (current default)
+(pkg enabled)          ; Auto-lock if missing + auto-fetch
+(pkg portable)         ; Auto-lock for all platforms + auto-fetch
+```
+
+Or with granular control:
+
+```lisp
+(lock disabled)        ; No auto-locking (current default)
+(lock enabled)         ; Auto-lock if missing
+(lock always)          ; Always re-solve (CI mode)
+(lock portable)        ; Solve for all platforms
+
+(fetch disabled)       ; No auto-fetching (current default)
+(fetch enabled)        ; Auto-fetch sources
 ```
 
 **Environment variable** (useful for CI):
 
 ```bash
-DUNE_CONFIG__AUTO_LOCK=always dune build
+DUNE_CONFIG__PKG=enabled dune build
+DUNE_CONFIG__LOCK=always dune build
+DUNE_CONFIG__FETCH=enabled dune build
 ```
 
-**Precedence:** CLI flag > config file > environment variable > default (`disabled`)
+**Precedence:** CLI flag > environment variable > config file > default (`disabled`)
 
 ## Workflow
 
@@ -201,7 +228,7 @@ the dependency resolution.
 
 ```lisp
 ; dune.lock (single file in source tree)
-(lang package 0.2)
+(lang package 0.1)
 
 ; Pin the repository state for reproducibility
 (repos
