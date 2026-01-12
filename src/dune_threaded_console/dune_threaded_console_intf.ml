@@ -56,4 +56,17 @@ module type S = sig
   (** [finish] is called finally by the main thread to finish broadcasting the
       user interface. Any locks on the terminal should be released here. *)
   val finish : unit -> unit
+
+  (** Event-driven API *)
+  val set_total : int -> unit
+
+  val activity_start
+    :  stage:Dune_console.stage
+    -> name:string
+    -> tool:string option
+    -> unit
+
+  val activity_finish : name:string -> unit
+  val activity_fail : name:string -> unit
+  val activity_log : name:string -> string -> unit
 end

@@ -5,34 +5,19 @@ open Stdune
 (** The console is a system than can report messages and a status to the user.
     It is usually the terminal the application is connected to, however it could
     be something else. This module allow to set a global backend for the
-    application as well as composing backends. *)
+    application as well as composing backends.
 
-module type Backend = sig
-  (** The interface of a custom console backend. *)
+    Design principle: One API, backend decides presentation.
+    Callers say "this event happened" - backend decides how to show it. *)
 
-  (** Start the backend. This is guaranteed to be called before all other
-      functions. *)
-  val start : unit -> unit
+type stage = Backend_intf.stage =
+  | Fetch
+  | Build
+  | Scan
+  | Save
+  | Vendor
 
-  (** Output a basic user message to the screen. *)
-  val print_user_message : User_message.t -> unit
-
-  (** Set the status line. *)
-  val set_status_line : User_message.Style.t Pp.t option -> unit
-
-  (** Print a message if the backend doesn't support a persistent status line. *)
-  val print_if_no_status_line : User_message.Style.t Pp.t -> unit
-
-  (** Reset the display. *)
-  val reset : unit -> unit
-
-  (** Reset the display and flush history. *)
-  val reset_flush_history : unit -> unit
-
-  (** Finalize the backend. After this function is called, it is guaranteed that
-      no other functions will be called. *)
-  val finish : unit -> unit
-end
+module type Backend = Backend_intf.S
 
 (** [separate_messages b] changes the behavior of [print_user_message], so that
     it separates messages with a blank line when [b = true]. *)
@@ -47,19 +32,26 @@ module Backend : sig
       backends. *)
   val compose : t -> t -> t
 
-  (** A dumb backend that hides the status line and simply dumps the messages to
-      the terminal. *)
-  val dumb : t
-
-  (** A backend that displays the status line in the terminal. *)
-  val progress : t
-
   (** [flush t] returns a backend that will flush [stderr] after every write *)
   val flush : t -> t
 
-  (** A base progress backend that doesn't flush. Any backend implemented on top
-      if is expected to flush manually *)
+  (** Dumb backend - no status line, just prints messages. *)
+  val dumb : t
+
+  (** Progress backend - displays status line in terminal. *)
+  val progress : t
+
+  (** Progress backend without flushing (for use by threaded console). *)
   val progress_no_flush : t
+
+  (** Quiet backend - errors only. *)
+  val quiet : t
+
+  (** Short backend - one line per event with progress counter. *)
+  val short : t
+
+  (** Verbose backend - one line per event plus log output. *)
+  val verbose : t
 end
 
 (** Format and print a user message to the console. *)
@@ -128,3 +120,26 @@ module Status_line : sig
 
   val refresh : unit -> unit
 end
+
+(** {1 Event-driven API} *)
+
+(** Set total count (libs + pkgs + exes - coarse grained). *)
+val set_total : int -> unit
+
+(** Mark an activity as started. *)
+val start : stage:stage -> name:string -> tool:string option -> unit
+
+(** Mark an activity as finished. *)
+val finish_activity : name:string -> unit
+
+(** Mark an activity as failed. *)
+val fail : name:string -> unit
+
+(** Log output for an activity - shown in verbose mode. *)
+val log : name:string -> string -> unit
+
+(** Messages - always shown (except in quiet mode). *)
+val message : User_message.t -> unit
+
+(** Errors - always shown. *)
+val error : User_message.t -> unit

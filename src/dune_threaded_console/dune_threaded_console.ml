@@ -57,6 +57,56 @@ let make ~frames_per_second (module Base : S) : (module Dune_console.Backend) =
       Exn.protect ~f:Base.reset_flush_history ~finally:(fun () -> Mutex.unlock mutex)
     ;;
 
+    (* Event-driven API - delegate to base backend *)
+    let set_total n =
+      Mutex.lock mutex;
+      state.dirty <- true;
+      Base.set_total n;
+      Mutex.unlock mutex
+    ;;
+
+    let activity_start ~stage ~name ~tool =
+      Mutex.lock mutex;
+      state.dirty <- true;
+      Base.activity_start ~stage ~name ~tool;
+      Mutex.unlock mutex
+    ;;
+
+    let activity_finish ~name =
+      Mutex.lock mutex;
+      state.dirty <- true;
+      Base.activity_finish ~name;
+      Mutex.unlock mutex
+    ;;
+
+    let activity_fail ~name =
+      Mutex.lock mutex;
+      state.dirty <- true;
+      Base.activity_fail ~name;
+      Mutex.unlock mutex
+    ;;
+
+    let activity_log ~name msg =
+      Mutex.lock mutex;
+      state.dirty <- true;
+      Base.activity_log ~name msg;
+      Mutex.unlock mutex
+    ;;
+
+    let message m =
+      Mutex.lock mutex;
+      state.dirty <- true;
+      Queue.push state.messages m;
+      Mutex.unlock mutex
+    ;;
+
+    let error m =
+      Mutex.lock mutex;
+      state.dirty <- true;
+      Queue.push state.messages m;
+      Mutex.unlock mutex
+    ;;
+
     type source =
       | Render
       | Handle_user_events

@@ -44,20 +44,19 @@ let to_dyn : t -> Dyn.t = function
 let console_backend = function
   | Tui -> Dune_tui.backend ()
   | Simple { verbosity = Verbose; _ } ->
-    (* Verbose mode uses dumb backend for line-by-line output *)
     Terminal_signals.unblock ();
-    Dune_console.Backend.dumb
-  | Simple { status_line; _ } ->
-    (match status_line with
-     | false ->
+    Dune_console.Backend.verbose
+  | Simple { verbosity = Short; status_line = false } ->
+    Terminal_signals.unblock ();
+    Dune_console.Backend.short
+  | Simple { verbosity = Quiet; status_line = false } ->
+    Terminal_signals.unblock ();
+    Dune_console.Backend.quiet
+  | Simple { status_line = true; _ } ->
+    (match Config.(get threaded_console) with
+     | `Enabled ->
+       Dune_threaded_console.progress ~frames_per_second:(Dune_util.frames_per_second ())
+     | `Disabled ->
        Terminal_signals.unblock ();
-       Dune_console.Backend.dumb
-     | true ->
-       (match Config.(get threaded_console) with
-        | `Enabled ->
-          Dune_threaded_console.progress
-            ~frames_per_second:(Dune_util.frames_per_second ())
-        | `Disabled ->
-          Terminal_signals.unblock ();
-          Dune_console.Backend.progress))
+       Dune_console.Backend.progress)
 ;;

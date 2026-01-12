@@ -379,6 +379,13 @@ module Console_backend = struct
 
   let reset_flush_history () = ()
   let finish () = Term.release (term ())
+
+  (* Event-driven API - TUI handles progress differently *)
+  let set_total _ = ()
+  let activity_start ~stage:_ ~name:_ ~tool:_ = ()
+  let activity_finish ~name:_ = ()
+  let activity_fail ~name:_ = ()
+  let activity_log ~name:_ _ = ()
 end
 
 let backend =

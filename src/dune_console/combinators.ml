@@ -21,6 +21,16 @@ let flush (module Backend : Backend_intf.S) : Backend_intf.t =
       reset_flush_history ();
       flush stderr
     ;;
+
+    let message msg =
+      message msg;
+      flush stderr
+    ;;
+
+    let error msg =
+      error msg;
+      flush stderr
+    ;;
   end : Backend_intf.S)
 ;;
 
@@ -61,6 +71,41 @@ let compose (module A : Backend_intf.S) (module B : Backend_intf.S)
     let reset_flush_history () =
       A.reset_flush_history ();
       B.reset_flush_history ()
+    ;;
+
+    let set_total n =
+      A.set_total n;
+      B.set_total n
+    ;;
+
+    let activity_start ~stage ~name ~tool =
+      A.activity_start ~stage ~name ~tool;
+      B.activity_start ~stage ~name ~tool
+    ;;
+
+    let activity_finish ~name =
+      A.activity_finish ~name;
+      B.activity_finish ~name
+    ;;
+
+    let activity_fail ~name =
+      A.activity_fail ~name;
+      B.activity_fail ~name
+    ;;
+
+    let activity_log ~name msg =
+      A.activity_log ~name msg;
+      B.activity_log ~name msg
+    ;;
+
+    let message msg =
+      A.message msg;
+      B.message msg
+    ;;
+
+    let error msg =
+      A.error msg;
+      B.error msg
     ;;
   end : Backend_intf.S)
 ;;

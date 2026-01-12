@@ -1,5 +1,12 @@
 open Stdune
 
+type stage = Backend_intf.stage =
+  | Fetch
+  | Build
+  | Scan
+  | Save
+  | Vendor
+
 module type Backend = Backend_intf.S
 
 module Backend = struct
@@ -7,7 +14,12 @@ module Backend = struct
 
   let dumb = (module Dumb : Backend_intf.S)
   let progress = Progress.flush
+  let progress_no_flush = Progress.no_flush
+  let quiet = Quiet.backend
+  let short = Short.backend
+  let verbose = Verbose.backend
   let compose = Combinators.compose
+  let flush = Combinators.flush
   let main = ref dumb
 
   let set (module T : Backend_intf.S) =
@@ -16,9 +28,6 @@ module Backend = struct
     main := (module T);
     T.start ()
   ;;
-
-  let flush t = Combinators.flush t
-  let progress_no_flush = Progress.no_flush
 end
 
 (* Flag that controls whether messages should be separated by a blank line *)
@@ -183,4 +192,41 @@ let () =
       else Printf.sprintf "%s %s" msg formatted_args
     in
     print [ Pp.verbatim full_msg ])
+;;
+
+(* Event-driven API *)
+
+let set_total n =
+  let (module M : Backend_intf.S) = !Backend.main in
+  M.set_total n
+;;
+
+let start ~stage ~name ~tool =
+  let (module M : Backend_intf.S) = !Backend.main in
+  M.activity_start ~stage ~name ~tool
+;;
+
+let finish_activity ~name =
+  let (module M : Backend_intf.S) = !Backend.main in
+  M.activity_finish ~name
+;;
+
+let fail ~name =
+  let (module M : Backend_intf.S) = !Backend.main in
+  M.activity_fail ~name
+;;
+
+let log ~name msg =
+  let (module M : Backend_intf.S) = !Backend.main in
+  M.activity_log ~name msg
+;;
+
+let message msg =
+  let (module M : Backend_intf.S) = !Backend.main in
+  M.message msg
+;;
+
+let error msg =
+  let (module M : Backend_intf.S) = !Backend.main in
+  M.error msg
 ;;
