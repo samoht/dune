@@ -4,8 +4,8 @@
 
 **Lock file = snapshot of the package universe.**
 
-You commit one file (`dune.lock`), and dune can reconstruct your exact
-dependencies on any machine. That's it.
+Commit one file (`dune.lock`), and dune reconstructs your exact dependencies
+on any machine.
 
 ```
 dune.lock    =    repo commit  +  package versions

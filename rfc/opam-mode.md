@@ -1,64 +1,47 @@
 # RFC: Opam Build Mode
 
-## Summary
+## Overview
 
 The `(mode opam)` build mode enables dune to build non-dune packages using their
-opam build instructions. This provides full compatibility with opam's build semantics.
+opam build instructions.
 
-## Background
+Many OCaml packages use `./configure && make`, topkg, oasis, or custom scripts.
+Dune runs these build commands in a sandboxed environment with opam variables
+expanded.
 
-Many OCaml packages don't use dune as their build system. They use:
-- `./configure && make`
-- topkg
-- oasis
-- Custom build scripts
+## When Used
 
-To vendor or lock these packages, dune needs to understand opam's build instructions.
+1. `(vendor dir (mode opam))` explicitly specified
+2. Vendored directory has opam file but no dune files (auto-detected)
+3. Locked package has non-dune build commands
 
-## When Opam Mode is Used
-
-Opam mode is used when:
-1. `(vendor dir (mode opam))` is explicitly specified
-2. A vendored directory contains an opam file but no dune files (auto-detected)
-3. A locked package has non-dune build commands
-
-## Opam Compatibility
-
-### Variable Expansion
+## Variable Expansion
 
 All opam variables are supported:
 
-**Global variables:**
-- `%{make}%`, `%{jobs}%` - build tools and parallelism
-- `%{arch}%`, `%{os}%`, `%{os-family}%`, `%{os-distribution}%`, `%{os-version}%` - platform
+| Category | Variables |
+|----------|-----------|
+| Global | `%{make}%`, `%{jobs}%`, `%{arch}%`, `%{os}%`, `%{os-family}%`, `%{os-distribution}%`, `%{os-version}%` |
+| Directories | `%{prefix}%`, `%{lib}%`, `%{bin}%`, `%{share}%`, `%{etc}%`, `%{doc}%`, `%{man}%`, `%{stublibs}%` |
+| Package | `%{name}%`, `%{version}%`, `%{build}%`, `%{build-id}%` |
+| Cross-package | `%{pkg:var}%`, `%{pkg:installed}%`, `%{pkg:enable}%` |
 
-**Directory variables:**
-- `%{prefix}%`, `%{lib}%`, `%{bin}%`, `%{share}%`, `%{etc}%`, `%{doc}%`, `%{man}%`, `%{stublibs}%`
-
-**Package variables:**
-- `%{name}%`, `%{version}%`, `%{build}%`, `%{build-id}%`
-
-**Cross-package variables:**
-- `%{pkg:var}%`, `%{pkg:installed}%`, `%{pkg:enable}%`
-
-### Filters
+## Filters
 
 Conditional commands are evaluated based on platform:
 
 ```
-[make] {os = "linux"}
-[nmake] {os = "win32"}
-["./configure" "--prefix=%{prefix}%"] {os != "win32"}
+build: [
+  [make] {os = "linux"}
+  [nmake] {os = "win32"}
+  ["./configure" "--prefix=%{prefix}%"] {os != "win32"}
+]
 ```
 
-### Substs
+## Substs and Patches
 
-Files listed in `substs:` are processed. For example, `config.ml.in` becomes
-`config.ml` with variables expanded.
-
-### Patches
-
-Patches listed in `patches:` are applied, including conditional patches:
+- `substs:` files are processed (`config.ml.in` → `config.ml` with variables expanded)
+- `patches:` are applied, including conditional patches
 
 ```
 patches: [
@@ -67,63 +50,58 @@ patches: [
 ]
 ```
 
-### Environment
+## Environment
 
-- `build-env:` sets environment variables for build commands
+- `build-env:` sets environment for build commands
 - `setenv:` exports variables to dependent packages
 
 ## Build Location
 
-Opam-mode packages are built in `_build/.pkgs/<context>/<name>/`:
-
 ```
-_build/.pkgs/default/zarith/
-  source/     # Linked/copied from duniverse/ or fetched
+_build/.pkgs/<context>/<name>/
+  source/     # Linked from duniverse/ or fetched to _build/.pkgs/
   target/     # Build artifacts
 ```
 
-When `(install false)`, the build-id is included in the path to allow multiple
-versions: `_build/.pkgs/<context>/<name>-<build-id>/`
+With `(install false)`, the build-id is included:
+`_build/.pkgs/<context>/<name>-<build-id>/`
 
 ## Build-id
 
-The `%{build-id}%` variable is a content-addressable hash for deterministic caching.
-For locked packages, it's computed as a Merkle tree over dependencies:
+Content-addressable hash for deterministic caching. Same mechanism for locked
+and vendored packages:
 
 ```
 build_id(pkg) = hash(
-  pkg_content_hash,       # hash of package definition
-  sorted(deps_build_ids), # build_ids of all dependencies
-  platforms_hash          # platforms the package is enabled on
+  opam_file_hash,         # includes url checksum for released packages
+  sorted(deps_build_ids), # Merkle tree over dependencies
+  platforms_hash
 )
 ```
 
-For manually vendored packages (no lock file), build-id is computed from:
-- Hash of the opam file contents
-- Hash of source directory contents
-- Build-ids of resolved dependencies (same Merkle tree approach)
-
-## Cross-Compilation
-
-When building for cross-compilation targets, dune sets up:
-- `OCAMLFIND_TOOLCHAIN=<target>`
-- Appropriate sysroot paths
-- Cross-compiler variables
-
-This enables non-dune packages to "just work" with cross-compilation.
+For vendored packages without an opam file url field, dune computes a checksum
+from the source directory contents.
 
 ## Installation
 
-Artifacts are installed to the shared prefix `_build/install/<context>/`:
-- Binaries to `bin/`
-- Libraries to `lib/<name>/`
-- Stubs to `lib/stublibs/`
+Artifacts install to `_build/install/<context>/`:
+- Binaries → `bin/`
+- Libraries → `lib/<name>/`
+- Stubs → `lib/stublibs/`
 
-Dune sets `PATH`, `OCAMLPATH`, and `CAML_LD_LIBRARY_PATH` so dependent packages
-can find installed artifacts.
+Dune sets `PATH`, `OCAMLPATH`, `CAML_LD_LIBRARY_PATH` for dependent packages.
+
+## Cross-Compilation
+
+Dune sets up:
+- `OCAMLFIND_TOOLCHAIN=<target>`
+- Sysroot paths
+- Cross-compiler variables
+
+Non-dune packages work with cross-compilation without modification.
 
 ## References
 
 - [RFC: Extended Vendor Stanza](vendor.md)
 - [RFC: Lock Files](lock.md)
-- [dune#8652](https://github.com/ocaml/dune/issues/8652) - Package management: build non-dune packages
+- [dune#8652](https://github.com/ocaml/dune/issues/8652)
