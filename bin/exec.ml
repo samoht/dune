@@ -314,6 +314,7 @@ let term : unit Term.t =
   and+ args =
     (* CR-someday Alizter: document this option *)
     Arg.(value & pos_right 0 Cmd_arg.conv [] (Arg.info [] ~docv:"ARGS" ~doc:None))
+  and+ pkg_opt = Common.pkg_term
   and+ auto_fetch_opt = Common.fetch_term
   and+ auto_lock_opt = Common.lock_term in
   (* TODO we should make sure to finalize the current backend before exiting dune.
@@ -321,9 +322,12 @@ let term : unit Term.t =
      runs. *)
   let common, config = Common.init builder in
   (* Apply CLI overrides for lock and fetch flags *)
-  let auto_fetch = Common.resolve_fetch_flag ~cli_opt:auto_fetch_opt ~config in
-  let (_ : Dune_config.Auto_lock.t) =
-    Common.resolve_lock_flag ~cli_opt:auto_lock_opt ~config
+  let auto_fetch, _auto_lock, _portable =
+    Common.resolve_pkg_flag
+      ~pkg_opt
+      ~fetch_opt:auto_fetch_opt
+      ~lock_opt:auto_lock_opt
+      ~config
   in
   match Dune_util.Global_lock.lock ~timeout:None with
   | Error lock_held_by ->

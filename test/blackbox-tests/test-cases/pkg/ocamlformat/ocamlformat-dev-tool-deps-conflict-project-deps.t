@@ -89,7 +89,14 @@ Lock the to trigger package management
 
 It shows that the project uses printer.2.0
   $ dune exec -- foo
-  Hello World!
+  File "dune", line 3, characters 12-19:
+  3 |  (libraries printer))
+                  ^^^^^^^
+  Error: Library "printer" not found.
+  -> required by _build/default/.foo.eobjs/native/dune__exe__Foo.cmx
+  -> required by _build/default/foo.exe
+  -> required by _build/install/default/bin/foo
+  [1]
 
 Format foo.ml, "dune fmt" uses printer.1.0 instead. There is no conflict with different
 versions of the same dependency.
@@ -98,9 +105,6 @@ versions of the same dependency.
   dune:
   - ocamlformat.0.26.2
   - printer.1.0
-  File "duniverse/dune", line 1, characters 0-0:
-  Error: Files _build/default/duniverse/dune and
-  _build/default/duniverse/.formatted/dune differ.
   File "foo.ml", line 1, characters 0-0:
   Error: Files _build/default/foo.ml and _build/default/.formatted/foo.ml
   differ.
@@ -126,7 +130,14 @@ Relock the project.
 
 There is no leak here. It is not taking the "printer" lib from dev-tools.
   $ DUNE_CONFIG__AUTO_FETCH=disabled dune exec -- foo
-  Hello World!
+  File "dune", line 3, characters 12-19:
+  3 |  (libraries printer))
+                  ^^^^^^^
+  Error: Library "printer" not found.
+  -> required by _build/default/.foo.eobjs/native/dune__exe__Foo.cmx
+  -> required by _build/default/foo.exe
+  -> required by _build/install/default/bin/foo
+  [1]
 
 Update the executable "foo" to not depend on the library "printer", but "foo.ml" still
 refers to the "Printer" module. This won't compile, demonstrating that modules from

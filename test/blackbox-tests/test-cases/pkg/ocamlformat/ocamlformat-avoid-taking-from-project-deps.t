@@ -33,9 +33,6 @@ Lock and build the project to make OCamlFormat from the project dependencies ava
 Run "dune fmt" without the dev-tools feature enabled. This should invoke the ocamlformat
 executable from the package dependencies (ie., 'ocamlformat.0.26.2').
   $ dune fmt --preview
-  File "duniverse/dune", line 1, characters 0-0:
-  Error: Files _build/default/duniverse/dune and
-  _build/default/duniverse/.formatted/dune differ.
   File "foo.ml", line 1, characters 0-0:
   Error: Files _build/default/foo.ml and _build/default/.formatted/foo.ml
   differ.
@@ -50,19 +47,13 @@ dev-tool (0.26.3).
   Solution for _build/.locks/tools-ocamlformat (1 package)
   dune:
   - ocamlformat.0.26.3
-  Error: Multiple rules generated for _build/install/default/bin/ocamlformat:
-  - duniverse/ocamlformat.0.26.2/dune:2
-  - <none>:1
-  -> required by _build/default/.formatted/foo.ml
-  -> required by alias .formatted/fmt
-  -> required by alias fmt
-  File "duniverse/dune", line 1, characters 0-0:
-  Error: Files _build/default/duniverse/dune and
-  _build/default/duniverse/.formatted/dune differ.
-  Promoting _build/default/duniverse/.formatted/dune to duniverse/dune.
+  File "foo.ml", line 1, characters 0-0:
+  Error: Files _build/default/foo.ml and _build/default/.formatted/foo.ml
+  differ.
+  Promoting _build/default/.formatted/foo.ml to foo.ml.
   [1]
   $ cat foo.ml
-  let () = print_endline "Hello, world"
+  formatted with version 0.26.3
 
 Retry, without dev-tools feature and without cleaning. This time it uses the OCamlFormat
 binary from the project dependencies rather than the dev-tool. This exercises the

@@ -39,10 +39,11 @@ Attempt to build the package the first time:
 
   $ build_pkg foo
   aaa
+  File "dune.lock/foo.dev.pkg", line 4, characters 30-36:
+  4 |  (all_platforms ((action (run ./make)))))
+                                    ^^^^^^
   Error: Logs for package foo
   
-  -> required by _build/.pkgs/default/foo/target/cookie
-  -> required by _build/.pkgs/default/foo/installed
   [1]
 
 
@@ -57,10 +58,11 @@ Update the message that gets printed while building foo:
 
 The change to the package is picked up:
   $ build_pkg foo
-  aaa
+  bbb
+  File "dune.lock/foo.dev.pkg", line 4, characters 30-36:
+  4 |  (all_platforms ((action (run ./make)))))
+                                    ^^^^^^
   Error: Logs for package foo
   
-  -> required by _build/.pkgs/default/foo/target/cookie
-  -> required by _build/.pkgs/default/foo/installed
   [1]
 

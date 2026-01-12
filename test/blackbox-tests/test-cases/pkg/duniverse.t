@@ -37,7 +37,7 @@ Lock the project (using directory format for mock repo compatibility):
 Note: The output shows "dune:" prefix for dune packages and "opam:" for non-dune packages.
 
 Test fetch command - reports no packages to fetch since mock packages have no source URLs:
-  $ dune pkg fetch 2>&1
+  $ dune pkg vendor 2>&1
 
 This is expected since our mock packages don't have URLs defined.
 
@@ -117,7 +117,7 @@ Lock the project - should show mylib as "dune:" and makelib as "opam:":
   - makelib.1.0.0
 
 Fetch duniverse packages - should fetch only mylib (the dune package):
-  $ dune pkg fetch 2>&1
+  $ dune pkg vendor 2>&1
 
 Verify the duniverse directory structure:
   $ find duniverse -type f | sort
@@ -142,4 +142,4 @@ Verify the library code was fetched:
   let greeting = "Hello from mylib"
 
 Running fetch again should skip already-fetched packages:
-  $ dune pkg fetch 2>&1
+  $ dune pkg vendor 2>&1

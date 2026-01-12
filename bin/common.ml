@@ -1554,6 +1554,36 @@ let help_secs =
 
 let auto_fetch_env = "DUNE_CONFIG__AUTO_FETCH"
 let auto_lock_env = "DUNE_CONFIG__AUTO_LOCK"
+let auto_pkg_env = "DUNE_CONFIG__PKG"
+
+(** The --pkg flag is a high-level convenience flag that controls both
+    auto-lock and auto-fetch behavior:
+    - enabled: auto-lock + auto-fetch
+    - portable: auto-lock for all platforms + auto-fetch
+    - disabled: no auto-lock, no auto-fetch *)
+module Pkg_mode = struct
+  type t =
+    | Enabled
+    | Portable
+    | Disabled
+
+  let all = [ "enabled", Enabled; "portable", Portable; "disabled", Disabled ]
+end
+
+let pkg_term =
+  let modes = Pkg_mode.all in
+  let doc =
+    Printf.sprintf
+      "High-level package management control (%s). $(b,enabled): auto-lock if missing + \
+       auto-fetch. $(b,portable): auto-lock for all platforms + auto-fetch. \
+       $(b,disabled): no automatic locking or fetching."
+      (Arg.doc_alts_enum modes)
+  in
+  Arg.(
+    value
+    & opt (some (enum modes)) None
+    & info [ "pkg" ] ~env:(Cmd.Env.info ~doc auto_pkg_env) ~doc:(Some doc))
+;;
 
 let fetch_term =
   let toggle = [ "enabled", true; "disabled", false ] in
@@ -1594,6 +1624,45 @@ let resolve_lock_flag ~cli_opt ~(config : Dune_config.t) =
   auto_lock
 ;;
 
+(** Resolve the --pkg flag to auto_fetch and auto_lock values.
+    The --pkg flag is a high-level convenience that expands to:
+    - enabled: auto_lock=Enabled, auto_fetch=true
+    - portable: auto_lock=Enabled (with portable solving), auto_fetch=true
+    - disabled: auto_lock=Disabled, auto_fetch=false
+
+    Returns (auto_fetch, auto_lock, portable) where portable indicates
+    if portable lock solving should be used. *)
+let resolve_pkg_flag ~pkg_opt ~fetch_opt ~lock_opt ~(config : Dune_config.t)
+  : bool * Dune_config.Auto_lock.t * bool
+  =
+  let auto_fetch, auto_lock, portable =
+    match pkg_opt with
+    | Some Pkg_mode.Enabled ->
+      (* --pkg=enabled overrides individual flags *)
+      let auto_fetch = Option.value fetch_opt ~default:true in
+      let auto_lock = Option.value lock_opt ~default:Dune_config.Auto_lock.Enabled in
+      auto_fetch, auto_lock, false
+    | Some Pkg_mode.Portable ->
+      (* --pkg=portable enables auto-lock for all platforms *)
+      let auto_fetch = Option.value fetch_opt ~default:true in
+      let auto_lock = Option.value lock_opt ~default:Dune_config.Auto_lock.Enabled in
+      auto_fetch, auto_lock, true
+    | Some Pkg_mode.Disabled ->
+      (* --pkg=disabled disables both unless explicitly overridden *)
+      let auto_fetch = Option.value fetch_opt ~default:false in
+      let auto_lock = Option.value lock_opt ~default:Dune_config.Auto_lock.Disabled in
+      auto_fetch, auto_lock, false
+    | None ->
+      (* No --pkg flag, use individual flags or config defaults *)
+      let auto_fetch = resolve_fetch_flag ~cli_opt:fetch_opt ~config in
+      let auto_lock = resolve_lock_flag ~cli_opt:lock_opt ~config in
+      auto_fetch, auto_lock, false
+  in
+  (* Update the global clflags ref so the build system sees the lock setting *)
+  Dune_rules.Clflags.auto_lock := auto_lock;
+  auto_fetch, auto_lock, portable
+;;
+
 let envs =
   Cmd.Env.
     [ info
@@ -1608,6 +1677,12 @@ let envs =
     ; info
         ~doc:"If set, determines the location of all the different caches used by dune."
         "DUNE_CACHE_ROOT"
+    ; info
+        ~doc:
+          "High-level package management control. $(b,enabled): auto-lock + auto-fetch. \
+           $(b,portable): auto-lock for all platforms + auto-fetch. $(b,disabled): no \
+           automatic locking or fetching."
+        auto_pkg_env
     ; info
         ~doc:
           "If set to $(b,disabled), automatic fetching of missing dune packages to \

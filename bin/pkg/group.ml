@@ -10,6 +10,7 @@ let man =
 let subcommands =
   [ Lock.command
   ; Fetch.command
+  ; Fetch.vendor_command
   ; Deps.command
   ; Patch.command
   ; Print_solver_env.command

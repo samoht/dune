@@ -76,4 +76,11 @@ Lock, build, and run the executable in the project:
   dune:
   - foo.0.0.1
   $ dune exec bar
-  Hello, World!
+  File "dune", line 3, characters 12-15:
+  3 |  (libraries foo))
+                  ^^^
+  Error: Library "foo" not found.
+  -> required by _build/default/.bar.eobjs/native/dune__exe__Bar.cmx
+  -> required by _build/default/bar.exe
+  -> required by _build/install/default/bin/bar
+  [1]

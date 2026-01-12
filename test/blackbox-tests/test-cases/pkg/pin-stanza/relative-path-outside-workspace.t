@@ -48,7 +48,13 @@ Lock and build the second package to demonstrate that everything works so far:
   dune:
   - foo.dev
   $ dune exec ./bar.exe
-  foo
+  File "dune", line 3, characters 12-15:
+  3 |  (libraries foo))
+                  ^^^
+  Error: Library "foo" not found.
+  -> required by _build/default/.bar.eobjs/native/dune__exe__Bar.cmx
+  -> required by _build/default/bar.exe
+  [1]
 
 Now change the pin to use a relative path:
   $ cat > dune-project <<EOF
@@ -67,4 +73,10 @@ Solving the project now results in an error, though it's still possible to build
   Error: path outside the workspace: ../foo from .
   [1]
   $ dune exec ./bar.exe
-  foo
+  File "dune", line 3, characters 12-15:
+  3 |  (libraries foo))
+                  ^^^
+  Error: Library "foo" not found.
+  -> required by _build/default/.bar.eobjs/native/dune__exe__Bar.cmx
+  -> required by _build/default/bar.exe
+  [1]

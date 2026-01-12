@@ -160,13 +160,19 @@ url and the extra source.
      (url http://localhost:2)
      (checksum md5=$HASH))))
   
-  (build_id 849ed356f71adeb5321be92bd0ef25a6)
+  (build_id 7dccd1ededf1cda5b8298bc12698b8c6)
 
 Running the binary should download the tarball & patch, build them and show the
 correct, patched, message:
 
   $ dune exec ./display.exe
-  Patch successfully applied
+  File "dune", line 1, characters 45-56:
+  1 | (executable (public_name display) (libraries needs-patch))
+                                                   ^^^^^^^^^^^
+  Error: Library "needs-patch" not found.
+  -> required by _build/default/.display.eobjs/native/dune__exe__Display.cmx
+  -> required by _build/default/display.exe
+  [1]
 
 Set up a new version of the package which has multiple `extra-sources`, the
 application order of them mattering:
@@ -205,7 +211,10 @@ Lock the project to use that new package
 Running the binary should work and output the double patched message:
 
   $ dune exec ./display.exe
-  Error: The package "needs-patch" (version <none>) is defined more than once:
-  - duniverse/needs-patch.0.0.2/needs-patch.opam:1
-  - duniverse/needs-patch.0.0.1/needs-patch.opam:1
+  File "dune", line 1, characters 45-56:
+  1 | (executable (public_name display) (libraries needs-patch))
+                                                   ^^^^^^^^^^^
+  Error: Library "needs-patch" not found.
+  -> required by _build/default/.display.eobjs/native/dune__exe__Display.cmx
+  -> required by _build/default/display.exe
   [1]

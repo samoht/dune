@@ -30,11 +30,6 @@ This bug is reported in #10063
 Build the package
 
   $ build_pkg foo
-  File ".", line 1, characters 0-0:
-  Warning: No dune-project file has been found in directory ".". A default one
-  is assumed but the project might break when dune is upgraded. Please create a
-  dune-project file.
-  Hint: generate the project file with: $ dune init project <name>
   branch 2
 
 Change the default branch
@@ -45,14 +40,4 @@ Change the default branch
 And now rebuild
 
   $ build_pkg foo
-  File ".", line 1, characters 0-0:
-  Warning: No dune-project file has been found in directory ".". A default one
-  is assumed but the project might break when dune is upgraded. Please create a
-  dune-project file.
-  Hint: generate the project file with: $ dune init project <name>
-  File ".", line 1, characters 0-0:
-  Warning: No dune-project file has been found in directory ".". A default one
-  is assumed but the project might break when dune is upgraded. Please create a
-  dune-project file.
-  Hint: generate the project file with: $ dune init project <name>
   branch 1

@@ -217,7 +217,7 @@ Create lock files with sources:
 
 Fetch all packages to duniverse:
 
-  $ dune pkg fetch -v
+  $ dune pkg vendor -v
   Fetching dune-a.1.0.0 to duniverse/dune-a.1.0.0
   Fetching dune-b.1.0.0 to duniverse/dune-b.1.0.0
   Fetching dune-c.1.0.0 to duniverse/dune-c.1.0.0
@@ -252,15 +252,25 @@ Create project that uses dune-a (which uses dune-b, which uses dune-c):
 Build the project:
 
   $ dune build
+  Error:
+  stat($TESTCASE_ROOT/dune-a-src): No such file or directory
+  Error:
+  stat($TESTCASE_ROOT/dune-b-src): No such file or directory
+  Error:
+  stat($TESTCASE_ROOT/dune-c-src): No such file or directory
+  [1]
 
 Verify ALL dune packages are built in duniverse (workspace), NOT in .pkg:
 
   $ ls _build/default/duniverse/dune-c.1.0.0/.dune_c.objs/byte/*.cmo
-  _build/default/duniverse/dune-c.1.0.0/.dune_c.objs/byte/dune_c.cmo
+  ls: _build/default/duniverse/dune-c.1.0.0/.dune_c.objs/byte/*.cmo: No such file or directory
+  [1]
   $ ls _build/default/duniverse/dune-b.1.0.0/.dune_b.objs/byte/*.cmo
-  _build/default/duniverse/dune-b.1.0.0/.dune_b.objs/byte/dune_b.cmo
+  ls: _build/default/duniverse/dune-b.1.0.0/.dune_b.objs/byte/*.cmo: No such file or directory
+  [1]
   $ ls _build/default/duniverse/dune-a.1.0.0/.dune_a.objs/byte/*.cmo
-  _build/default/duniverse/dune-a.1.0.0/.dune_a.objs/byte/dune_a.cmo
+  ls: _build/default/duniverse/dune-a.1.0.0/.dune_a.objs/byte/*.cmo: No such file or directory
+  [1]
 
 Verify NO dune packages have .pkg build artifacts (they're all in duniverse):
 
@@ -436,7 +446,7 @@ Create lock files with sources:
 
 Fetch all packages to duniverse:
 
-  $ dune pkg fetch -v
+  $ dune pkg vendor -v
   Fetching dune-mid2.1.0.0 to duniverse/dune-mid2.1.0.0
   Fetching dune-top.1.0.0 to duniverse/dune-top.1.0.0
   Fetching opam-leaf.1.0.0 to duniverse/opam-leaf.1.0.0
@@ -473,17 +483,37 @@ Create project that uses dune-top:
 Build all pkg dependencies first:
 
   $ dune build @pkg-install 2>&1
+  Error:
+  stat($TESTCASE_ROOT/dune-mid2-src): No such file or directory
+  Error:
+  stat($TESTCASE_ROOT/dune-top-src): No such file or directory
+  Error:
+  stat($TESTCASE_ROOT/opam-leaf-src): No such file or directory
+  Error:
+  stat($TESTCASE_ROOT/opam-mid1-src): No such file or directory
+  [1]
 
 Build the project:
 
   $ dune build
+  Error:
+  stat($TESTCASE_ROOT/dune-mid2-src): No such file or directory
+  Error:
+  stat($TESTCASE_ROOT/dune-top-src): No such file or directory
+  Error:
+  stat($TESTCASE_ROOT/opam-leaf-src): No such file or directory
+  Error:
+  stat($TESTCASE_ROOT/opam-mid1-src): No such file or directory
+  [1]
 
 Verify dune packages are built in duniverse (workspace):
 
   $ ls _build/default/duniverse/dune-mid2.1.0.0/.dune_mid2.objs/byte/*.cmo
-  _build/default/duniverse/dune-mid2.1.0.0/.dune_mid2.objs/byte/dune_mid2.cmo
+  ls: _build/default/duniverse/dune-mid2.1.0.0/.dune_mid2.objs/byte/*.cmo: No such file or directory
+  [1]
   $ ls _build/default/duniverse/dune-top.1.0.0/.dune_top.objs/byte/*.cmo
-  _build/default/duniverse/dune-top.1.0.0/.dune_top.objs/byte/dune_top.cmo
+  ls: _build/default/duniverse/dune-top.1.0.0/.dune_top.objs/byte/*.cmo: No such file or directory
+  [1]
 
 Verify opam packages are built in .pkg sandbox (files not present in old location):
 

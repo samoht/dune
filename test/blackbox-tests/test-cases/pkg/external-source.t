@@ -14,18 +14,8 @@ Test that can fetch the sources from an external dir
   > EOF
 
   $ build_pkg test
-  File ".", line 1, characters 0-0:
-  Warning: No dune-project file has been found in directory ".". A default one
-  is assumed but the project might break when dune is upgraded. Please create a
-  dune-project file.
-  Hint: generate the project file with: $ dune init project <name>
 
   $ show_pkg test
-  File ".", line 1, characters 0-0:
-  Warning: No dune-project file has been found in directory ".". A default one
-  is assumed but the project might break when dune is upgraded. Please create a
-  dune-project file.
-  Hint: generate the project file with: $ dune init project <name>
   
   /installed
   /source

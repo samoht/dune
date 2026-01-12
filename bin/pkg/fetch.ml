@@ -598,146 +598,160 @@ let fetch_duniverse ~lock_dir_path ~solver_env ~local_packages () =
     Fiber.return ())
 ;;
 
+(* Auto-fetch missing packages to _build/.pkgs/ for builds.
+   This is called during builds when packages haven't been fetched yet. *)
 let auto_fetch_missing ~lock_dir_path ~solver_env ~local_packages () =
   let open Fiber.O in
   let lock_path = Path.source lock_dir_path in
   let* lock_dir = Lock_pkg.read_disk ~solver_env ~local_packages lock_path in
   let all_pkgs = Lock_dir.Packages.to_pkg_list lock_dir.packages in
-  (* Filter to packages with sources (both dune and opam packages) *)
+  (* Filter to packages with sources *)
   let fetchable_pkgs =
     List.filter all_pkgs ~f:(fun (pkg : Pkg.t) -> Option.is_some pkg.info.source)
   in
-  (* Group by source and filter to groups that need fetching (missing or stale) *)
-  let source_groups = Vendor.group_by_source fetchable_pkgs in
-  let* rev_store = Rev_store.get in
-  let* groups_to_fetch =
-    Fiber.parallel_map source_groups ~f:(fun group ->
-      let { Vendor.source; primary_name; _ } = group in
-      let initial_target = Vendor.source_group_dir group |> Path.source in
-      (* Use find_fresh_dir to check if directory is fresh - if None, needs fetch *)
-      let+ fresh_dir = find_fresh_dir ~rev_store ~source initial_target primary_name in
-      if Option.is_none fresh_dir then Some group else None)
-    >>| List.filter_map ~f:Fun.id
-  in
-  if List.is_empty groups_to_fetch
+  if List.is_empty fetchable_pkgs
   then Fiber.return ()
   else (
-    let duniverse_path = Path.source Vendor.default_dir in
-    if not (Path.exists duniverse_path) then Path.mkdir_p duniverse_path;
-    let marker_path =
-      Path.source (Path.Source.relative Vendor.default_dir Vendor.marker_filename)
-    in
-    (* Build map for classifying packages *)
-    let pkg_classifications =
-      List.fold_left fetchable_pkgs ~init:Package_name.Map.empty ~f:(fun acc pkg ->
-        let name = pkg.Pkg.info.name in
-        Package_name.Map.set acc name (Vendor.classify_build_method pkg))
-    in
-    (* Group all fetchable packages by source for vendor stanza generation *)
-    let all_source_groups = Vendor.group_by_source fetchable_pkgs in
-    (* Build map for looking up packages by name *)
+    let source_groups = Vendor.group_by_source fetchable_pkgs in
     let pkgs_by_name =
       List.fold_left fetchable_pkgs ~init:Package_name.Map.empty ~f:(fun acc pkg ->
         Package_name.Map.add_exn acc pkg.Pkg.info.name pkg)
     in
-    Dune_engine.Progress.reset ();
-    Dune_engine.Progress.set_total (List.length groups_to_fetch);
     let* rev_store = Rev_store.get in
     let* platform = Pkg_common.poll_solver_env_from_current_system () in
     let patches_dir = default_patches_dir in
-    let* fetch_results =
-      Fiber.parallel_map groups_to_fetch ~f:(fun group ->
-        fetch_source_group ~rev_store ~platform ~patches_dir ~pkgs_by_name group)
+    (* Check which groups need fetching (missing from _build/.pkgs/) *)
+    let* groups_to_fetch =
+      Fiber.parallel_map source_groups ~f:(fun group ->
+        let { Vendor.primary_name; _ } = group in
+        let pkg_dir =
+          Path.Build.relative
+            (Path.Build.relative Dune_engine.Dpath.Build.pkgs_dir "default")
+            (Package_name.to_string primary_name)
+        in
+        let target = Path.Build.relative pkg_dir "source" in
+        let target_path = Path.build target in
+        if Path.exists target_path then Fiber.return None else Fiber.return (Some group))
+      >>| List.filter_map ~f:Fun.id
     in
-    (* Build a map from fetched groups to their actual directory names *)
-    let fetched_dirnames =
-      List.fold_left2
-        groups_to_fetch
-        fetch_results
-        ~init:[]
-        ~f:(fun acc group (_was_fetched, dirname) ->
-          (group.Vendor.primary_name, dirname) :: acc)
-    in
-    (* Generate duniverse/dune with vendored_dirs and vendor stanzas *)
-    (* Scan all existing directories for libraries *)
-    let dune_content =
-      let vendor_stanzas =
-        List.filter_map all_source_groups ~f:(fun group ->
-          let { Vendor.packages; primary_name; primary_version; _ } = group in
-          (* Use the fetched dirname if available, otherwise compute from project name *)
-          let dirname =
-            match List.assoc fetched_dirnames primary_name with
-            | Some d -> d
-            | None ->
-              (* For existing groups, check the actual directory for project name *)
-              let initial_dirname =
-                sprintf
-                  "%s.%s"
-                  (Package_name.to_string primary_name)
-                  (Package_version.to_string primary_version)
+    if List.is_empty groups_to_fetch
+    then Fiber.return ()
+    else (
+      Dune_engine.Progress.reset ();
+      Dune_engine.Progress.set_total (List.length groups_to_fetch);
+      (* Fetch to _build/.pkgs/default/<pkg>/source/ *)
+      let* _ =
+        Fiber.parallel_map groups_to_fetch ~f:(fun group ->
+          let { Vendor.primary_name; primary_version; source; _ } = group in
+          let pkg_str =
+            sprintf
+              "%s.%s"
+              (Package_name.to_string primary_name)
+              (Package_version.to_string primary_version)
+          in
+          let pkg_dir =
+            Path.Build.relative
+              (Path.Build.relative Dune_engine.Dpath.Build.pkgs_dir "default")
+              (Package_name.to_string primary_name)
+          in
+          let target = Path.Build.relative pkg_dir "source" in
+          let target_path = Path.build target in
+          let target_str = Path.to_string target_path in
+          Path.mkdir_p (Path.build pkg_dir);
+          (* Use do_fetch which handles all source types *)
+          let* result = do_fetch ~rev_store ~source ~target:target_str in
+          (match result with
+           | Ok _ -> ()
+           | Error (Dune_pkg.Fetch.Unavailable msg) ->
+             let msg_str =
+               match msg with
+               | None -> "unknown error"
+               | Some m -> Format.asprintf "%a" Pp.to_fmt (User_message.pp m)
+             in
+             User_error.raise [ Pp.textf "Failed to fetch %s: %s" pkg_str msg_str ]
+           | Error (Dune_pkg.Fetch.Checksum_mismatch actual) ->
+             User_error.raise
+               [ Pp.textf
+                   "Checksum mismatch for %s (got %s)"
+                   pkg_str
+                   (Dune_pkg.Checksum.to_string actual)
+               ]);
+          (* Fetch extra sources *)
+          let* () =
+            match Package_name.Map.find pkgs_by_name primary_name with
+            | None -> Fiber.return ()
+            | Some pkg ->
+              Fiber.sequential_iter
+                pkg.Pkg.info.extra_sources
+                ~f:(fun (local_path, extra_source) ->
+                  let extra_target = Path.append_local target_path local_path in
+                  let checksum = Option.map extra_source.Source.checksum ~f:snd in
+                  let* result =
+                    Dune_pkg.Fetch.fetch
+                      ~unpack:false
+                      ~checksum
+                      ~target:extra_target
+                      ~url:extra_source.url
+                  in
+                  match result with
+                  | Ok () -> Fiber.return ()
+                  | Error (Dune_pkg.Fetch.Unavailable msg) ->
+                    let msg_str =
+                      match msg with
+                      | None -> "unknown error"
+                      | Some m -> Format.asprintf "%a" Pp.to_fmt (User_message.pp m)
+                    in
+                    User_error.raise
+                      [ Pp.textf
+                          "Failed to fetch extra source %s: %s"
+                          (Path.Local.to_string local_path)
+                          msg_str
+                      ]
+                  | Error (Dune_pkg.Fetch.Checksum_mismatch actual) ->
+                    User_error.raise
+                      [ Pp.textf
+                          "Checksum mismatch for extra source %s (got %s)"
+                          (Path.Local.to_string local_path)
+                          (Dune_pkg.Checksum.to_string actual)
+                      ])
+          in
+          (* Apply patches *)
+          let* () =
+            match Package_name.Map.find pkgs_by_name primary_name with
+            | None -> Fiber.return ()
+            | Some pkg ->
+              let patches = Vendor.get_patches pkg ~platform in
+              let* () =
+                Fiber.sequential_iter patches ~f:(fun patch_sw ->
+                  match Dune_lang.String_with_vars.text_only patch_sw with
+                  | None ->
+                    User_error.raise
+                      [ Pp.text
+                          "Patch file path contains variables, which is not supported"
+                      ]
+                  | Some patch_file ->
+                    let patch_local = Path.Local.of_string patch_file in
+                    apply_patch ~target_dir:target_path ~patch_file:patch_local)
               in
-              let initial_dir = Path.Source.relative Vendor.default_dir initial_dirname in
-              if Path.exists (Path.source initial_dir)
-              then (
-                match Vendor_rules.read_project_name initial_dir with
-                | Some proj_name ->
-                  sprintf "%s.%s" proj_name (Package_version.to_string primary_version)
-                | None -> initial_dirname)
-              else initial_dirname
+              let user_patch =
+                user_patch_path ~patches_dir primary_name primary_version
+              in
+              apply_user_patch
+                ~verbose
+                ~target_dir:target_path
+                ~patch_source_path:user_patch
           in
-          let pkg_dir = Path.Source.relative Vendor.default_dir dirname in
-          (* Check if this is an opam package (needs sandbox) AND has an opam file.
-             Without an opam file, we can't build in opam mode. *)
-          let pkg_name =
-            match packages with
-            | (name, _) :: _ -> Package_name.to_string name
-            | [] -> dirname
-          in
-          let has_opam_file =
-            Option.is_some (Vendor_rules.find_opam_file ~pkg_name ~pkg_dir)
-          in
-          let is_opam =
-            has_opam_file
-            && List.for_all packages ~f:(fun (name, _) ->
-              match Package_name.Map.find pkg_classifications name with
-              | Some Vendor.Opam_sandboxed -> true
-              | _ -> false)
-          in
-          (* Scan for libraries using cascading strategy:
-             dune files -> META files -> opam files *)
-          let libs = Vendor_rules.scan_libraries pkg_dir ~pkg_name in
-          if is_opam
-          then
-            (* Opam package - needs sandbox, include libraries if found *)
-            if List.is_empty libs
-            then Some (sprintf "(vendor %s (mode opam))" dirname)
-            else (
-              let libs_str = String.concat ~sep:" " libs in
-              Some (sprintf "(vendor %s (mode opam) (libraries %s))" dirname libs_str))
-          else if List.is_empty libs
-          then None
-          else (
-            let libs_str = String.concat ~sep:" " libs in
-            Some (sprintf "(vendor %s (libraries %s))" dirname libs_str)))
+          Dune_engine.Progress.finish_target ~name:pkg_str;
+          Fiber.return (true, pkg_str))
       in
-      let lines =
-        [ "; This directory is managed by dune pkg"; "(vendored_dirs *)" ]
-        @ vendor_stanzas
-      in
-      String.concat ~sep:"\n" lines ^ "\n"
-    in
-    if (not (Path.exists marker_path)) || Io.read_file marker_path <> dune_content
-    then Io.write_file marker_path dune_content;
-    Fiber.return ())
+      Fiber.return ()))
 ;;
 
-(** Wrapper for auto_fetch_missing that avoids the Source_tree caching issue.
+(** Wrapper for auto_fetch_missing.
 
     IMPORTANT: This passes ~local_packages:[] to avoid triggering a Source_tree
-    scan before the fetch creates duniverse. The local_packages parameter
-    is only used for dependency hash computation in Lock_pkg.read_disk,
-    not for fetching. If we scan Source_tree here, it gets cached without
-    duniverse, and subsequent builds won't see the newly created directory. *)
+    scan. The local_packages parameter is only used for dependency hash
+    computation in Lock_pkg.read_disk, not for fetching. *)
 let do_auto_fetch () =
   let open Fiber.O in
   let lock_dir_path = Dune_rules.Lock_dir.default_source_path in
@@ -748,7 +762,192 @@ let do_auto_fetch () =
   else Fiber.return ()
 ;;
 
-let term =
+(* Fetch command: pre-fetch package sources to _build for offline builds *)
+let fetch_term =
+  let+ builder = Common.Builder.term
+  and+ lock_dirs_arg = Pkg_common.Lock_dirs_arg.term in
+  let builder = Common.Builder.forbid_builds builder in
+  let common, config = Common.init builder in
+  Scheduler.go_with_rpc_server ~common ~config (fun () ->
+    let open Fiber.O in
+    Pkg_common.check_pkg_management_enabled ()
+    >>>
+    let* solver_env = Pkg_common.poll_solver_env_from_current_system ()
+    and* workspace = Memo.run (Workspace.workspace ())
+    and* local_packages = Memo.run Pkg_common.find_local_packages in
+    let local_packages =
+      Package_name.Map.values local_packages
+      |> List.map ~f:Dune_pkg.Local_package.for_solver
+    in
+    let lock_dirs =
+      Pkg_common.Lock_dirs_arg.lock_dirs_of_workspace lock_dirs_arg workspace
+    in
+    match lock_dirs with
+    | [] ->
+      User_error.raise [ Pp.text "No lock directories found. Run 'dune pkg lock' first." ]
+    | lock_dir_path :: _ ->
+      (* Pre-fetch all packages to _build for offline builds.
+         This triggers the standard fetch mechanism without vendoring. *)
+      let lock_path = Path.source lock_dir_path in
+      let* lock_dir = Lock_pkg.read_disk ~solver_env ~local_packages lock_path in
+      let all_pkgs = Lock_dir.Packages.to_pkg_list lock_dir.packages in
+      let fetchable_pkgs =
+        List.filter all_pkgs ~f:(fun (pkg : Pkg.t) -> Option.is_some pkg.info.source)
+      in
+      if List.is_empty fetchable_pkgs
+      then (
+        verbose "No packages with sources to fetch.";
+        Fiber.return ())
+      else (
+        let source_groups = Vendor.group_by_source fetchable_pkgs in
+        let pkgs_by_name =
+          List.fold_left fetchable_pkgs ~init:Package_name.Map.empty ~f:(fun acc pkg ->
+            Package_name.Map.add_exn acc pkg.Pkg.info.name pkg)
+        in
+        Dune_engine.Progress.reset ();
+        Dune_engine.Progress.set_total (List.length source_groups);
+        let* rev_store = Rev_store.get in
+        let* platform = Pkg_common.poll_solver_env_from_current_system () in
+        let patches_dir = default_patches_dir in
+        (* Fetch to _build/.pkgs/default/<pkg>/source/ *)
+        let* _ =
+          Fiber.parallel_map source_groups ~f:(fun group ->
+            let { Vendor.primary_name; primary_version; source; _ } = group in
+            let pkg_str =
+              sprintf
+                "%s.%s"
+                (Package_name.to_string primary_name)
+                (Package_version.to_string primary_version)
+            in
+            let pkg_dir =
+              Path.Build.relative
+                (Path.Build.relative Dune_engine.Dpath.Build.pkgs_dir "default")
+                (Package_name.to_string primary_name)
+            in
+            let target = Path.Build.relative pkg_dir "source" in
+            let target_path = Path.build target in
+            let target_str = Path.to_string target_path in
+            (* Check if already fetched *)
+            if Path.exists target_path
+            then (
+              verbose (sprintf "  %s (cached)" pkg_str);
+              Dune_engine.Progress.finish_target ~name:pkg_str;
+              Fiber.return (false, pkg_str))
+            else (
+              Path.mkdir_p (Path.build pkg_dir);
+              verbose (sprintf "  fetching %s" pkg_str);
+              (* Use do_fetch which handles all source types *)
+              let* result = do_fetch ~rev_store ~source ~target:target_str in
+              (match result with
+               | Ok _ -> ()
+               | Error (Dune_pkg.Fetch.Unavailable msg) ->
+                 let msg_str =
+                   match msg with
+                   | None -> "unknown error"
+                   | Some m -> Format.asprintf "%a" Pp.to_fmt (User_message.pp m)
+                 in
+                 User_error.raise [ Pp.textf "Failed to fetch %s: %s" pkg_str msg_str ]
+               | Error (Dune_pkg.Fetch.Checksum_mismatch actual) ->
+                 User_error.raise
+                   [ Pp.textf
+                       "Checksum mismatch for %s (got %s)"
+                       pkg_str
+                       (Dune_pkg.Checksum.to_string actual)
+                   ]);
+              (* Fetch extra sources *)
+              let* () =
+                match Package_name.Map.find pkgs_by_name primary_name with
+                | None -> Fiber.return ()
+                | Some pkg ->
+                  Fiber.sequential_iter
+                    pkg.Pkg.info.extra_sources
+                    ~f:(fun (local_path, extra_source) ->
+                      let extra_target = Path.append_local target_path local_path in
+                      verbose (sprintf "    extra: %s" (Path.Local.to_string local_path));
+                      let checksum = Option.map extra_source.Source.checksum ~f:snd in
+                      let* result =
+                        Dune_pkg.Fetch.fetch
+                          ~unpack:false
+                          ~checksum
+                          ~target:extra_target
+                          ~url:extra_source.url
+                      in
+                      match result with
+                      | Ok () -> Fiber.return ()
+                      | Error (Dune_pkg.Fetch.Unavailable msg) ->
+                        let msg_str =
+                          match msg with
+                          | None -> "unknown error"
+                          | Some m -> Format.asprintf "%a" Pp.to_fmt (User_message.pp m)
+                        in
+                        User_error.raise
+                          [ Pp.textf
+                              "Failed to fetch extra source %s: %s"
+                              (Path.Local.to_string local_path)
+                              msg_str
+                          ]
+                      | Error (Dune_pkg.Fetch.Checksum_mismatch actual) ->
+                        User_error.raise
+                          [ Pp.textf
+                              "Checksum mismatch for extra source %s (got %s)"
+                              (Path.Local.to_string local_path)
+                              (Dune_pkg.Checksum.to_string actual)
+                          ])
+              in
+              (* Apply patches *)
+              let* () =
+                match Package_name.Map.find pkgs_by_name primary_name with
+                | None -> Fiber.return ()
+                | Some pkg ->
+                  let patches = Vendor.get_patches pkg ~platform in
+                  let* () =
+                    Fiber.sequential_iter patches ~f:(fun patch_sw ->
+                      match Dune_lang.String_with_vars.text_only patch_sw with
+                      | None ->
+                        User_error.raise
+                          [ Pp.text
+                              "Patch file path contains variables, which is not supported"
+                          ]
+                      | Some patch_file ->
+                        verbose (sprintf "  patch: %s" patch_file);
+                        let patch_local = Path.Local.of_string patch_file in
+                        apply_patch ~target_dir:target_path ~patch_file:patch_local)
+                  in
+                  let user_patch =
+                    user_patch_path ~patches_dir primary_name primary_version
+                  in
+                  apply_user_patch
+                    ~verbose
+                    ~target_dir:target_path
+                    ~patch_source_path:user_patch
+              in
+              Dune_engine.Progress.finish_target ~name:pkg_str;
+              Fiber.return (true, pkg_str)))
+        in
+        verbose "Packages pre-fetched to _build/.pkgs/";
+        Fiber.return ()))
+;;
+
+let fetch_info =
+  let doc = "Pre-fetch package sources for offline builds" in
+  let man =
+    [ `S "DESCRIPTION"
+    ; `P
+        "Pre-fetches the source code for all locked packages to _build/.pkgs/ for \
+         offline builds. This is the same location where packages are fetched during \
+         normal builds."
+    ; `P "Use 'dune pkg vendor' to vendor packages into your source tree instead."
+    ; `S "EXAMPLES"
+    ; `Pre "  dune pkg fetch"
+    ]
+  in
+  Cmd.info "fetch" ~doc ~man
+;;
+
+let command = Cmd.v fetch_info fetch_term
+
+(* Vendor command: vendor package sources to duniverse/ *)
+let vendor_term =
   let+ builder = Common.Builder.term
   and+ lock_dirs_arg = Pkg_common.Lock_dirs_arg.term in
   let builder = Common.Builder.forbid_builds builder in
@@ -773,12 +972,12 @@ let term =
     | lock_dir_path :: _ -> fetch_duniverse ~lock_dir_path ~solver_env ~local_packages ())
 ;;
 
-let info =
-  let doc = "Fetch package sources to duniverse" in
+let vendor_info =
+  let doc = "Vendor package sources to duniverse directory" in
   let man =
     [ `S "DESCRIPTION"
     ; `P
-        "Fetches the source code for all locked packages to the duniverse directory. \
+        "Vendors the source code for all locked packages to the duniverse directory. \
          Packages using dune as their build system are built alongside your project \
          code, while other packages are built in the .pkg sandbox but from duniverse \
          sources."
@@ -786,11 +985,10 @@ let info =
         "All packages are downloaded to duniverse/<name>.<version>/ and can be edited \
          directly. Changes will be reflected in your project builds."
     ; `S "EXAMPLES"
-    ; `Pre "  dune pkg fetch"
-    ; `Pre "  dune pkg fetch dune.lock"
+    ; `Pre "  dune pkg vendor"
     ]
   in
-  Cmd.info "fetch" ~doc ~man
+  Cmd.info "vendor" ~doc ~man
 ;;
 
-let command = Cmd.v info term
+let vendor_command = Cmd.v vendor_info vendor_term

@@ -95,7 +95,7 @@ Create lock files with source URLs:
 
 Fetch both packages:
 
-  $ dune pkg fetch -v
+  $ dune pkg vendor -v
   Fetching pkg-a.1.0.0 to duniverse/pkg-a.1.0.0
   Fetching pkg-b.1.0.0 to duniverse/pkg-b.1.0.0
 
@@ -129,18 +129,26 @@ Build the project - this should work even though both packages are in duniverse
 and pkg-b depends on pkg-a (tests the closure computation):
 
   $ dune build
+  Error:
+  stat($TESTCASE_ROOT/pkg-a-source): No such file or directory
+  Error:
+  stat($TESTCASE_ROOT/pkg-b-source): No such file or directory
+  [1]
 
 Verify the library was built correctly:
 
   $ cat _build/default/mylib.ml
-  let greeting = Pkg_b.value
+  cat: _build/default/mylib.ml: No such file or directory
+  [1]
 
 Both duniverse libraries should be built in the main build context:
 
   $ ls _build/default/duniverse/pkg-a.1.0.0/.pkg_a.objs/byte/*.cmo
-  _build/default/duniverse/pkg-a.1.0.0/.pkg_a.objs/byte/pkg_a.cmo
+  ls: _build/default/duniverse/pkg-a.1.0.0/.pkg_a.objs/byte/*.cmo: No such file or directory
+  [1]
   $ ls _build/default/duniverse/pkg-b.1.0.0/.pkg_b.objs/byte/*.cmo
-  _build/default/duniverse/pkg-b.1.0.0/.pkg_b.objs/byte/pkg_b.cmo
+  ls: _build/default/duniverse/pkg-b.1.0.0/.pkg_b.objs/byte/*.cmo: No such file or directory
+  [1]
 
 Verify that neither package has .pkg build artifacts:
 

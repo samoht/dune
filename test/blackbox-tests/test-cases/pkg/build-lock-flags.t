@@ -1,10 +1,15 @@
-Test the --lock flag for dune build.
+Test the --lock and --pkg flags for dune build.
 
 The --lock flag controls whether package management is used:
 - auto: Default behavior (use workspace config, then check for lock file)
 - disabled: Ignore lock file, use system packages only
 - enabled: Enable package management, auto-lock if missing
 - always: Always re-solve before building
+
+The --pkg flag is a high-level convenience flag:
+- enabled: Auto-lock + auto-fetch
+- portable: Auto-lock for all platforms + auto-fetch
+- disabled: No automatic locking or fetching
 
   $ mkrepo
   $ add_mock_repo_if_needed
@@ -43,4 +48,15 @@ Now enable package management in workspace:
 Test --lock=disabled should override workspace (pkg enabled):
 
   $ dune build --lock=disabled 2>&1 | grep -E "(Error|not found)" | head -2
+  Error: Library "foo" not found.
+
+Test that the --pkg help text is available (grep needs special handling for man page formatting):
+
+  $ dune build --help 2>&1 | grep -i 'high-level package management control' | head -1
+             High-level package management control (one of eennaabblleedd, ppoorrttaabbllee or
+
+Test that --pkg=disabled environment variable works (disables both lock and fetch):
+
+  $ rm -rf dune.lock duniverse _build
+  $ DUNE_CONFIG__PKG=disabled dune build 2>&1 | grep -E "(Error|not found)" | head -2
   Error: Library "foo" not found.

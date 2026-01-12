@@ -72,6 +72,19 @@ val help_secs : Cmdliner.Manpage.block list
 val footer : Cmdliner.Manpage.block
 val auto_fetch_env : string
 val auto_lock_env : string
+val auto_pkg_env : string
+
+(** The --pkg flag values for high-level package management control *)
+module Pkg_mode : sig
+  type t =
+    | Enabled (** auto-lock + auto-fetch *)
+    | Portable (** auto-lock for all platforms + auto-fetch *)
+    | Disabled (** no automatic locking or fetching *)
+
+  val all : (string * t) list
+end
+
+val pkg_term : Pkg_mode.t option Cmdliner.Term.t
 val fetch_term : bool option Cmdliner.Term.t
 val lock_term : Dune_config.Auto_lock.t option Cmdliner.Term.t
 val resolve_fetch_flag : cli_opt:bool option -> config:Dune_config.t -> bool
@@ -80,6 +93,15 @@ val resolve_lock_flag
   :  cli_opt:Dune_config.Auto_lock.t option
   -> config:Dune_config.t
   -> Dune_config.Auto_lock.t
+
+(** Resolve the --pkg flag to auto_fetch, auto_lock, and portable values.
+    Returns (auto_fetch, auto_lock, portable) *)
+val resolve_pkg_flag
+  :  pkg_opt:Pkg_mode.t option
+  -> fetch_opt:bool option
+  -> lock_opt:Dune_config.Auto_lock.t option
+  -> config:Dune_config.t
+  -> bool * Dune_config.Auto_lock.t * bool
 
 val envs : Cmdliner.Cmd.Env.info list
 val debug_backtraces : bool Cmdliner.Term.t

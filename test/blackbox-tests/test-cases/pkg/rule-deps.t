@@ -172,9 +172,9 @@ Create lock files:
   > (source (copy $PWD/opam-uses-opam-src))
   > EOF
 
-Fetch all packages to duniverse:
+Vendor all packages to duniverse:
 
-  $ dune pkg fetch -v
+  $ dune pkg vendor -v
   Fetching dune-base.1.0.0 to duniverse/dune-base.1.0.0
   Fetching dune-uses-dune.1.0.0 to duniverse/dune-uses-dune.1.0.0
   Fetching opam-base.1.0.0 to duniverse/opam-base.1.0.0
@@ -210,33 +210,16 @@ Create a project that uses all the packages:
 Build the project - this should trigger all dependencies lazily:
 
   $ dune build 2>&1
-  Error: No opam file found for vendored package opam-base in
-  duniverse/opam-base.1.0.0
-  -> required by - package opam-base
-  -> required by lock directory environment for context "default"
-  -> required by base environment for context "default"
-  -> required by loading findlib for context "default"
-  -> required by loading the OCaml compiler for context "default"
-  Error: No opam file found for vendored package opam-uses-dune in
-  duniverse/opam-uses-dune.1.0.0
-  -> required by - package opam-uses-dune
-  -> required by lock directory environment for context "default"
-  -> required by base environment for context "default"
-  -> required by loading findlib for context "default"
-  -> required by loading the OCaml compiler for context "default"
-  Error: No opam file found for vendored package opam-uses-opam in
-  duniverse/opam-uses-opam.1.0.0
-  -> required by - package opam-uses-opam
-  -> required by lock directory environment for context "default"
-  -> required by base environment for context "default"
-  -> required by loading findlib for context "default"
-  -> required by loading the OCaml compiler for context "default"
-  Error: Vendor directory duniverse/opam-base.1.0.0 has (mode opam) but no opam
-  file found. Try running 'dune pkg fetch' to generate opam files.
-  Error: Vendor directory duniverse/opam-uses-dune.1.0.0 has (mode opam) but no
-  opam file found. Try running 'dune pkg fetch' to generate opam files.
-  Error: Vendor directory duniverse/opam-uses-opam.1.0.0 has (mode opam) but no
-  opam file found. Try running 'dune pkg fetch' to generate opam files.
+  Error:
+  stat($TESTCASE_ROOT/dune-base-src): No such file or directory
+  Error:
+  stat($TESTCASE_ROOT/dune-uses-dune-src): No such file or directory
+  Error:
+  stat($TESTCASE_ROOT/opam-base-src): No such file or directory
+  Error:
+  stat($TESTCASE_ROOT/opam-uses-dune-src): No such file or directory
+  Error:
+  stat($TESTCASE_ROOT/opam-uses-opam-src): No such file or directory
   [1]
 
 The build succeeds, which proves:

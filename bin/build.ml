@@ -197,6 +197,7 @@ let build =
                  "Build $(docv) in its parent directory only. Equivalent to the build \
                   target $(b,@@)$(docv). Example: $(b,--alias dir/foo) builds the \
                   $(b,foo) alias in $(b,dir/) only. Repeatable."))
+    and+ pkg_opt = Common.pkg_term
     and+ auto_fetch_opt = Common.fetch_term
     and+ auto_lock_opt = Common.lock_term in
     let targets = List.concat [ targets; aliases; aliases_rec ] in
@@ -242,8 +243,13 @@ let build =
         >>| Rpc.Rpc_common.wrap_build_outcome_exn ~print_on_success:true)
     | Ok () ->
       let request setup = Target.interpret_targets (Common.root common) setup targets in
-      let auto_fetch = Common.resolve_fetch_flag ~cli_opt:auto_fetch_opt ~config in
-      let auto_lock = Common.resolve_lock_flag ~cli_opt:auto_lock_opt ~config in
+      let auto_fetch, auto_lock, _portable =
+        Common.resolve_pkg_flag
+          ~pkg_opt
+          ~fetch_opt:auto_fetch_opt
+          ~lock_opt:auto_lock_opt
+          ~config
+      in
       run_build_command ~common ~config ~auto_fetch ~auto_lock ~request
   in
   Cmd.v (Cmd.info "build" ~doc ~man ~envs:Common.envs) term

@@ -21,11 +21,6 @@ Additional files overlaid on top of the source can be found in the
   > EOF
 
   $ build_pkg test
-  File ".", line 1, characters 0-0:
-  Warning: No dune-project file has been found in directory ".". A default one
-  is assumed but the project might break when dune is upgraded. Please create a
-  dune-project file.
-  Hint: generate the project file with: $ dune init project <name>
   foo:
   foo from test.files
   bar:

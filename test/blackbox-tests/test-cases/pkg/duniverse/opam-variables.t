@@ -54,7 +54,7 @@ Create lock file:
 
 Fetch the package:
 
-  $ dune pkg fetch -v
+  $ dune pkg vendor -v
   Fetching var-pkg.1.2.3 to duniverse/var-pkg.1.2.3
 
 Verify the vendor stanza was created:

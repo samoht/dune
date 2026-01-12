@@ -50,11 +50,8 @@ cache, it will fail, as the source is 404 now:
   $ dune clean
   $ export DUNE_CACHE=disabled
   $ build_pkg test
-  File "dune.lock/test.pkg", line 4, characters 7-25:
-  4 |   (url http://localhost:1)
-             ^^^^^^^^^^^^^^^^^^
-  Error: Download failed with code 404
-         
+  Error: Failed to fetch test.0.0.1: Download failed with code 404
+  
   [1]
 
 However when enabling the cache again, the file that was fetched in the first
@@ -63,9 +60,6 @@ build should be retrieved from the cache and the build succeed:
   $ dune clean
   $ export DUNE_CACHE=enabled
   $ build_pkg test
-  File "dune.lock/test.pkg", line 4, characters 7-25:
-  4 |   (url http://localhost:1)
-             ^^^^^^^^^^^^^^^^^^
-  Error: Download failed with code 404
-         
+  Error: Failed to fetch test.0.0.1: Download failed with code 404
+  
   [1]

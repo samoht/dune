@@ -13,9 +13,4 @@ Build a package with make
   > (source (copy $PWD/foo))
   > EOF
   $ build_pkg foo
-  File ".", line 1, characters 0-0:
-  Warning: No dune-project file has been found in directory ".". A default one
-  is assumed but the project might break when dune is upgraded. Please create a
-  dune-project file.
-  Hint: generate the project file with: $ dune init project <name>
   running makefile

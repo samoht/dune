@@ -91,15 +91,12 @@ Update and rebuild:
   dune:
   - foo.0.0.2
   $ dune build @pkg-install 2>&1 | grep -v "^File"
-  Error: The package "foo" (version <none>) is defined more than once:
-  - duniverse/foo.0.0.2/dune-project:2
-  - duniverse/foo.0.0.1/dune-project:2
+  [1]
 
 The new file should exist:
 
   $ cat _build/install/default/lib/foo/new_file.txt
-  cat: _build/install/default/lib/foo/new_file.txt: No such file or directory
-  [1]
+  new content
 
 The old file should be cleaned up:
 
@@ -111,4 +108,4 @@ The installed manifest should show the new file:
   $ cat _build/.pkgs/default/*/installed | sort
   lib/foo/META
   lib/foo/dune-package
-  lib/foo/old_file.txt
+  lib/foo/new_file.txt

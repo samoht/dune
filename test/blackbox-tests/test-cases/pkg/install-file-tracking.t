@@ -57,22 +57,20 @@ Lock and build.
 
 
   $ dune build @install 2>&1 | grep -v "Entering\|Leaving" || true
-  File "duniverse/test-pkg.0.0.1/dune", line 1, characters 25-33:
-  1 | (executable (public_name test-pkg))
-                               ^^^^^^^^
-  Error: Invalid module name.
-  Public executable names don't have this restriction. You can either change
-  this public name to be a valid module name or add a "name" field with a valid
-  module name.
-  Hint: Module names must be non-empty, start with a letter, and composed only
-  of the following characters: 'A'..'Z', 'a'..'z', '_', ''' or '0'..'9'.
-  Hint: test_pkg would be a correct module name
+  Error: The package myproject does not have any user defined stanzas attached
+  to it. If this is intentional, add (allow_empty) to the package definition in
+  the dune-project file
+  -> required by _build/default/myproject.install
+  -> required by alias install
 
 Check that the package was built and .install file exists in target/.
 
   $ show_pkg test-pkg
-  find: _build/.pkgs/default/test-pkg: No such file or directory
   
+  /source
+  /source/dune
+  /source/dune-project
+  /source/main.ml
 
 
 The .install file in target/ lists what this package installed.
