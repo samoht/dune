@@ -727,7 +727,13 @@ module Dune_config = struct
 
   let init t ~watch =
     Config.init (String.Map.of_list_exn t.experimental);
-    Console.Backend.set (Display.console_backend t.display);
+    (* Apply verbose override to display settings *)
+    let display =
+      match t.display, t.verbose with
+      | Simple { status_line; _ }, verbosity -> Display.Simple { status_line; verbosity }
+      | Tui, _ -> Display.Tui
+    in
+    Console.Backend.set (Display.console_backend display);
     if watch
     then (
       match t.terminal_persistence with
@@ -736,7 +742,7 @@ module Dune_config = struct
       | Clear_on_rebuild_and_flush_history -> Console.reset_flush_history ());
     Stdune.Io.set_copy_impl Config.(get copy_file);
     Log.verbose
-    := match t.display with
+    := match display with
        | Simple { verbosity = Verbose; _ } -> true
        | _ -> false
   ;;
@@ -801,10 +807,11 @@ module Dune_config = struct
         Log.info "Auto-detected concurrency" [ "concurrency", Dyn.int n ];
         n
     in
+    (* Use verbose override if set *)
     (Dune_engine.Clflags.display
      := match t.display with
         | Tui -> Dune_engine.Display.Quiet
-        | Simple { verbosity; _ } -> verbosity);
+        | Simple _ -> t.verbose);
     { Scheduler.Config.concurrency; stats; print_ctrl_c_warning; watch_exclusions }
   ;;
 end
