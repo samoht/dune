@@ -10,9 +10,9 @@ of the main project, with selective library exposure and sandbox modes.
 
 ## Overview
 
-By default, locked dependencies are fetched to `_build/.pkgs/<context>/<name>/source/`
-(transient, not version controlled). With `--vendor`, sources are copied to `duniverse/`
-for version control and editing.
+Locked dependencies can be fetched in two modes:
+- `dune pkg fetch` — Sources go to `_build/.pkgs/` (transient, auto-fetched during build)
+- `dune pkg vendor [pkg...]` — Sources copied to `duniverse/` (editable, version controlled)
 
 **Default (no vendoring):**
 ```
@@ -29,7 +29,7 @@ project/
     install/default/          # Shared install prefix
 ```
 
-**With vendoring (`dune pkg fetch --vendor`):**
+**With vendoring (`dune pkg vendor`):**
 ```
 project/
   dune.lock                   # Lock file
@@ -88,7 +88,7 @@ Rule: _build/.pkgs/lib-cache
   Depends: dune.lock
   Action:
     1. Read package list from dune.lock
-    2. For each package, fetch source to _build/.pkgs/ (or duniverse/ with --vendor)
+    2. For each package, fetch source to _build/.pkgs/ (or duniverse/ via `dune pkg vendor`)
     3. Scan each directory for libraries (dune files, META, opam files)
     4. Write library:directory mappings to lib-cache
 ```
@@ -111,9 +111,46 @@ dune exec ./main.exe
 This enables:
 
 - **Fast builds**: Sources cached in `_build/.pkgs/`, no download on rebuild
-- **Editable dependencies** (with `--vendor`): Sources in `duniverse/`, edit and rebuild
-- **Full editor tooling** (with `--vendor`): Merlin/LSP works into dependency code
+- **Editable dependencies** (via `dune pkg vendor`): Sources in `duniverse/`, edit and rebuild
+- **Full editor tooling** (via `dune pkg vendor`): Merlin/LSP works into dependency code
 - **Appropriate build method**: Dune packages in main context, others sandboxed
+
+## CLI Commands
+
+### `dune pkg fetch`
+
+Fetches package sources to `_build/.pkgs/<context>/<name>/source/`. This happens
+automatically during builds when packages are needed. Manual invocation pre-fetches
+all packages.
+
+```bash
+dune pkg fetch              # Fetch all packages to _build
+```
+
+### `dune pkg vendor`
+
+```bash
+dune pkg vendor             # Vendor all locked packages
+dune pkg vendor fmt         # Vendor specific package(s)
+dune pkg vendor --force     # Overwrite existing vendored sources
+```
+
+Copies sources to `duniverse/<name>.<version>/` and generates `duniverse/dune`
+with appropriate `(vendor ...)` stanzas.
+
+**Behavior:**
+1. Reads lock file to get package list
+2. For each package (or specified packages):
+   - Fetches source if not already in `_build/.pkgs/`
+   - Copies to `duniverse/<name>.<version>/`
+   - Writes `.dune-source-url` marker for staleness detection
+3. Generates `duniverse/dune` with vendor stanzas
+4. Generates `duniverse/.gitignore`
+
+**Staleness Detection:**
+When re-running `dune pkg vendor`, existing directories are checked against
+their source markers. If the lock file source changed, the directory is
+refreshed (unless `--force` is used to always overwrite).
 
 ## Architecture
 

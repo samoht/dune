@@ -138,6 +138,34 @@ Dune sets `OCAMLFIND_TOOLCHAIN=<name>` and builds toolchain packages first.
 | `(mode opam)` but no opam file | clear error message |
 | Alias conflicts with existing library | library resolution error |
 
+## Commands
+
+### `dune pkg fetch`
+
+Fetches all locked packages to `_build/.pkgs/<context>/<name>/source/`. Sources are
+transient and not version controlled. This is the default behavior during builds.
+
+```bash
+dune pkg fetch              # Fetch all packages to _build
+```
+
+### `dune pkg vendor [PKG...]`
+
+Copies package sources to `duniverse/` for version control and editing.
+
+```bash
+dune pkg vendor             # Vendor all packages
+dune pkg vendor fmt zarith  # Vendor specific packages
+dune pkg vendor --all       # Same as no arguments
+```
+
+After vendoring, packages build from `duniverse/` instead of `_build/.pkgs/`.
+The `duniverse/dune` file is auto-generated with appropriate vendor stanzas.
+
+**Options:**
+- `--force` — Re-vendor even if already present (overwrites local changes)
+- `--output <dir>` — Vendor to different directory (default: `duniverse`)
+
 ## Compatibility
 
 `(vendored_dirs)` continues to work. In `vendor/dune`, these are equivalent:
