@@ -51,11 +51,38 @@ let fail_target ~name =
   state.failed <- state.failed + 1
 ;;
 
+(* Get short description from a running job's Pp.t description *)
+let extract_job_name (pp : unit Pp.t) =
+  let buf = Buffer.create 64 in
+  let fmt = Format.formatter_of_buffer buf in
+  Pp.to_fmt fmt pp;
+  Format.pp_print_flush fmt ();
+  let s = Buffer.contents buf in
+  (* Extract just the target name from descriptions like "ocamldep .foo.eobjs/foo.ml.d" *)
+  match String.lsplit2 s ~on:' ' with
+  | Some (_, rest) ->
+    (* Get the filename without path *)
+    (match String.rsplit2 rest ~on:'/' with
+     | Some (_, name) -> name
+     | None -> rest)
+  | None -> s
+;;
+
 (* Format progress line respecting terminal width *)
 let pp ~max_width =
   let fetching, building =
     List.partition_map state.active ~f:(fun (t : Target.t) ->
       if t.is_fetch then Left t.name else Right t.name)
+  in
+  (* Get running jobs as fallback when no targets are tracked *)
+  let running_jobs =
+    if List.is_empty fetching && List.is_empty building
+    then (
+      let jobs_state = Fiber.Svar.read Running_jobs.jobs in
+      let current = Running_jobs.current jobs_state in
+      Running_jobs.Id.Map.values current
+      |> List.map ~f:(fun (job : Running_jobs.job) -> extract_job_name job.description))
+    else []
   in
   (* Format: "[3/15] Fetching: pkg1, pkg2 | Building: lib1 [8j]" *)
   let prefix =
@@ -94,12 +121,18 @@ let pp ~max_width =
   let build_part = format_targets ~label:"Building: " building available in
   let main_part =
     match fetch_part, build_part with
-    | None, None -> "Waiting..."
+    | None, None ->
+      if List.is_empty running_jobs
+      then ""
+      else (
+        match format_targets ~label:"" running_jobs available with
+        | Some s -> s
+        | None -> "")
     | Some f, None -> f
     | None, Some b -> b
     | Some f, Some b -> sprintf "%s | %s" f b
   in
-  Pp.verbatim (prefix ^ main_part ^ suffix)
+  if String.is_empty main_part then Pp.nop else Pp.verbatim (prefix ^ main_part ^ suffix)
 ;;
 
 (* Summary after completion *)
