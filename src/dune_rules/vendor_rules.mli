@@ -29,7 +29,7 @@ val parse_pkg_name_from_dir : string -> string
 
 (** {2 Library Scanning} *)
 
-val scan_public_libraries : Path.Source.t -> string list
+val scan_public_libraries : pkg_name:string -> Path.Source.t -> string list
 val scan_meta_libraries : Path.Source.t -> pkg_name:string -> string list
 val scan_opam_libraries : Path.Source.t -> string list
 val scan_libraries : Path.Source.t -> pkg_name:string -> string list

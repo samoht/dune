@@ -3243,7 +3243,8 @@ module Lib_cache_spec = struct
   let action { target = _; lock_file } ~ectx:_ ~eenv:{ Action.Ext.Exec.env; _ } =
     let open Fiber.O in
     let* () = Fiber.return () in
-    (* Read the lock file to get package list *)
+    (* Read the lock file to get package list.
+       Try build lock directory first (for auto-lock), then fall back to source. *)
     let* solver_env =
       let+ solver_env_from_current_system =
         let sys_poll = Dune_pkg.Sys_poll.make ~path:(Env_path.path env) in
@@ -3253,8 +3254,24 @@ module Lib_cache_spec = struct
         Dune_pkg.Solver_env.with_defaults
         solver_env_from_current_system
     in
+    (* Try reading from build lock directory (for auto-lock cases) *)
+    let lock_name = Path.basename lock_file in
+    let build_lock_dir =
+      Path.Build.relative
+        (Path.Build.relative Dpath.Build.locks_dir "default")
+        lock_name
+    in
+    let build_pkgs_dir = Path.Build.relative build_lock_dir "pkgs" in
+    let build_lock_file = Path.Build.relative build_lock_dir "lock" in
+    let actual_lock_file =
+      if Path.Untracked.exists (Path.build build_lock_file)
+      then Path.build build_lock_file
+      else if Path.Untracked.exists (Path.build build_pkgs_dir)
+      then Path.build build_pkgs_dir
+      else lock_file
+    in
     let* lock_dir =
-      Dune_pkg.Lock_pkg.read_disk ~solver_env ~local_packages:[] lock_file
+      Dune_pkg.Lock_pkg.read_disk ~solver_env ~local_packages:[] actual_lock_file
     in
     let pkgs = Dune_pkg.Lock.Packages.to_pkg_list lock_dir.packages in
     (* Collect library→package→directory mappings from the lock file.
@@ -3309,16 +3326,16 @@ let setup_lib_cache_rule () =
     (* No lock files - no lib-cache needed *)
     Memo.return None
   | lock_dir_path :: _ ->
+    (* Get the build lock directory path - this depends on lock generation rules *)
+    let* build_lock_dir =
+      Lock_dir.lock_dir_of_source Context_name.default lock_dir_path
+    in
     let lock_file = Path.source lock_dir_path in
     let+ () = Memo.return () in
     let { Action_builder.With_targets.build; targets } =
       (let open Action_builder.O in
-       (* Depend on the lock file *)
-       let deps =
-         Dep.Set.of_source_files
-           ~files:(Path.Set.singleton lock_file)
-           ~empty_directories:Path.Set.empty
-       in
+       (* Depend on the build lock directory (handles auto-lock generation) *)
+       let deps = Dep.Set.singleton (Dep.file build_lock_dir) in
        Action_builder.deps deps
        >>> (lib_cache_action ~target ~lock_file
             |> Action.Full.make ~can_go_in_shared_cache:false

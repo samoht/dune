@@ -13,6 +13,7 @@ val get_path : Context_name.t -> Path.t option Memo.t
 val default_path : Path.t
 val default_source_path : Path.Source.t
 val select_lock_dir : Workspace.Lock_dir_selection.t -> Path.Source.t Memo.t
+val lock_dir_of_source : Context_name.t -> Path.Source.t -> Path.t Memo.t
 
 (** Returns the lock directories present in the given workspace. *)
 val lock_dirs_of_workspace : Workspace.t -> Path.Source.Set.t Memo.t

@@ -30,7 +30,23 @@ let extract_public_name_and_package_from_sexp sexp =
   | _ -> None
 ;;
 
-let scan_dune_file path =
+(* Determine if a library belongs to a package.
+   - If (package X) is specified, the library belongs to package X
+   - If no (package ...) is specified, use the first component of public_name *)
+let library_belongs_to_package ~pkg_name (public_name, explicit_package) =
+  match explicit_package with
+  | Some pkg -> String.equal pkg pkg_name
+  | None ->
+    (* Infer package from public_name: first component before the dot *)
+    let inferred_pkg =
+      match String.lsplit2 public_name ~on:'.' with
+      | Some (prefix, _) -> prefix
+      | None -> public_name
+    in
+    String.equal inferred_pkg pkg_name
+;;
+
+let scan_dune_file ~pkg_name path =
   let full_path = Path.source path in
   if Path.Untracked.exists full_path && not (Path.Untracked.is_directory full_path)
   then (
@@ -42,17 +58,24 @@ let scan_dune_file path =
         contents
     with
     | exception _ -> []
-    | sexps -> List.filter_map sexps ~f:extract_public_name_from_sexp)
+    | sexps ->
+      List.filter_map sexps ~f:(fun sexp ->
+        match extract_public_name_and_package_from_sexp sexp with
+        | Some (public_name, explicit_package) ->
+          if library_belongs_to_package ~pkg_name (public_name, explicit_package)
+          then Some public_name
+          else None
+        | None -> None))
   else []
 ;;
 
-let rec scan_dir_for_dune_files dir =
+let rec scan_dir_for_dune_files ~pkg_name dir =
   let full_path = Path.source dir in
   if not (Path.Untracked.exists full_path)
   then []
   else (
     let dune_file = Path.Source.relative dir "dune" in
-    let libs = scan_dune_file dune_file in
+    let libs = scan_dune_file ~pkg_name dune_file in
     match Path.Untracked.readdir_unsorted_with_kinds full_path with
     | Error _ -> libs
     | Ok entries ->
@@ -62,11 +85,13 @@ let rec scan_dir_for_dune_files dir =
           | Unix.S_DIR -> Some (Path.Source.relative dir entry)
           | _ -> None)
       in
-      let subdir_libs = List.concat_map subdirs ~f:scan_dir_for_dune_files in
+      let subdir_libs =
+        List.concat_map subdirs ~f:(scan_dir_for_dune_files ~pkg_name)
+      in
       libs @ subdir_libs)
 ;;
 
-let scan_public_libraries dir = scan_dir_for_dune_files dir
+let scan_public_libraries ~pkg_name dir = scan_dir_for_dune_files ~pkg_name dir
 
 let scan_meta_libraries dir ~pkg_name =
   let meta_file_in_pkg = Path.Source.relative dir (pkg_name ^ "/META") in
@@ -102,7 +127,7 @@ let find_opam_file ~pkg_name ~pkg_dir =
 ;;
 
 let scan_libraries dir ~pkg_name =
-  match scan_public_libraries dir with
+  match scan_public_libraries ~pkg_name dir with
   | [] ->
     (match scan_meta_libraries dir ~pkg_name with
      | [] -> scan_opam_libraries dir
