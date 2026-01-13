@@ -45,7 +45,7 @@ let run_build_system ~common ~auto_fetch ~request =
             (fun () ->
               Pp.map_tags (Dune_engine.Progress.pp ~max_width:80) ~f:(fun () ->
                 User_message.Style.Details)));
-       let* () = if auto_fetch then Pkg.Fetch.do_auto_fetch () else Fiber.return () in
+       let* () = if auto_fetch then Pkg.Fetch.do_auto_vendor () else Fiber.return () in
        let* setup = Import.Main.setup () in
        let request =
          Action_builder.bind (Action_builder.of_memo setup) ~f:(fun setup ->

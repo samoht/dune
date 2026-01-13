@@ -21,7 +21,7 @@ Create a project:
 Now try to build the package with --fetch=disabled. Since the package source
 hasn't been fetched yet, this should fail with a clear error message:
 
-  $ dune build @pkg-install --fetch=disabled
+  $ dune build @pkg-install --fetch=disabled 2>&1
   File "dune.lock/mypkg.pkg", line 4, characters 7-39:
   4 |   (url https://example.com/mypkg.tar.gz)
              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

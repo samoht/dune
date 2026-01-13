@@ -2,7 +2,9 @@ open Import
 module Vendor = Dune_pkg.Vendor
 module Vendor_stanza = Dune_lang.Vendor_stanza
 
-let extract_public_name_from_sexp sexp =
+(* Extract (public_name, package) from a library stanza.
+   Returns (public_name, Some pkg) if package is specified, (public_name, None) otherwise. *)
+let extract_public_name_and_package_from_sexp sexp =
   let open Dune_sexp.Ast in
   let atom_to_string = function
     | Atom (_, a) -> Some (Dune_sexp.Atom.to_string a)
@@ -11,18 +13,26 @@ let extract_public_name_from_sexp sexp =
   match sexp with
   | List (_, Atom (_, lib_atom) :: fields)
     when String.equal (Dune_sexp.Atom.to_string lib_atom) "library" ->
-    List.find_map fields ~f:(fun field ->
+    let public_name = ref None in
+    let package = ref None in
+    List.iter fields ~f:(fun field ->
       match field with
-      | List (_, [ Atom (_, key); value ])
-        when String.equal (Dune_sexp.Atom.to_string key) "public_name" ->
-        atom_to_string value
-      | _ -> None)
+      | List (_, [ Atom (_, key); value ]) ->
+        let key_str = Dune_sexp.Atom.to_string key in
+        if String.equal key_str "public_name"
+        then public_name := atom_to_string value
+        else if String.equal key_str "package"
+        then package := atom_to_string value
+      | _ -> ());
+    (match !public_name with
+     | Some name -> Some (name, !package)
+     | None -> None)
   | _ -> None
 ;;
 
 let scan_dune_file path =
   let full_path = Path.source path in
-  if Path.Untracked.exists full_path
+  if Path.Untracked.exists full_path && not (Path.Untracked.is_directory full_path)
   then (
     let contents = Io.read_file ~binary:true full_path in
     match

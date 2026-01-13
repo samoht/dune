@@ -597,7 +597,11 @@ let shared_with_config_file =
                 successful build has a \"clean\" empty output."))
   in
   { Dune_config.Partial.display
-  ; verbose = None
+  ; verbose =
+      (* Derive verbose from display when set (e.g., -v sets display with verbosity) *)
+      Option.bind display ~f:(function
+        | Dune_config.Display.Simple { verbosity; _ } -> Some verbosity
+        | Tui -> None)
   ; concurrency
   ; sandboxing_preference = Option.map sandboxing_preference ~f:(fun x -> [ x ])
   ; terminal_persistence

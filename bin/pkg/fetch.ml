@@ -42,7 +42,9 @@ let write_git_source_marker ~target_dir (source : Source.t) ~commit =
 
 let read_source_marker target_dir =
   let marker_path = Path.relative target_dir source_marker_filename in
-  if Path.exists marker_path then Some (Io.read_file marker_path) else None
+  match Path.stat marker_path with
+  | Ok { st_kind = S_REG; _ } -> Some (Io.read_file marker_path)
+  | _ -> None
 ;;
 
 (* For git sources, we need to resolve to check if there's a new commit.
@@ -272,7 +274,14 @@ let start_fetch ~name ~version =
       (Package_name.to_string name)
       (Dune_pkg.Package_version.to_string version)
   in
-  Console.infof "Fetching %s to duniverse/%s" pkg_str pkg_str;
+  let msg =
+    User_message.make
+      [ User_message.aligned_message
+          ~left:(User_message.Style.Ok, "Fetching")
+          ~right:(Pp.textf "%s to duniverse/%s" pkg_str pkg_str)
+      ]
+  in
+  Console.print_user_message msg;
   Dune_engine.Progress.start_target (Dune_engine.Progress.Target.fetch pkg_str);
   pkg_str
 ;;
@@ -329,7 +338,14 @@ let fetch_source_group ~rev_store ~platform ~patches_dir ~pkgs_by_name group =
   | Some existing ->
     (* Already fetched with matching source - count all packages as cached *)
     let dirname = Path.basename existing in
-    Console.infof "Cached %s" dirname;
+    let msg =
+      User_message.make
+        [ User_message.aligned_message
+            ~left:(User_message.Style.Ok, "Cached")
+            ~right:(Pp.text dirname)
+        ]
+    in
+    Console.print_user_message msg;
     List.iter packages ~f:(fun _ -> Dune_engine.Progress.incr_cached ());
     Fiber.return (false, dirname)
   | None ->
@@ -516,19 +532,35 @@ let fetch_duniverse ~lock_dir_path ~solver_env ~local_packages () =
         | None -> ()
         | Some opam_content ->
           (* Write opam file to the package directory.
-             If opam/ is a directory, write inside it as opam/opam or opam/<pkg>.opam *)
+             Detect existing layout and preserve it:
+             - opam/opam or opam/<pkg>.opam -> write under opam/
+             - opam or <pkg>.opam at root -> write at root
+             Single file (opam or opam/opam) vs multi-file (<pkg>.opam) detection. *)
           let pkg_dir = Path.source (Path.Source.relative Vendor.default_dir dirname) in
           let pkg_name = Package_name.to_string name in
-          let base_opam_path = Path.relative pkg_dir "opam" in
+          let opam_dir = Path.relative pkg_dir "opam" in
+          let is_dir p =
+            match Path.stat p with
+            | Ok { st_kind = S_DIR; _ } -> true
+            | _ -> false
+          in
+          let is_file p =
+            match Path.stat p with
+            | Ok { st_kind = S_REG; _ } -> true
+            | _ -> false
+          in
           let opam_path =
-            match Path.stat base_opam_path with
-            | Ok { st_kind = S_DIR; _ } ->
-              (* opam/ is a directory - write inside it *)
-              let inside_path = Path.relative base_opam_path "opam" in
-              if Path.exists inside_path
-              then inside_path
-              else Path.relative base_opam_path (pkg_name ^ ".opam")
-            | _ -> base_opam_path
+            if is_dir opam_dir
+            then (
+              (* opam/ directory exists - write inside it *)
+              let single = Path.relative opam_dir "opam" in
+              let multi = Path.relative opam_dir (pkg_name ^ ".opam") in
+              if is_file single then single else multi)
+            else (
+              (* No opam/ directory - write at root *)
+              let single = Path.relative pkg_dir "opam" in
+              let multi = Path.relative pkg_dir (pkg_name ^ ".opam") in
+              if is_file single then single else multi)
           in
           (* Only write if content changed or file doesn't exist *)
           let should_write =
@@ -583,8 +615,12 @@ let fetch_duniverse ~lock_dir_path ~solver_env ~local_packages () =
       in
       String.concat ~sep:"\n" lines ^ "\n"
     in
-    if (not (Path.exists marker_path)) || Io.read_file marker_path <> dune_content
-    then Io.write_file marker_path dune_content;
+    let marker_exists_and_matches =
+      match Path.stat marker_path with
+      | Ok { st_kind = S_REG; _ } -> Io.read_file marker_path = dune_content
+      | _ -> false
+    in
+    if not marker_exists_and_matches then Io.write_file marker_path dune_content;
     (* Generate .gitignore to exclude fetched sources by default *)
     let gitignore_path =
       Path.source (Path.Source.relative Vendor.default_dir ".gitignore")
@@ -597,9 +633,12 @@ let fetch_duniverse ~lock_dir_path ~solver_env ~local_packages () =
 !dune
 |}
     in
-    if
-      (not (Path.exists gitignore_path))
-      || Io.read_file gitignore_path <> gitignore_content
+    let gitignore_exists_and_matches =
+      match Path.stat gitignore_path with
+      | Ok { st_kind = S_REG; _ } -> Io.read_file gitignore_path = gitignore_content
+      | _ -> false
+    in
+    if not gitignore_exists_and_matches
     then Io.write_file gitignore_path gitignore_content;
     Console.verbose "Packages vendored to duniverse/";
     Fiber.return ())
@@ -752,14 +791,58 @@ let _auto_fetch_missing ~lock_dir_path ~solver_env ~local_packages () =
       Fiber.return ()))
 ;;
 
-(** Auto-fetch is now a no-op.
+(** Auto-vendor packages to duniverse/ when --pkg=enabled or --fetch=true.
+    This ensures packages are available for library resolution during the build.
 
-    For non-vendored builds, the build system fetches sources on-demand through
-    fetch_rules.ml. Auto-fetch was designed for vendoring to duniverse/, which
-    should now be done explicitly with 'dune pkg vendor'.
+    The flow is:
+    1. Read lock file to determine packages
+    2. Fetch sources to duniverse/
+    3. Generate vendor stanzas in duniverse/dune
 
-    If you want to pre-fetch for offline builds, use 'dune pkg fetch'. *)
-let do_auto_fetch () = Fiber.return ()
+    Note: This is called 'auto_fetch' in the config/CLI flags for historical
+    reasons, but it actually performs vendoring (not just fetching). On-demand
+    fetching to _build/.pkgs/ is controlled separately by Clflags.auto_fetch.
+
+    For offline builds without auto-vendoring, use 'dune pkg fetch' to pre-fetch
+    to _build/.pkgs/ and then build with --fetch=disabled. *)
+let do_auto_vendor () =
+  let open Fiber.O in
+  (* Check if package management is enabled - if not, skip auto-fetch *)
+  let* enabled = Pkg_common.pkg_management_enabled () in
+  if not enabled
+  then Fiber.return ()
+  else
+    let* workspace = Memo.run (Workspace.workspace ()) in
+    let* lock_dirs = Memo.run (Dune_rules.Lock_dir.lock_dirs_of_workspace workspace) in
+    match Path.Source.Set.to_list lock_dirs with
+    | [] ->
+      (* No lock file - nothing to fetch *)
+      Fiber.return ()
+    | lock_dir_path :: _ ->
+      (* Check if duniverse/ already exists with packages *)
+      let duniverse_path = Path.source Vendor.default_dir in
+      let marker_path =
+        Path.source (Path.Source.relative Vendor.default_dir Vendor.marker_filename)
+      in
+      let marker_is_file =
+        match Path.stat marker_path with
+        | Ok { st_kind = S_REG; _ } -> true
+        | _ -> false
+      in
+      if Path.exists duniverse_path && marker_is_file
+      then
+        (* Already vendored - skip *)
+        Fiber.return ()
+      else
+        (* Vendor packages to duniverse/ *)
+        let* solver_env = Pkg_common.poll_solver_env_from_current_system ()
+        and* local_packages = Memo.run Pkg_common.find_local_packages in
+        let local_packages =
+          Package_name.Map.values local_packages
+          |> List.map ~f:Dune_pkg.Local_package.for_solver
+        in
+        fetch_duniverse ~lock_dir_path ~solver_env ~local_packages ()
+;;
 
 (* Fetch command: pre-fetch package sources to _build for offline builds *)
 let fetch_term =

@@ -279,13 +279,13 @@ let exec_building_directly ~common ~config ~context ~prog ~args ~no_rebuild ~aut
     Dune_engine.Scheduler.Run.poll
     @@
     let* () = Fiber.return @@ Scheduler.maybe_clear_screen ~details_hum:[] config in
-    let* () = if auto_fetch then Pkg.Fetch.do_auto_fetch () else Fiber.return () in
+    let* () = if auto_fetch then Pkg.Fetch.do_auto_vendor () else Fiber.return () in
     build @@ step ~prog ~args ~common ~no_rebuild ~context ~on_exit
   | No ->
     Scheduler.go_with_rpc_server ~common ~config
     @@ fun () ->
     let open Fiber.O in
-    let* () = if auto_fetch then Pkg.Fetch.do_auto_fetch () else Fiber.return () in
+    let* () = if auto_fetch then Pkg.Fetch.do_auto_vendor () else Fiber.return () in
     let* setup = Import.Main.setup () in
     build_exn (fun () ->
       let open Memo.O in

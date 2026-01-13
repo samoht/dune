@@ -86,6 +86,10 @@ val pp_packages : Dune_pkg.Pkg.t list -> User_message.Style.t Pp.t
     their build target (duniverse for dune-built packages, opam sandbox for others). *)
 val pp_packages_by_target : Dune_pkg.Pkg.t list -> User_message.Style.t Pp.t
 
+(** [pkg_management_enabled ()] returns true if package management is enabled in the
+    workspace configuration. Unlike [check_pkg_management_enabled], this doesn't raise. *)
+val pkg_management_enabled : unit -> bool Fiber.t
+
 (** [check_pkg_management_enabled ()] checks if package management is enabled in the
     workspace configuration. Raises a user error if it is explicitly disabled. *)
 val check_pkg_management_enabled : unit -> unit Fiber.t

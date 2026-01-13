@@ -46,13 +46,15 @@ let console_backend = function
   | Simple { verbosity = Verbose; _ } ->
     Terminal_signals.unblock ();
     Dune_console.Backend.verbose
-  | Simple { verbosity = Short; status_line = false } ->
+  | Simple { verbosity = Short; _ } ->
+    (* Short mode always uses short backend - no status line, one line per action *)
     Terminal_signals.unblock ();
     Dune_console.Backend.short
   | Simple { verbosity = Quiet; status_line = false } ->
     Terminal_signals.unblock ();
     Dune_console.Backend.quiet
-  | Simple { status_line = true; _ } ->
+  | Simple { status_line = true; verbosity = Quiet } ->
+    (* Progress mode: status line with quiet verbosity *)
     (match Config.(get threaded_console) with
      | `Enabled ->
        Dune_threaded_console.progress ~frames_per_second:(Dune_util.frames_per_second ())

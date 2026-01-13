@@ -237,6 +237,15 @@ module Lock_dirs_arg = struct
   ;;
 end
 
+(* Check if package management is enabled, returns bool fiber (doesn't raise) *)
+let pkg_management_enabled () =
+  let open Fiber.O in
+  let+ workspace = Memo.run (Workspace.workspace ()) in
+  match workspace.Workspace.config.pkg_enabled with
+  | Set (_, `Enabled) | Unset -> true
+  | Set (_, `Disabled) -> false
+;;
+
 let check_pkg_management_enabled () =
   Memo.run
   @@
