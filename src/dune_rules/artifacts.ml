@@ -107,11 +107,35 @@ let binary t ?hint ?(where = Install_dir) ~loc name =
        Ok (Path.build src))
 ;;
 
+(* Check if a binary is available for %{bin-available:...} expansion.
+
+   This function is called during dune file loading (rule generation), so it
+   must not trigger resolution of (mode opam) packages (which would create
+   dependency cycles).
+
+   Limitation: %{bin-available:...} only detects:
+   - Local project binaries (from install stanzas and public executables)
+   - Binaries on PATH
+   - Binaries from (vendor ... (mode dune)) packages
+
+   It does NOT detect binaries from (vendor ... (mode opam)) packages. These
+   packages are external to the project's rule graph - their binaries only
+   exist after they are built. *)
 let binary_available t name =
-  analyze_binary t name
-  >>| function
-  | `None -> false
-  | `Resolved _ | `Origin _ -> true
+  match Filename.is_relative name with
+  | false ->
+    (* Absolute path - check if file exists *)
+    Memo.return (Path.Untracked.exists (Path.of_filename_relative_to_initial_cwd name))
+  | true ->
+    let* local_bins = Memo.Lazy.force t.local_bins in
+    (match Filename.Map.find local_bins name with
+     | Some (Resolved _) -> Memo.return true
+     | Some (Origin origins) ->
+       (* Check if any origin is enabled *)
+       Memo.List.exists origins ~f:(fun origin -> origin.enabled_if)
+     | None ->
+       (* Not in local bins - check PATH only (see limitation above) *)
+       Which.which ~path:(Context.path t.context) name >>| Option.is_some)
 ;;
 
 let add_binaries t ~dir l =
