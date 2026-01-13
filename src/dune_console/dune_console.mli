@@ -143,3 +143,17 @@ val message : User_message.t -> unit
 
 (** Errors - always shown. *)
 val error : User_message.t -> unit
+
+(** Informational message - shown in short (-v) and verbose (-vv) modes.
+    Use for progress messages that help track what's happening. *)
+val info : string -> unit
+
+(** Formatted informational message. *)
+val infof : ('a, unit, string, unit) format4 -> 'a
+
+(** Verbose/debug message - shown only in verbose (-vv) mode.
+    Use for detailed debugging output. *)
+val verbose : string -> unit
+
+(** Formatted verbose message. *)
+val verbosef : ('a, unit, string, unit) format4 -> 'a

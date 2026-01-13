@@ -31,6 +31,16 @@ let flush (module Backend : Backend_intf.S) : Backend_intf.t =
       error msg;
       flush stderr
     ;;
+
+    let info msg =
+      info msg;
+      flush stderr
+    ;;
+
+    let verbose msg =
+      verbose msg;
+      flush stderr
+    ;;
   end : Backend_intf.S)
 ;;
 
@@ -106,6 +116,16 @@ let compose (module A : Backend_intf.S) (module B : Backend_intf.S)
     let error msg =
       A.error msg;
       B.error msg
+    ;;
+
+    let info msg =
+      A.info msg;
+      B.info msg
+    ;;
+
+    let verbose msg =
+      A.verbose msg;
+      B.verbose msg
     ;;
   end : Backend_intf.S)
 ;;

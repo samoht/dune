@@ -243,13 +243,13 @@ let apply_patch ~target_dir ~patch_file =
   ()
 ;;
 
-let apply_user_patch ~verbose ~target_dir ~patch_source_path =
+let apply_user_patch ~target_dir ~patch_source_path =
   let open Fiber.O in
   let patch_path = Path.source patch_source_path in
   if not (Path.exists patch_path)
   then Fiber.return ()
   else (
-    verbose (sprintf "  user-patch: %s" (Path.Source.to_string patch_source_path));
+    Console.verbosef "  user-patch: %s" (Path.Source.to_string patch_source_path);
     let stderr =
       Dune_engine.Process.Io.make_stderr
         ~output_on_success:Swallow
@@ -265,23 +265,6 @@ let apply_user_patch ~verbose ~target_dir ~patch_source_path =
     ())
 ;;
 
-(* Two levels of verbosity:
-   - status: one line per package (shown in status line, not new lines)
-   - verbose: detailed debug messages (-vv only, prints new lines) *)
-let status msg =
-  match !Dune_engine.Clflags.display with
-  | Verbose | Short ->
-    (* Use status line to avoid adding newlines - updates in place *)
-    Console.Status_line.set (Constant (Pp.text msg))
-  | Quiet -> ()
-;;
-
-let verbose msg =
-  match !Dune_engine.Clflags.display with
-  | Verbose -> Console.print_user_message (User_message.make [ Pp.text msg ])
-  | Quiet | Short -> ()
-;;
-
 let start_fetch ~name ~version =
   let pkg_str =
     sprintf
@@ -289,7 +272,7 @@ let start_fetch ~name ~version =
       (Package_name.to_string name)
       (Dune_pkg.Package_version.to_string version)
   in
-  status (sprintf "Fetching %s to duniverse/%s" pkg_str pkg_str);
+  Console.infof "Fetching %s to duniverse/%s" pkg_str pkg_str;
   Dune_engine.Progress.start_target (Dune_engine.Progress.Target.fetch pkg_str);
   pkg_str
 ;;
@@ -346,14 +329,14 @@ let fetch_source_group ~rev_store ~platform ~patches_dir ~pkgs_by_name group =
   | Some existing ->
     (* Already fetched with matching source - count all packages as cached *)
     let dirname = Path.basename existing in
-    status (sprintf "Cached %s" dirname);
+    Console.infof "Cached %s" dirname;
     List.iter packages ~f:(fun _ -> Dune_engine.Progress.incr_cached ());
     Fiber.return (false, dirname)
   | None ->
     (* Remove stale directory if it exists but source changed *)
     if Path.exists initial_target
     then (
-      verbose (sprintf "  source changed, re-fetching %s" (Path.to_string initial_target));
+      Console.verbosef "  source changed, re-fetching %s" (Path.to_string initial_target);
       Path.rm_rf initial_target);
     let pkg_str = start_fetch ~name:primary_name ~version:primary_version in
     let* result = do_fetch ~rev_store ~source ~target:initial_target_path in
@@ -373,7 +356,7 @@ let fetch_source_group ~rev_store ~platform ~patches_dir ~pkgs_by_name group =
       if String.equal (Path.to_string initial_target) (Path.to_string final_target)
       then initial_target
       else (
-        verbose (sprintf "  renaming to %s (from dune-project)" final_dirname);
+        Console.verbosef "  renaming to %s (from dune-project)" final_dirname;
         (* Remove existing target if present (stale from previous fetch) *)
         if Path.exists final_target then Path.rm_rf final_target;
         Unix.rename (Path.to_string initial_target) (Path.to_string final_target);
@@ -388,7 +371,7 @@ let fetch_source_group ~rev_store ~platform ~patches_dir ~pkgs_by_name group =
           let { Pkg.Info.extra_sources; _ } = pkg.Pkg.info in
           Fiber.sequential_iter extra_sources ~f:(fun extra ->
             let local_path, _ = extra in
-            verbose (sprintf "  extra-source: %s" (Path.Local.to_string local_path));
+            Console.verbosef "  extra-source: %s" (Path.Local.to_string local_path);
             let* result = fetch_extra_source ~rev_store ~target_dir:target extra in
             match result with
             | Ok () -> Fiber.return ()
@@ -426,12 +409,12 @@ let fetch_source_group ~rev_store ~platform ~patches_dir ~pkgs_by_name group =
                 User_error.raise
                   [ Pp.text "Patch file path contains variables, which is not supported" ]
               | Some patch_file ->
-                verbose (sprintf "  patch: %s" patch_file);
+                Console.verbosef "  patch: %s" patch_file;
                 let patch_local = Path.Local.of_string patch_file in
                 apply_patch ~target_dir:target ~patch_file:patch_local)
           in
           let user_patch = user_patch_path ~patches_dir name version in
-          apply_user_patch ~verbose ~target_dir:target ~patch_source_path:user_patch)
+          apply_user_patch ~target_dir:target ~patch_source_path:user_patch)
     in
     (* Write source marker so we can detect stale directories on re-lock *)
     (match commit_opt with
@@ -444,22 +427,45 @@ let fetch_source_group ~rev_store ~platform ~patches_dir ~pkgs_by_name group =
 let fetch_duniverse ~lock_dir_path ~solver_env ~local_packages () =
   let open Fiber.O in
   let lock_path = Path.source lock_dir_path in
+  Console.verbosef "Reading lock directory: %s" (Path.to_string lock_path);
   let* lock_dir, opam_files =
-    Lock_pkg.read_disk_with_opam_files ~solver_env ~local_packages lock_path
+    try Lock_pkg.read_disk_with_opam_files ~solver_env ~local_packages lock_path with
+    | Unix.Unix_error (error, func, arg) ->
+      let msg =
+        sprintf
+          "Unix error while reading lock file %s: %s(%s): %s"
+          (Path.to_string lock_path)
+          func
+          arg
+          (Unix.error_message error)
+      in
+      User_error.raise
+        ~hints:
+          [ Pp.text "Check that the lock directory exists and is in the correct format."
+          ; Pp.text "Run 'dune pkg lock' to regenerate the lock file."
+          ]
+        [ Pp.text msg ]
+    | Sys_error msg ->
+      User_error.raise
+        ~hints:
+          [ Pp.text "Check that the lock directory exists and is in the correct format."
+          ; Pp.text "Run 'dune pkg lock' to regenerate the lock file."
+          ]
+        [ Pp.textf "Error reading lock file %s: %s" (Path.to_string lock_path) msg ]
   in
   let all_pkgs = Lock_dir.Packages.to_pkg_list lock_dir.packages in
   let fetchable_pkgs =
     List.filter all_pkgs ~f:(fun (pkg : Pkg.t) -> Option.is_some pkg.info.source)
   in
   let no_source_count = List.length all_pkgs - List.length fetchable_pkgs in
+  Console.verbosef
+    "Found %d packages (%d with sources, %d local)"
+    (List.length all_pkgs)
+    (List.length fetchable_pkgs)
+    no_source_count;
   if List.is_empty fetchable_pkgs
   then (
-    if no_source_count > 0
-    then
-      verbose
-        (sprintf
-           "%d package(s) have no source URL (likely local packages)."
-           no_source_count);
+    Console.verbose "No packages with sources to vendor.";
     Fiber.return ())
   else (
     let duniverse_path = Path.source Vendor.default_dir in
@@ -533,7 +539,7 @@ let fetch_duniverse ~lock_dir_path ~solver_env ~local_packages () =
           in
           if should_write
           then (
-            verbose (sprintf "  writing %s" (Path.to_string opam_path));
+            Console.verbosef "  writing %s" (Path.to_string opam_path);
             Io.write_file opam_path opam_content)));
     (* After fetching, generate duniverse/dune with vendor stanzas *)
     (* We scan each fetched directory for libraries to include in vendor stanzas *)
@@ -595,6 +601,7 @@ let fetch_duniverse ~lock_dir_path ~solver_env ~local_packages () =
       (not (Path.exists gitignore_path))
       || Io.read_file gitignore_path <> gitignore_content
     then Io.write_file gitignore_path gitignore_content;
+    Console.verbose "Packages vendored to duniverse/";
     Fiber.return ())
 ;;
 
@@ -737,10 +744,7 @@ let _auto_fetch_missing ~lock_dir_path ~solver_env ~local_packages () =
               let user_patch =
                 user_patch_path ~patches_dir primary_name primary_version
               in
-              apply_user_patch
-                ~verbose
-                ~target_dir:target_path
-                ~patch_source_path:user_patch
+              apply_user_patch ~target_dir:target_path ~patch_source_path:user_patch
           in
           Dune_engine.Progress.finish_target ~name:pkg_str;
           Fiber.return (true, pkg_str))
@@ -784,14 +788,47 @@ let fetch_term =
       (* Pre-fetch all packages to _build for offline builds.
          This triggers the standard fetch mechanism without vendoring. *)
       let lock_path = Path.source lock_dir_path in
-      let* lock_dir = Lock_pkg.read_disk ~solver_env ~local_packages lock_path in
+      Console.verbosef "Reading lock directory: %s" (Path.to_string lock_path);
+      let* lock_dir =
+        try Lock_pkg.read_disk ~solver_env ~local_packages lock_path with
+        | Unix.Unix_error (error, func, arg) ->
+          let msg =
+            sprintf
+              "Unix error while reading lock file %s: %s(%s): %s"
+              (Path.to_string lock_path)
+              func
+              arg
+              (Unix.error_message error)
+          in
+          User_error.raise
+            ~hints:
+              [ Pp.text
+                  "Check that the lock directory exists and is in the correct format."
+              ; Pp.text "Run 'dune pkg lock' to regenerate the lock file."
+              ]
+            [ Pp.text msg ]
+        | Sys_error msg ->
+          User_error.raise
+            ~hints:
+              [ Pp.text
+                  "Check that the lock directory exists and is in the correct format."
+              ; Pp.text "Run 'dune pkg lock' to regenerate the lock file."
+              ]
+            [ Pp.textf "Error reading lock file %s: %s" (Path.to_string lock_path) msg ]
+      in
       let all_pkgs = Lock_dir.Packages.to_pkg_list lock_dir.packages in
       let fetchable_pkgs =
         List.filter all_pkgs ~f:(fun (pkg : Pkg.t) -> Option.is_some pkg.info.source)
       in
+      let no_source_count = List.length all_pkgs - List.length fetchable_pkgs in
+      Console.verbosef
+        "Found %d packages (%d with sources, %d local)"
+        (List.length all_pkgs)
+        (List.length fetchable_pkgs)
+        no_source_count;
       if List.is_empty fetchable_pkgs
       then (
-        verbose "No packages with sources to fetch.";
+        Console.verbose "No packages with sources to fetch.";
         Fiber.return ())
       else (
         let source_groups = Vendor.group_by_source fetchable_pkgs in
@@ -825,12 +862,12 @@ let fetch_term =
             (* Check if already fetched *)
             if Path.exists target_path
             then (
-              verbose (sprintf "  %s (cached)" pkg_str);
+              Console.verbosef "  %s (cached)" pkg_str;
               Dune_engine.Progress.finish_target ~name:pkg_str;
               Fiber.return (false, pkg_str))
             else (
               Path.mkdir_p (Path.build pkg_dir);
-              verbose (sprintf "  fetching %s" pkg_str);
+              Console.verbosef "  fetching %s" pkg_str;
               (* Use do_fetch which handles all source types *)
               let* result = do_fetch ~rev_store ~source ~target:target_str in
               (match result with
@@ -858,7 +895,7 @@ let fetch_term =
                     pkg.Pkg.info.extra_sources
                     ~f:(fun (local_path, extra_source) ->
                       let extra_target = Path.append_local target_path local_path in
-                      verbose (sprintf "    extra: %s" (Path.Local.to_string local_path));
+                      Console.verbosef "    extra: %s" (Path.Local.to_string local_path);
                       let checksum = Option.map extra_source.Source.checksum ~f:snd in
                       let* result =
                         Dune_pkg.Fetch.fetch
@@ -904,22 +941,19 @@ let fetch_term =
                               "Patch file path contains variables, which is not supported"
                           ]
                       | Some patch_file ->
-                        verbose (sprintf "  patch: %s" patch_file);
+                        Console.verbosef "  patch: %s" patch_file;
                         let patch_local = Path.Local.of_string patch_file in
                         apply_patch ~target_dir:target_path ~patch_file:patch_local)
                   in
                   let user_patch =
                     user_patch_path ~patches_dir primary_name primary_version
                   in
-                  apply_user_patch
-                    ~verbose
-                    ~target_dir:target_path
-                    ~patch_source_path:user_patch
+                  apply_user_patch ~target_dir:target_path ~patch_source_path:user_patch
               in
               Dune_engine.Progress.finish_target ~name:pkg_str;
               Fiber.return (true, pkg_str)))
         in
-        verbose "Packages pre-fetched to _build/.pkgs/";
+        Console.verbose "Packages pre-fetched to _build/.pkgs/";
         Fiber.return ()))
 ;;
 

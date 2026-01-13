@@ -30,6 +30,12 @@ module type S = sig
   val activity_log : name:string -> string -> unit
   val message : User_message.t -> unit
   val error : User_message.t -> unit
+
+  (** Informational message - shown in short (-v) and verbose (-vv) modes *)
+  val info : string -> unit
+
+  (** Verbose/debug message - shown only in verbose (-vv) mode *)
+  val verbose : string -> unit
 end
 
 type t = (module S)

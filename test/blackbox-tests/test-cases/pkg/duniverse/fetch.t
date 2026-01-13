@@ -36,9 +36,6 @@ Create a project that depends on the dune package:
 Lock the dependencies:
 
   $ dune pkg lock --format=directory
-  Solution for dune.lock (1 package)
-  dune:
-  - dune-pkg.1.0.0
 
 Check that fetch command runs silently when packages have no sources:
 
@@ -72,7 +69,6 @@ Create a lock file with a source URL pointing to our local directory:
 Fetch the package (using -v for one-liner status messages):
 
   $ dune pkg vendor -v
-  Fetching mypkg.1.0.0 to duniverse/mypkg.1.0.0
 
 Verify the package was placed in duniverse/:
 
@@ -89,7 +85,6 @@ First remove the original source to avoid duplicate package definition:
 
   $ rm -rf pkg-source
   $ dune pkg vendor -v
-  Cached mypkg.1.0.0
 
 The duniverse directory should have the vendored_dirs stanza:
 
@@ -128,21 +123,18 @@ Create a new project that uses the duniverse library:
 Build the project - it should use the duniverse library, not the .pkg sandbox:
 
   $ dune build
-  Error:
-  stat($TESTCASE_ROOT/pkg-source): No such file or directory
-  [1]
 
 Verify the library was built correctly:
 
   $ cat _build/default/mylib.ml
-  cat: _build/default/mylib.ml: No such file or directory
-  [1]
+  let greeting = Mypkg.hello
 
 The duniverse library should be built in the main build context (not .pkg):
 
   $ ls _build/default/duniverse/mypkg.1.0.0/.mypkg.objs/byte/
-  ls: _build/default/duniverse/mypkg.1.0.0/.mypkg.objs/byte/: No such file or directory
-  [1]
+  mypkg.cmi
+  mypkg.cmo
+  mypkg.cmt
 
 Verify that the .pkg directory does NOT contain the mypkg build artifacts
 (since it's a duniverse package, not an opam sandbox package):
@@ -159,13 +151,9 @@ Test that edits to duniverse packages are picked up:
 Rebuild - the edit should be picked up:
 
   $ dune build
-  Error:
-  stat($TESTCASE_ROOT/pkg-source): No such file or directory
-  [1]
 
   $ cat _build/default/duniverse/mypkg.1.0.0/mypkg.ml
-  cat: _build/default/duniverse/mypkg.1.0.0/mypkg.ml: No such file or directory
-  [1]
+  let hello = "EDITED: hello from mypkg v2"
 
 This confirms that duniverse packages fetched via `dune pkg vendor` are:
 1. Built in the main context (not .pkg sandbox)

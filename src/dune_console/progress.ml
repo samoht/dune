@@ -192,6 +192,14 @@ module No_flush = struct
     Dumb.No_flush.print_user_message msg;
     show_status_line ()
   ;;
+
+  let info msg =
+    hide_status_line ();
+    Printf.eprintf "%s\n%!" msg;
+    show_status_line ()
+  ;;
+
+  let verbose _ = ()
 end
 
 let no_flush = (module No_flush : Backend_intf.S)

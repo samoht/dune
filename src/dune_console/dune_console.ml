@@ -230,3 +230,17 @@ let error msg =
   let (module M : Backend_intf.S) = !Backend.main in
   M.error msg
 ;;
+
+let info msg =
+  let (module M : Backend_intf.S) = !Backend.main in
+  M.info msg
+;;
+
+let infof fmt = Printf.ksprintf info fmt
+
+let verbose msg =
+  let (module M : Backend_intf.S) = !Backend.main in
+  M.verbose msg
+;;
+
+let verbosef fmt = Printf.ksprintf verbose fmt

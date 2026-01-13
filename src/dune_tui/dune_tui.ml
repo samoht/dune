@@ -386,6 +386,8 @@ module Console_backend = struct
   let activity_finish ~name:_ = ()
   let activity_fail ~name:_ = ()
   let activity_log ~name:_ _ = ()
+  let info _ = ()
+  let verbose _ = ()
 end
 
 let backend =

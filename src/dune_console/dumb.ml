@@ -28,6 +28,8 @@ module No_flush : Backend_intf.S = struct
   let activity_log ~name:_ _ = ()
   let message = print_msg
   let error = print_msg
+  let info _ = ()
+  let verbose _ = ()
 end
 
 let flush = Combinators.flush (module No_flush)

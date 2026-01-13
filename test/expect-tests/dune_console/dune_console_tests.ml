@@ -129,6 +129,52 @@ Here is another status line
   |}]
 ;;
 
+(* Info and verbose output *)
+
+let test_info_verbose (module Console : New_console) =
+  Console.info "This is an info message";
+  Console.infof "Formatted info: %s" "hello";
+  Console.verbose "This is a verbose message";
+  Console.verbosef "Formatted verbose: %d" 42
+;;
+
+(* Quiet backend - info and verbose are silent *)
+let%expect_test "info/verbose with quiet backend" =
+  let module Console = New () in
+  Console.Backend.set Console.Backend.quiet;
+  test_info_verbose (module Console);
+  escape [%expect.output];
+  [%expect {| |}]
+;;
+
+(* Short backend - info is shown, verbose is silent *)
+let%expect_test "info/verbose with short backend" =
+  let module Console = New () in
+  Console.Backend.set Console.Backend.short;
+  test_info_verbose (module Console);
+  escape [%expect.output];
+  [%expect
+    {|
+    This is an info message
+    Formatted info: hello
+    |}]
+;;
+
+(* Verbose backend - both info and verbose are shown *)
+let%expect_test "info/verbose with verbose backend" =
+  let module Console = New () in
+  Console.Backend.set Console.Backend.verbose;
+  test_info_verbose (module Console);
+  escape [%expect.output];
+  [%expect
+    {|
+    This is an info message
+    Formatted info: hello
+    This is a verbose message
+    Formatted verbose: 42
+    |}]
+;;
+
 (* Progress backend *)
 
 let%expect_test "basic usage" =
