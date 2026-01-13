@@ -169,9 +169,20 @@ let of_ctx =
             { name; version; source = Source.From_vendor { source_dir; stanza } }
           in
           let entries = Package.Name.Map.set entries name entry in
+          (* Add libraries to the mapping, checking for duplicates *)
           let libs =
             List.fold_left libraries ~init:libs ~f:(fun acc lib ->
-              String.Map.set acc lib name)
+              match String.Map.find acc lib with
+              | Some existing_pkg when not (Package.Name.equal existing_pkg name) ->
+                User_error.raise
+                  ~loc:stanza.loc
+                  [ Pp.textf
+                      "Library %S is already provided by package %S"
+                      lib
+                      (Package.Name.to_string existing_pkg)
+                  ; Pp.text "Use (libraries (lib :as alias)) to rename one of them."
+                  ]
+              | _ -> String.Map.set acc lib name)
           in
           entries, libs)
     in

@@ -55,7 +55,10 @@ module Parse = struct
   open Decoder
   open Ast
 
-  let generic ~inc ~elt =
+  (* The ~list_elt parameter is optional and allows parsing list elements
+     like (name :as alias). When provided, lists that don't match other
+     patterns will be parsed using this decoder. *)
+  let generic ~inc ~elt ?list_elt () =
     let open Decoder in
     let rec one () =
       peek_exn
@@ -72,18 +75,27 @@ module Parse = struct
          | _ when s.[0] = ':' ->
            User_error.raise ~loc [ Pp.textf "undefined symbol %s" s ]
          | _ -> elt)
-      | List (_, Atom (loc, A s) :: _) ->
+      | List (_, Atom (_, A s) :: _) ->
         (match s with
          | ":include" -> inc
-         | s when s <> "" && s.[0] <> '-' && s.[0] <> ':' ->
-           User_error.raise
-             ~loc
-             [ Pp.text
-                 "This atom must be quoted because it is the first element of a list and \
-                  doesn't start with - or:"
-             ]
-         | _ -> enter (many []))
-      | List _ -> enter (many [])
+         | _ ->
+           (match list_elt with
+            | Some list_parser -> list_parser
+            | None ->
+              if s <> "" && s.[0] <> '-' && s.[0] <> ':'
+              then
+                let* loc = loc in
+                User_error.raise
+                  ~loc
+                  [ Pp.text
+                      "This atom must be quoted because it is the first element of a \
+                       list and doesn't start with - or:"
+                  ]
+              else enter (many [])))
+      | List _ ->
+        (match list_elt with
+         | Some list_parser -> list_parser
+         | None -> enter (many []))
     and many acc =
       peek
       >>= function
@@ -106,16 +118,18 @@ module Parse = struct
             Include s )
         ]
     in
-    fun ~elt -> generic ~elt ~inc
+    fun ~elt ?list_elt () -> generic ~elt ~inc ?list_elt ()
   ;;
 
-  let without_include ~elt =
+  let without_include ~elt ?list_elt () =
     generic
       ~elt
       ~inc:
         (enter
            (let* loc = loc in
             User_error.raise ~loc [ Pp.text "(:include ...) is not allowed here" ]))
+      ?list_elt
+      ()
   ;;
 end
 
@@ -124,7 +138,7 @@ let decode =
   let+ context = get_all
   and+ loc, ast =
     located
-      (Parse.without_include ~elt:(plain_string (fun ~loc s -> Ast.Element (loc, s))))
+      (Parse.without_include ~elt:(plain_string (fun ~loc s -> Ast.Element (loc, s))) ())
   in
   { ast; loc = Some loc; context }
 ;;
@@ -248,7 +262,8 @@ module Unexpanded = struct
         (Parse.with_include
            ~elt:
              (let+ s = String_with_vars.decode in
-              Ast.Element s))
+              Ast.Element s)
+           ())
     in
     { ast; loc = Some loc; context }
   ;;

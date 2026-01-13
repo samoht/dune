@@ -151,6 +151,126 @@ For HTTP sources or local pins, use `--format=directory`.
 | `dune pkg vendor` | Copy sources to `duniverse/` for editing |
 | `dune pkg update` | Re-solve with latest versions |
 | `dune pkg update PKG` | Update specific package |
+| `dune pkg tree` | Show dependency tree |
+| `dune pkg why PKG` | Explain why a package is included |
+
+### Dependency Visibility
+
+The lock file is minimal by design, but developers need to understand their
+dependency graph. Dune provides visibility through solver output and inspection
+commands.
+
+#### Tree Output During Resolution
+
+`dune pkg lock` and `dune pkg update` show the resolved dependency tree:
+
+```bash
+$ dune pkg lock
+Solving dependencies...
+
+Locked 12 packages:
+
+fmt.0.9.0
+cmdliner.1.3.0
+yojson.2.2.0
+├── seq.base
+└── sedlex.3.2
+    └── ppxlib.0.32.0 (×4)
+        ├── ppx_derivers.1.2.1
+        └── sexplib0.16.0 (×3)
+
+(×N) = N reverse dependencies in the solution
+```
+
+The `(×N)` counter reveals the DAG structure hidden by the tree view. A package
+with many reverse dependencies is a "hub" — updating it affects many packages.
+
+Tree output respects `--display`: `verbose` shows full tree, `short` shows summary.
+
+#### `dune pkg tree`
+
+Inspect the dependency graph of an existing lock:
+
+```bash
+$ dune pkg tree
+fmt.0.9.0
+cmdliner.1.3.0
+yojson.2.2.0
+├── seq.base
+└── sedlex.3.2
+    └── ppxlib.0.32.0 (×4)
+        ├── ppx_derivers.1.2.1
+        └── sexplib0.16.0 (×3)
+
+$ dune pkg tree --depth=1      # Limit depth
+fmt.0.9.0
+cmdliner.1.3.0
+yojson.2.2.0 (3 deps)
+
+$ dune pkg tree --flat          # Flat list with revdep counts
+cmdliner.1.3.0
+fmt.0.9.0
+ppx_derivers.1.2.1 (×1)
+ppxlib.0.32.0 (×4)
+sedlex.3.2 (×1)
+seq.base (×2)
+sexplib0.16.0 (×3)
+yojson.2.2.0
+
+$ dune pkg tree --inverted      # Show what depends on each package
+ppxlib.0.32.0
+├── sedlex.3.2
+├── ppx_yojson.1.2.0
+├── ppx_deriving.5.2.1
+└── merlin-lib.4.14
+
+$ dune pkg tree PKG             # Tree rooted at specific package
+$ dune pkg tree --roots         # Only show direct dependencies
+```
+
+#### `dune pkg why`
+
+Explain why a transitive dependency is included:
+
+```bash
+$ dune pkg why sexplib0
+sexplib0.16.0 is required by:
+
+(root)
+└── yojson.2.2.0
+    └── sedlex.3.2
+        └── ppxlib.0.32.0
+            └── sexplib0.16.0
+
+(root)
+└── ppx_expect.0.16.0
+    └── ppxlib.0.32.0
+        └── sexplib0.16.0
+
+2 dependency paths
+```
+
+The output shows all paths from root to the target package.
+
+#### Lock Diff with Context
+
+When re-locking, `dune pkg lock` shows what changed:
+
+```bash
+$ dune pkg lock
+Solving dependencies...
+
+Changes:
+  ~ ppxlib 0.32.0 → 0.33.0
+  + ppx_derivers.1.2.2 (new, required by ppxlib)
+  - ppx_derivers.1.2.1 (removed)
+  ~ sexplib0 16.0 → 17.0 (required by ppxlib)
+      ↳ affects: ppx_expect, ppx_inline_test, sedlex (3 packages)
+
+Locked 12 packages (4 changed)
+```
+
+The `affects:` line shows reverse dependencies — packages that will be rebuilt.
 
 ### Build Flags
 

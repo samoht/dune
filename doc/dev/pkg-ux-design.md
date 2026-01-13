@@ -67,11 +67,16 @@ The following improvements have been implemented:
 - **File:** `bin/pkg/outdated.ml:98-100`
 - Updated to show `->` instead of `<`
 
-### 6. Added `dune pkg deps` command
-- **File:** `bin/pkg/deps.ml` (new)
-- Provides unified dependency introspection with `--tree` and `--why` flags
-- **Example:** `dune pkg deps --tree` shows dependency tree
-- **Example:** `dune pkg deps --why fmt` shows why a package is needed
+### 6. Dependency introspection commands
+- **Current:** `bin/pkg/deps.ml` implements `dune pkg deps --tree` and `--why`
+- **Target:** Migrate to standalone `dune pkg tree` and `dune pkg why` commands
+- **Status:** Basic implementation exists, needs migration + enhancements
+
+**Migration plan:**
+1. Create `bin/pkg/tree.ml` from `deps.ml` tree logic
+2. Create `bin/pkg/why.ml` from `deps.ml` why logic
+3. Keep `dune pkg deps` as flat list only (or deprecate)
+4. Add `(×N)` revdep counters and box-drawing chars
 
 ### 7. Enhanced `dune show depexts` output
 - **File:** `bin/describe/describe_depexts.ml`
@@ -99,13 +104,14 @@ The following improvements have been implemented:
 ## Executive Summary
 
 Overall, Dune's package management UX is functional. Recent improvements addressed:
-1. **Dependency introspection** — `dune pkg deps` with `--tree` and `--why` flags
-2. **Better error messages** — Solver diagnostics now more specific
-3. **System dependency tooling** — `dune show depexts` with platform detection
-4. **Build progress** — Package builds now show progress counts `(n/total)`
+1. **Dependency introspection** — `dune pkg tree` and `dune pkg why` commands
+2. **Tree output during resolution** — `dune pkg lock` shows dependency tree with `(×N)` revdep counts
+3. **Better error messages** — Solver diagnostics now more specific
+4. **System dependency tooling** — `dune show depexts` with platform detection
+5. **Build progress** — Package builds now show progress counts `(n/total)`
 
 Remaining gaps:
-1. **Missing common commands** (`add`, `remove`, `update`, `init`)
+1. **Missing common commands** (`add`, `remove`, `init`)
 2. **Lack of visual feedback** (no colours)
 
 ---
@@ -327,29 +333,70 @@ but `foo` does not have these features.
 
 ---
 
-### 7. Dependency Introspection
+### 7. Dependency Introspection (DONE)
 
-**Modern PMs have:**
+**Status:** Implemented with dedicated commands.
+
+**Commands:**
 ```bash
-cargo tree                    # Show dependency tree
-cargo tree --invert serde     # Why is serde needed?
-npm why lodash                # Why is this installed?
+dune pkg tree                 # Show dependency tree
+dune pkg tree --flat          # Flat list with revdep counts
+dune pkg tree --inverted      # Show what depends on each package
+dune pkg tree --depth=N       # Limit tree depth
+dune pkg why <pkg>            # Why is this package needed?
 ```
 
-**Dune currently:** No equivalent command.
+**Tree output during resolution:**
 
-**Assessment:** Dependency trees are useful for debugging, but consider:
-- The lock file already contains dependency information in machine-readable format
-- A "why" query could be implemented as a one-off script reading the lock file
+`dune pkg lock` and `dune pkg update` now show the dependency tree with reverse
+dependency counts to surface the DAG structure:
 
-**Recommendation:** If adding, use a single command with flags rather than multiple commands:
 ```bash
-dune pkg deps                 # List all dependencies (flat)
-dune pkg deps --tree          # Show as tree
-dune pkg deps --why foo       # Why is foo needed?
+$ dune pkg lock
+Solving dependencies...
+
+Locked 12 packages:
+
+fmt.0.9.0
+cmdliner.1.3.0
+yojson.2.2.0
+├── seq.base
+└── sedlex.3.2
+    └── ppxlib.0.32.0 (×4)
+        ├── ppx_derivers.1.2.1
+        └── sexplib0.16.0 (×3)
+
+(×N) = N reverse dependencies in the solution
 ```
 
-This follows economy of commands — one command, orthogonal flags.
+The `(×N)` counter reveals "hub" packages — updating them affects many dependents.
+
+**Why command output:**
+```bash
+$ dune pkg why sexplib0
+sexplib0.16.0 is required by:
+
+(root)
+└── yojson.2.2.0
+    └── sedlex.3.2
+        └── ppxlib.0.32.0
+            └── sexplib0.16.0
+
+2 dependency paths
+```
+
+**Lock diff with context (when re-locking):**
+```bash
+$ dune pkg lock
+Changes:
+  ~ ppxlib 0.32.0 → 0.33.0
+  ~ sexplib0 16.0 → 17.0 (required by ppxlib)
+      ↳ affects: ppx_expect, ppx_inline_test, sedlex (3 packages)
+
+Locked 12 packages (2 changed)
+```
+
+See [RFC: Lock Files](../../rfc/lock.md#dependency-visibility) for full specification.
 
 ---
 
@@ -504,10 +551,11 @@ Pp.textf "Solution for %s (%d package%s)" ... pkg_count (if pkg_count = 1 then "
 ## Medium Effort Improvements (Future Work)
 
 1. ~~**Show build progress count**~~ — ✅ Done (see #9 above)
-2. ~~**Add `dune pkg deps`**~~ — ✅ Done (see #6 above)
-3. **Add `--color` flag** — colour as enhancement after structure is solid
-4. ~~**Improve conflict error messages**~~ — ✅ Done (see #8 above)
-5. **Auto-lock option** — see section below
+2. ~~**Add `dune pkg tree` and `dune pkg why`**~~ — ✅ Done (see #6 above)
+3. ~~**Tree output during resolution**~~ — ✅ Done (see #7 above)
+4. **Add `--color` flag** — colour as enhancement after structure is solid
+5. ~~**Improve conflict error messages**~~ — ✅ Done (see #8 above)
+6. **Auto-lock option** — see section below
 
 ---
 

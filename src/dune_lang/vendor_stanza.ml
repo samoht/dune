@@ -97,81 +97,75 @@ module Libraries_spec = struct
     | All_except of Lib_name.t list (** [:standard \ lib1 lib2] - all except excluded *)
     | Explicit of Library_entry.t list (** Explicit list, possibly with aliasing *)
 
+  (* Convert the ordered set lang AST to Libraries_spec.t.
+     We analyze the structure to determine which variant to use:
+     - Standard alone -> All
+     - Diff(Standard, elements) -> All_except (extract names from elements)
+     - Union of elements -> Explicit
+
+     Note: The AST type is a GADT where Include only exists for unexpanded.
+     Since we're working with expanded ASTs, Include is unreachable, but
+     OCaml's pattern matching requires we handle it. *)
+  let of_ast ast =
+    let module Ast = Ordered_set_lang.Ast in
+    (* Collect all elements from a union/element AST.
+       The type annotation ensures we have an expanded AST, so Include is
+       unreachable, but we still need a catch-all pattern for the compiler. *)
+    let rec collect_entries acc (ast : (Library_entry.t, Ast.expanded) Ast.t) =
+      match ast with
+      | Ast.Element entry -> entry :: acc
+      | Ast.Union elts -> List.fold_left elts ~init:acc ~f:collect_entries
+      | Ast.Standard | Ast.Diff _ -> acc
+      | _ -> acc (* Include is unreachable for expanded AST *)
+    in
+    let rec collect_exclusions acc (ast : (Library_entry.t, Ast.expanded) Ast.t) =
+      match ast with
+      | Ast.Element entry ->
+        (match entry.Library_entry.alias with
+         | Some _ ->
+           User_error.raise [ Pp.text "Cannot use :as aliasing in exclusion list" ]
+         | None -> entry.lib_name :: acc)
+      | Ast.Union elts -> List.fold_left elts ~init:acc ~f:collect_exclusions
+      | Ast.Standard | Ast.Diff _ -> acc
+      | _ -> acc (* Include is unreachable for expanded AST *)
+    in
+    match (ast : (Library_entry.t, Ast.expanded) Ast.t) with
+    | Ast.Standard -> All
+    | Ast.Diff (Ast.Standard, excluded) -> All_except (collect_exclusions [] excluded)
+    | Ast.Diff (_, _) ->
+      User_error.raise [ Pp.text "\\ can only be used after :standard" ]
+    | Ast.Element entry -> Explicit [ entry ]
+    | Ast.Union elts ->
+      (* Check if any element is Standard - that's an error *)
+      let has_standard =
+        List.exists elts ~f:(fun (elt : (Library_entry.t, Ast.expanded) Ast.t) ->
+          match elt with
+          | Ast.Standard -> true
+          | _ -> false)
+      in
+      if has_standard
+      then User_error.raise [ Pp.text "Cannot mix :standard with explicit library names" ]
+      else Explicit (List.rev (List.fold_left elts ~init:[] ~f:collect_entries))
+    | _ -> All (* Include is unreachable for expanded AST *)
+  ;;
+
   let decode =
     let open Decoder in
-    (* Parse a single element: either a library name or (name :as alias) *)
-    let element =
-      let simple =
-        let+ lib_name = Lib_name.decode in
-        `Lib { Library_entry.lib_name; alias = None }
-      in
-      let with_alias =
-        enter
-          (let* lib_name = Lib_name.decode in
-           let* () = keyword ":as" in
-           let+ alias = Lib_name.decode in
-           `Lib { Library_entry.lib_name; alias = Some alias })
-      in
-      let standard =
-        let+ () = keyword ":standard" in
-        `Standard
-      in
-      let backslash =
-        let+ () = keyword "\\" in
-        `Backslash
-      in
-      backslash <|> standard <|> with_alias <|> simple
+    (* Decoder for simple atom elements *)
+    let simple_elt =
+      let+ lib_name = Lib_name.decode in
+      Ordered_set_lang.Ast.Element { Library_entry.lib_name; alias = None }
     in
-    (* Parse the full specification *)
-    let+ elements = repeat element in
-    (* Process the parsed elements into a Libraries_spec.t *)
-    let rec process ~has_standard ~libs ~excluded ~in_exclusion = function
-      | [] ->
-        if in_exclusion
-        then All_except (List.rev excluded)
-        else if has_standard
-        then All
-        else (
-          match libs with
-          | [] -> All
-          | _ -> Explicit (List.rev libs))
-      | `Standard :: rest ->
-        if in_exclusion
-        then User_error.raise [ Pp.text ":standard cannot appear after \\" ]
-        else if has_standard
-        then User_error.raise [ Pp.text ":standard can only appear once" ]
-        else if libs <> []
-        then
-          User_error.raise [ Pp.text "Cannot mix :standard with explicit library names" ]
-        else process ~has_standard:true ~libs ~excluded ~in_exclusion rest
-      | `Backslash :: rest ->
-        if not has_standard
-        then
-          User_error.raise
-            [ Pp.text "\\ can only be used after :standard in vendor stanzas" ]
-        else if in_exclusion
-        then User_error.raise [ Pp.text "Cannot have multiple \\ operators" ]
-        else process ~has_standard ~libs ~excluded ~in_exclusion:true rest
-      | `Lib entry :: rest ->
-        if in_exclusion
-        then (
-          (* In exclusion mode, only simple names are allowed *)
-          match entry.Library_entry.alias with
-          | Some _ ->
-            User_error.raise [ Pp.text "Cannot use :as aliasing in exclusion list" ]
-          | None ->
-            process
-              ~has_standard
-              ~libs
-              ~excluded:(entry.lib_name :: excluded)
-              ~in_exclusion
-              rest)
-        else if has_standard
-        then
-          User_error.raise [ Pp.text "Cannot mix :standard with explicit library names" ]
-        else process ~has_standard ~libs:(entry :: libs) ~excluded ~in_exclusion rest
+    (* Decoder for list elements like (name :as alias) *)
+    let list_elt =
+      enter
+        (let* lib_name = Lib_name.decode in
+         let* () = keyword ":as" in
+         let+ alias = Lib_name.decode in
+         Ordered_set_lang.Ast.Element { Library_entry.lib_name; alias = Some alias })
     in
-    process ~has_standard:false ~libs:[] ~excluded:[] ~in_exclusion:false elements
+    let+ ast = Ordered_set_lang.Parse.without_include ~elt:simple_elt ~list_elt () in
+    of_ast ast
   ;;
 
   let to_dyn = function
@@ -221,63 +215,43 @@ module Packages_spec = struct
     (** [:standard \ pkg1 pkg2] - all except excluded *)
     | Explicit of Package_name.t list (** Explicit list of packages *)
 
+  (* Convert the ordered set lang AST to Packages_spec.t *)
+  let of_ast ast =
+    let module Ast = Ordered_set_lang.Ast in
+    let rec collect_pkgs acc (ast : (Package_name.t, Ast.expanded) Ast.t) =
+      match ast with
+      | Ast.Element name -> name :: acc
+      | Ast.Union elts -> List.fold_left elts ~init:acc ~f:collect_pkgs
+      | Ast.Standard | Ast.Diff _ -> acc
+      | _ -> acc (* Include is unreachable for expanded AST *)
+    in
+    match (ast : (Package_name.t, Ast.expanded) Ast.t) with
+    | Ast.Standard -> All
+    | Ast.Diff (Ast.Standard, excluded) -> All_except (collect_pkgs [] excluded)
+    | Ast.Diff (_, _) ->
+      User_error.raise [ Pp.text "\\ can only be used after :standard" ]
+    | Ast.Element name -> Explicit [ name ]
+    | Ast.Union elts ->
+      let has_standard =
+        List.exists elts ~f:(fun (elt : (Package_name.t, Ast.expanded) Ast.t) ->
+          match elt with
+          | Ast.Standard -> true
+          | _ -> false)
+      in
+      if has_standard
+      then User_error.raise [ Pp.text "Cannot mix :standard with explicit package names" ]
+      else Explicit (List.rev (List.fold_left elts ~init:[] ~f:collect_pkgs))
+    | _ -> All (* Include is unreachable for expanded AST *)
+  ;;
+
   let decode =
     let open Decoder in
-    (* Parse a single element *)
-    let element =
-      let pkg =
-        let+ name = Package_name.decode in
-        `Pkg name
-      in
-      let standard =
-        let+ () = keyword ":standard" in
-        `Standard
-      in
-      let backslash =
-        let+ () = keyword "\\" in
-        `Backslash
-      in
-      backslash <|> standard <|> pkg
+    let elt =
+      let+ name = Package_name.decode in
+      Ordered_set_lang.Ast.Element name
     in
-    (* Parse the full specification *)
-    let+ elements = repeat element in
-    (* Process the parsed elements *)
-    let rec process ~has_standard ~pkgs ~excluded ~in_exclusion = function
-      | [] ->
-        if in_exclusion
-        then All_except (List.rev excluded)
-        else if has_standard
-        then All
-        else (
-          match pkgs with
-          | [] -> All
-          | _ -> Explicit (List.rev pkgs))
-      | `Standard :: rest ->
-        if in_exclusion
-        then User_error.raise [ Pp.text ":standard cannot appear after \\" ]
-        else if has_standard
-        then User_error.raise [ Pp.text ":standard can only appear once" ]
-        else if pkgs <> []
-        then
-          User_error.raise [ Pp.text "Cannot mix :standard with explicit package names" ]
-        else process ~has_standard:true ~pkgs ~excluded ~in_exclusion rest
-      | `Backslash :: rest ->
-        if not has_standard
-        then
-          User_error.raise
-            [ Pp.text "\\ can only be used after :standard in vendor stanzas" ]
-        else if in_exclusion
-        then User_error.raise [ Pp.text "Cannot have multiple \\ operators" ]
-        else process ~has_standard ~pkgs ~excluded ~in_exclusion:true rest
-      | `Pkg name :: rest ->
-        if in_exclusion
-        then process ~has_standard ~pkgs ~excluded:(name :: excluded) ~in_exclusion rest
-        else if has_standard
-        then
-          User_error.raise [ Pp.text "Cannot mix :standard with explicit package names" ]
-        else process ~has_standard ~pkgs:(name :: pkgs) ~excluded ~in_exclusion rest
-    in
-    process ~has_standard:false ~pkgs:[] ~excluded:[] ~in_exclusion:false elements
+    let+ ast = Ordered_set_lang.Parse.without_include ~elt () in
+    of_ast ast
   ;;
 
   let to_dyn = function
