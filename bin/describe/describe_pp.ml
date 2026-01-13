@@ -70,6 +70,7 @@ let execute_pp_action ~sctx file pp_file dump_file =
     ; rule_loc = Loc.none
     ; execution_parameters
     ; action
+    ; rule_name = None
     }
   in
   let ok =

@@ -728,10 +728,59 @@ let raise_on_lock_dir_out_of_sync =
                   ]
               ]
           in
-          User_error.raise
-            ~loc
-            ~hints
+          (* Compute what changed to show in error message.
+             Use runtime_package_names to exclude dev tools (with-doc, with-test). *)
+          let local_pkg_names =
+            Dune_lang.Package.Name.Map.keys local_packages
+            |> Dune_pkg.Package_name.Set.of_list
+          in
+          let runtime_deps =
+            Dune_lang.Package.Name.Map.values local_packages
+            |> List.concat_map ~f:(fun (pkg : Dune_pkg.Local_package.t) ->
+              Dune_pkg.Dependency_formula.runtime_package_names pkg.dependencies
+              |> Dune_pkg.Package_name.Set.to_list)
+            |> Dune_pkg.Package_name.Set.of_list
+          in
+          (* Remove local packages from deps to get external deps only *)
+          let current_deps =
+            Dune_pkg.Package_name.Set.diff runtime_deps local_pkg_names
+          in
+          let locked_pkgs =
+            Dune_pkg.Lock.Packages.to_pkg_list lock_dir.packages
+            |> List.map ~f:(fun (pkg : Dune_pkg.Pkg.t) -> pkg.info.name)
+            |> Dune_pkg.Package_name.Set.of_list
+          in
+          (* Show dependencies declared but not locked (newly added) *)
+          let not_locked = Dune_pkg.Package_name.Set.diff current_deps locked_pkgs in
+          let changes =
+            if not (Dune_pkg.Package_name.Set.is_empty not_locked)
+            then
+              [ Pp.textf
+                  "Dependencies not in lock file: %s"
+                  (Dune_pkg.Package_name.Set.to_list not_locked
+                   |> List.map ~f:Dune_pkg.Package_name.to_string
+                   |> String.concat ~sep:", ")
+              ]
+            else []
+          in
+          (* Always show current dependencies for context *)
+          let current_deps_info =
+            if Dune_pkg.Package_name.Set.is_empty current_deps
+            then []
+            else
+              [ Pp.textf
+                  "Current dependencies in dune-project: %s"
+                  (Dune_pkg.Package_name.Set.to_list current_deps
+                   |> List.map ~f:Dune_pkg.Package_name.to_string
+                   |> String.concat ~sep:", ")
+              ]
+          in
+          let msg =
             [ Pp.text "Lock dir out of sync with dune-project" ]
+            @ changes
+            @ current_deps_info
+          in
+          User_error.raise ~loc ~hints msg
       else Memo.return ())
     |> Memo.Lazy.force)
   |> Staged.unstage

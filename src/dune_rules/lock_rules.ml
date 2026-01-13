@@ -144,12 +144,20 @@ module Spec = struct
     =
     let open Fiber.O in
     let* () = Fiber.return () in
+    (* Show status during lock generation *)
+    let status_ref = ref "Initializing solver..." in
+    let overlay =
+      Console.Status_line.add_overlay
+        (Live (fun () -> Pp.textf "Locking: %s" !status_ref))
+    in
     let local_packages = Package.Name.Map.map packages ~f:Local_package.for_solver in
     let portable_lock_dir =
       match Config.get Compile_time.portable_lock_dir with
       | `Enabled -> true
       | `Disabled -> false
     in
+    status_ref := "Detecting system environment...";
+    Console.Status_line.refresh ();
     let* solver_env =
       (* CR-soon Alizter: This solver environment construction pattern (combining
        solver_env_from_current_system with solver_env_from_context, then
@@ -165,6 +173,8 @@ module Spec = struct
       in
       Solver_env.unset_multi solver_env unset_solver_vars
     in
+    status_ref := "Solving dependencies...";
+    Console.Status_line.refresh ();
     let* solver_result =
       if portable_lock_dir
       then (
@@ -180,6 +190,8 @@ module Spec = struct
             Dune_lang.Package_variable_name.platform_specific
         in
         let solve_for_platforms = Solver_env.popular_platform_envs in
+        status_ref := "Solving for multiple platforms...";
+        Console.Status_line.refresh ();
         let+ results =
           Fiber.parallel_map solve_for_platforms ~f:(fun platform_env ->
             let solver_env_for_platform =
@@ -216,6 +228,7 @@ module Spec = struct
           ~selected_depopts
           ~portable_lock_dir
     in
+    Console.Status_line.remove_overlay overlay;
     match solver_result with
     | Error (`Manifest_error diagnostic) -> raise (User_error.E diagnostic)
     | Error (`Solve_error diagnostic) ->

@@ -25,3 +25,11 @@ val has_entries : t -> bool
 (** Returns the [Package_name.t] of a dependency from the formula, if it
     exists. *)
 val any_package_name : t -> Package_name.t option
+
+(** Returns all package names mentioned in the dependency formula *)
+val all_package_names : t -> Package_name.Set.t
+
+(** Returns package names that are NOT guarded by with-doc filters.
+    Includes with-test deps (needed for dune test), excludes doc tools (odoc)
+    which are handled as dev tools. *)
+val runtime_package_names : t -> Package_name.Set.t
