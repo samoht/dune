@@ -1271,6 +1271,15 @@ end
 (* System-provided packages that don't need to be built *)
 let default_system_provided = Package.Name.Set.singleton Dune_pkg.Dune_dep.name
 
+(* Check if a lock package is virtual (no source, no build/install commands).
+   Virtual packages are markers in opam that don't need actual building.
+   Examples: base-effects, base-domains, base-nnp, ocaml *)
+let is_virtual_lock_package (pkg : Pkg.t) =
+  Option.is_none pkg.info.source
+  && List.is_empty pkg.build_command
+  && List.is_empty pkg.install_command
+;;
+
 (** Status of a package with respect to vendoring. *)
 module Vendor_status = struct
   type t =
@@ -1478,7 +1487,15 @@ end = struct
           then has_dune_dep, acc
           else (
             match Package_registry.find registry name with
-            | Some dep_entry -> has_dune_dep, dep_entry :: acc
+            | Some dep_entry ->
+              (* Skip virtual lock packages to avoid dependency cycles.
+                 Virtual packages (no source, no build/install commands) don't need building. *)
+              let is_virtual =
+                match dep_entry.Package_registry.source with
+                | Package_registry.Source.From_lock { pkg } -> is_virtual_lock_package pkg
+                | From_vendor _ | From_workspace _ -> false
+              in
+              if is_virtual then has_dune_dep, acc else has_dune_dep, dep_entry :: acc
             | None ->
               (* Not in registry - check if it's a workspace package *)
               (match Package.Name.Map.find workspace_packages name with
@@ -3111,9 +3128,13 @@ let all_deps universe =
        | Some Opam_sandboxed ->
          let+ pkg = Resolve.resolve_entry registry entry ~package_universe:universe in
          Some pkg)
-    | Package_registry.Source.From_lock _ ->
-      let+ pkg = Resolve.resolve_entry registry entry ~package_universe:universe in
-      Some pkg)
+    | Package_registry.Source.From_lock { pkg } ->
+      (* Skip virtual packages - they don't need building *)
+      if is_virtual_lock_package pkg
+      then Memo.return None
+      else
+        let+ resolved = Resolve.resolve_entry registry entry ~package_universe:universe in
+        Some resolved)
   >>| List.filter_map ~f:Fun.id
   >>| Resolved_pkg.top_closure
 ;;
