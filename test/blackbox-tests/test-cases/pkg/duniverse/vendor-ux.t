@@ -730,10 +730,12 @@ EMPTY LIBRARIES LIST - No libraries exposed
 With empty libraries list, chain.base should NOT be available:
 
   $ dune build main.exe 2>&1
-  File "main.ml", line 1, characters 23-36:
-  1 | let () = print_endline Chain_derived.derived
-                             ^^^^^^^^^^^^^
-  Error: Unbound module Chain_derived
+  File "dune", line 1, characters 35-45:
+  1 | (executable (name main) (libraries chain.base))
+                                         ^^^^^^^^^^
+  Error: Library "chain.base" not found.
+  -> required by _build/default/.main.eobjs/native/dune__exe__Main.cmx
+  -> required by _build/default/main.exe
   [1]
 
 ===========================================

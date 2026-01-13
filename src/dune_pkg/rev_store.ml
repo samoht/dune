@@ -716,6 +716,7 @@ let fetch_allow_failure repo ~url obj =
     >>= function
     | true -> Fiber.return `Fetched
     | false ->
+      Console.infof "Fetching %s from %s" (Object.to_hex obj) url;
       run_with_exit_code
         ~allow_codes:(Int.equal 0)
         repo
@@ -1066,6 +1067,7 @@ let remote =
       let command = [ "ls-remote"; url ] in
       let refs =
         Fiber.Lazy.create (fun () ->
+          Console.infof "Querying %s" url;
           let+ hits =
             run_capture_lines t ~display:!Dune_engine.Clflags.display command
             >>| function

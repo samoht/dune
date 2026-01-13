@@ -178,8 +178,6 @@ module Status_line = struct
   ;;
 end
 
-let () = User_warning.set_reporter print_user_message
-
 let () =
   Log.set_forward_verbose (fun msg args ->
     let formatted_args =
@@ -230,6 +228,13 @@ let error msg =
   let (module M : Backend_intf.S) = !Backend.main in
   M.error msg
 ;;
+
+let warning msg =
+  let (module M : Backend_intf.S) = !Backend.main in
+  M.warning msg
+;;
+
+let () = User_warning.set_reporter warning
 
 let info msg =
   let (module M : Backend_intf.S) = !Backend.main in

@@ -107,6 +107,13 @@ let make ~frames_per_second (module Base : S) : (module Dune_console.Backend) =
       Mutex.unlock mutex
     ;;
 
+    let warning m =
+      Mutex.lock mutex;
+      state.dirty <- true;
+      Queue.push state.messages m;
+      Mutex.unlock mutex
+    ;;
+
     let info msg =
       Mutex.lock mutex;
       state.dirty <- true;

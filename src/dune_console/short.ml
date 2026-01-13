@@ -64,6 +64,11 @@ module M : Backend_intf.S = struct
     flush stderr
   ;;
 
+  let warning msg =
+    Dumb.print_msg msg;
+    flush stderr
+  ;;
+
   let info msg = Printf.eprintf "%s\n%!" msg
   let verbose _ = ()
 end

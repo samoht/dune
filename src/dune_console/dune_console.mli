@@ -144,6 +144,9 @@ val message : User_message.t -> unit
 (** Errors - always shown. *)
 val error : User_message.t -> unit
 
+(** Warnings - always shown. *)
+val warning : User_message.t -> unit
+
 (** Informational message - shown in short (-v) and verbose (-vv) modes.
     Use for progress messages that help track what's happening. *)
 val info : string -> unit

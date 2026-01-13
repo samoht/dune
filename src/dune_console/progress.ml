@@ -193,6 +193,12 @@ module No_flush = struct
     show_status_line ()
   ;;
 
+  let warning msg =
+    hide_status_line ();
+    Dumb.No_flush.print_user_message msg;
+    show_status_line ()
+  ;;
+
   let info msg =
     hide_status_line ();
     Printf.eprintf "%s\n%!" msg;
