@@ -21,5 +21,12 @@ Create a project:
 Now try to build the package with --fetch=disabled. Since the package source
 hasn't been fetched yet, this should fail with a clear error message:
 
-  $ dune build @pkg-install --fetch=disabled 2>&1
+  $ dune build @pkg-install --fetch=disabled
+  File "dune.lock/mypkg.pkg", line 4, characters 7-39:
+  4 |   (url https://example.com/mypkg.tar.gz)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  Error: Package source not cached and network access is disabled
+  (--fetch=disabled).
+  Run 'dune pkg fetch' first to download package sources, or use
+  --fetch=enabled.
   [1]

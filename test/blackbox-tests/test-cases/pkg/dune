@@ -46,6 +46,7 @@
   pin-depends
   extra-sources
   broken-symlink-in-dependency
+  fetch-disabled
   duniverse
   duniverse/non-dune-pkg))
 
