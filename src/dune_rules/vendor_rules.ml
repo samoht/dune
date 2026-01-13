@@ -86,21 +86,39 @@ let scan_meta_libraries' (dir : Path.t) ~pkg_name =
   else []
 ;;
 
-let scan_opam_libraries' (dir : Path.t) =
-  match Path.Untracked.readdir_unsorted dir with
-  | Error _ -> []
-  | Ok entries ->
-    List.filter_map entries ~f:(fun entry ->
-      if String.is_suffix entry ~suffix:".opam"
-      then Some (Filename.remove_extension entry)
-      else None)
+let scan_opam_libraries' (dir : Path.t) ~pkg_name =
+  let check_opam_file path =
+    Path.Untracked.exists path && not (Path.Untracked.is_directory path)
+  in
+  (* Check for <name>.opam files in root - these give us exact library names *)
+  let root_opam_libs =
+    match Path.Untracked.readdir_unsorted dir with
+    | Error _ -> []
+    | Ok entries ->
+      List.filter_map entries ~f:(fun entry ->
+        if String.is_suffix entry ~suffix:".opam"
+        then Some (Filename.remove_extension entry)
+        else None)
+  in
+  match root_opam_libs with
+  | _ :: _ -> root_opam_libs
+  | [] ->
+    (* Check standard opam file locations (same as find_opam_file) *)
+    let candidates =
+      [ Path.relative dir "opam"
+      ; Path.relative dir (pkg_name ^ ".opam")
+      ; Path.relative dir "opam/opam"
+      ; Path.relative dir (sprintf "opam/%s.opam" pkg_name)
+      ]
+    in
+    if List.exists candidates ~f:check_opam_file then [ pkg_name ] else []
 ;;
 
 let scan_libraries' (dir : Path.t) ~pkg_name =
   match scan_dir_for_dune_files' ~pkg_name dir with
   | [] ->
     (match scan_meta_libraries' dir ~pkg_name with
-     | [] -> scan_opam_libraries' dir
+     | [] -> scan_opam_libraries' dir ~pkg_name
      | libs -> libs)
   | libs -> libs
 ;;
@@ -112,14 +130,20 @@ let scan_public_libraries ~pkg_name dir =
 ;;
 
 let scan_meta_libraries dir ~pkg_name = scan_meta_libraries' (Path.source dir) ~pkg_name
-let scan_opam_libraries dir = scan_opam_libraries' (Path.source dir)
+let scan_opam_libraries dir ~pkg_name = scan_opam_libraries' (Path.source dir) ~pkg_name
 
-(* Find opam file in a directory. Checks both "opam" and "<name>.opam".
+(* Find opam file in a directory. Checks standard locations:
+   1. opam - simple file
+   2. <name>.opam - named file
+   3. opam/opam - nested in opam directory
+   4. opam/<name>.opam - nested named file
    We check that it exists and is not a directory to avoid matching opam/ directories. *)
 let find_opam_file ~pkg_name ~pkg_dir =
   let candidates =
     [ Path.Source.relative pkg_dir "opam"
     ; Path.Source.relative pkg_dir (pkg_name ^ ".opam")
+    ; Path.Source.relative pkg_dir "opam/opam"
+    ; Path.Source.relative pkg_dir (sprintf "opam/%s.opam" pkg_name)
     ]
   in
   List.find candidates ~f:(fun p ->

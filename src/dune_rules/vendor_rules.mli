@@ -31,7 +31,7 @@ val parse_pkg_name_from_dir : string -> string
 
 val scan_public_libraries : pkg_name:string -> Path.Source.t -> string list
 val scan_meta_libraries : Path.Source.t -> pkg_name:string -> string list
-val scan_opam_libraries : Path.Source.t -> string list
+val scan_opam_libraries : Path.Source.t -> pkg_name:string -> string list
 val scan_libraries : Path.Source.t -> pkg_name:string -> string list
 
 (** Scan libraries from any path (source or build). This is the unified version
