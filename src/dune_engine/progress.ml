@@ -51,21 +51,25 @@ let fail_target ~name =
   state.failed <- state.failed + 1
 ;;
 
-(* Get short description from a running job's Pp.t description *)
+(* Get short description from a running job's Pp.t description.
+   Strips _build/<context>/ prefix from paths. *)
 let extract_job_name (pp : unit Pp.t) =
   let buf = Buffer.create 64 in
   let fmt = Format.formatter_of_buffer buf in
   Pp.to_fmt fmt pp;
   Format.pp_print_flush fmt ();
   let s = Buffer.contents buf in
-  (* Extract just the target name from descriptions like "ocamldep .foo.eobjs/foo.ml.d" *)
-  match String.lsplit2 s ~on:' ' with
-  | Some (_, rest) ->
-    (* Get the filename without path *)
-    (match String.rsplit2 rest ~on:'/' with
-     | Some (_, name) -> name
-     | None -> rest)
-  | None -> s
+  (* Strip _build/<context>/ prefix *)
+  if String.is_prefix s ~prefix:"_build/"
+  then (
+    match String.lsplit2 s ~on:'/' with
+    | Some (_, rest) ->
+      (* Skip context name (default, etc.) *)
+      (match String.lsplit2 rest ~on:'/' with
+       | Some (_, rest) -> rest
+       | None -> rest)
+    | None -> s)
+  else s
 ;;
 
 (* Format progress line respecting terminal width *)

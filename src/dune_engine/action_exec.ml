@@ -380,14 +380,24 @@ type input =
   ; rule_loc : Loc.t
   ; execution_parameters : Execution_parameters.t
   ; action : Action.t
+  ; rule_name : string option
   }
 
 let exec
-      { targets; root; context; env; rule_loc; execution_parameters; action = t }
+      { targets
+      ; root
+      ; context
+      ; env
+      ; rule_loc
+      ; execution_parameters
+      ; action = t
+      ; rule_name
+      }
       ~build_deps
   =
   let ectx =
-    let metadata = Process.create_metadata ~purpose:(Build_job targets) () in
+    let purpose = Process.Build_job { targets; rule_name } in
+    let metadata = Process.create_metadata ~purpose () in
     { targets; metadata; context; rule_loc; build_deps }
   and eenv =
     let env =

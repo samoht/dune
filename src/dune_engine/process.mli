@@ -68,7 +68,11 @@ end
 (** Why a Fiber.t was run.*)
 type purpose =
   | Internal_job
-  | Build_job of Targets.Validated.t option
+  | Build_job of
+      { targets : Targets.Validated.t option
+      ; rule_name : string option
+        (** When set, used in display output instead of deriving from targets *)
+      }
 
 (** Additional metadata attached to processes. The location and annotations will
     be attached to error messages. *)

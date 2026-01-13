@@ -202,7 +202,10 @@ end
 
 type purpose =
   | Internal_job
-  | Build_job of Targets.Validated.t option
+  | Build_job of
+      { targets : Targets.Validated.t option
+      ; rule_name : string option
+      }
 
 type metadata =
   { loc : Loc.t option
@@ -378,56 +381,62 @@ module Short_display : sig
     -> error:Exit_status.error
     -> User_message.Style.t Pp.t
 end = struct
+  (* Extract contexts from target paths *)
+  let extract_contexts_from_targets targets =
+    let rec split_ctxs ctxs_acc = function
+      | [] -> Context_name.Set.to_list ctxs_acc
+      | path :: rest ->
+        let add_ctx ctx acc =
+          if Context_name.is_default ctx then acc else Context_name.Set.add acc ctx
+        in
+        (match Dpath.analyse_target path with
+         | Other _ -> split_ctxs ctxs_acc rest
+         | Regular (ctx, _) | Pkgs (ctx, _) | Locks (ctx, _) | Alias (ctx, _) ->
+           split_ctxs (add_ctx ctx ctxs_acc) rest
+         | Anonymous_action ctx -> split_ctxs (add_ctx ctx ctxs_acc) rest)
+    in
+    split_ctxs Context_name.Set.empty targets
+  ;;
+
+  (* Derive display name from target paths when rule_name is not provided *)
+  let derive_name_from_targets targets =
+    let rec split_paths targets_acc = function
+      | [] -> List.rev targets_acc
+      | path :: rest ->
+        (match Dpath.analyse_target path with
+         | Other path -> split_paths (Path.Build.to_string path :: targets_acc) rest
+         | Regular (_, filename) | Pkgs (_, filename) | Locks (_, filename) ->
+           split_paths (Path.Source.to_string filename :: targets_acc) rest
+         | Alias (_, name) ->
+           split_paths (("alias " ^ Path.Source.to_string name) :: targets_acc) rest
+         | Anonymous_action _ -> split_paths ("(internal)" :: targets_acc) rest)
+    in
+    let target_names = split_paths [] targets in
+    String.Set.of_list target_names |> String.Set.to_list |> String.concat ~sep:", "
+  ;;
+
   let pp_purpose = function
     | Internal_job -> Pp.verbatim "(internal)"
-    | Build_job targets ->
-      let rec split_paths targets_acc ctxs_acc = function
-        | [] -> List.rev targets_acc, Context_name.Set.to_list ctxs_acc
-        | path :: rest ->
-          let add_ctx ctx acc =
-            if Context_name.is_default ctx then acc else Context_name.Set.add acc ctx
-          in
-          (match Dpath.analyse_target path with
-           | Other path ->
-             split_paths (Path.Build.to_string path :: targets_acc) ctxs_acc rest
-           | Regular (ctx, filename) | Pkgs (ctx, filename) | Locks (ctx, filename) ->
-             split_paths
-               (Path.Source.to_string filename :: targets_acc)
-               (add_ctx ctx ctxs_acc)
-               rest
-           | Alias (ctx, name) ->
-             split_paths
-               (("alias " ^ Path.Source.to_string name) :: targets_acc)
-               (add_ctx ctx ctxs_acc)
-               rest
-           | Anonymous_action ctx ->
-             split_paths ("(internal)" :: targets_acc) (add_ctx ctx ctxs_acc) rest)
+    | Build_job { targets; rule_name } ->
+      let target_list =
+        match targets with
+        | None -> []
+        | Some targets ->
+          Targets.Validated.fold
+            targets
+            ~init:[]
+            ~file:(fun path acc -> path :: acc)
+            ~dir:(fun dir acc -> dir :: acc)
+          |> List.rev
       in
-      let target_names, contexts =
-        let targets =
-          match targets with
-          | None -> []
-          | Some targets ->
-            Targets.Validated.fold
-              targets
-              ~init:[]
-              ~file:(fun path acc -> path :: acc)
-              ~dir:(fun dir acc -> dir :: acc)
-            |> List.rev
-        in
-        split_paths [] Context_name.Set.empty targets
+      (* Use rule_name if provided, otherwise derive from targets *)
+      let name =
+        match rule_name with
+        | Some name -> name
+        | None -> derive_name_from_targets target_list
       in
-      let targets =
-        List.map target_names ~f:Filename.split_extension_after_dot
-        |> String.Map.of_list_multi
-        |> String.Map.to_list_map ~f:(fun prefix suffixes ->
-          match suffixes with
-          | [] -> assert false
-          | [ suffix ] -> prefix ^ suffix
-          | _ -> sprintf "%s{%s}" prefix (String.concat ~sep:"," suffixes))
-        |> String.concat ~sep:","
-      in
-      let pp = Pp.verbatim targets in
+      let contexts = extract_contexts_from_targets target_list in
+      let pp = Pp.verbatim name in
       (match contexts with
        | [] -> pp
        | l ->
@@ -818,8 +827,8 @@ let report_process_finished
   let targets =
     match metadata.purpose with
     | Internal_job -> None
-    | Build_job None -> None
-    | Build_job (Some { dirs; files; root }) ->
+    | Build_job { targets = None; _ } -> None
+    | Build_job { targets = Some { dirs; files; root }; _ } ->
       Some { Dune_trace.Event.root; dirs; files }
   in
   let stdout = Result.Out.get stdout in
@@ -1018,12 +1027,11 @@ let run_internal
     in
     let* () =
       let description =
-        (* CR-soon amokhov: What happens with actions attached to aliases? Do they go into
-           [Build_job None] category? Can produce more informative description for them? *)
         match metadata.purpose with
         | Internal_job -> Pp.text "(internal)"
-        | Build_job None -> Pp.text "(no targets)"
-        | Build_job (Some target) ->
+        | Build_job { rule_name = Some name; _ } -> Pp.verbatim name
+        | Build_job { targets = None; rule_name = None } -> Pp.text "(no targets)"
+        | Build_job { targets = Some target; rule_name = None } ->
           Targets.Validated.head target
           |> Path.Build.to_string_maybe_quoted
           |> Pp.verbatim

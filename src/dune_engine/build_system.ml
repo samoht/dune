@@ -350,6 +350,7 @@ end = struct
         ~execution_parameters
         ~sandbox_mode
         ~(targets : Targets.Validated.t)
+        ~name
     : Exec_result.t Fiber.t
     =
     let open Fiber.O in
@@ -435,6 +436,7 @@ end = struct
                ; rule_loc = loc
                ; execution_parameters
                ; action
+               ; rule_name = name
                }
              in
              let build_deps deps = Memo.run (build_deps deps) in
@@ -471,7 +473,7 @@ end = struct
   ;;
 
   let execute_rule_impl ~rule_kind rule =
-    let { Rule.id = _; targets; mode; action; info = _; loc } = rule in
+    let { Rule.id = _; targets; mode; action; info = _; loc; name } = rule in
     (* We run [State.start_rule_exn ()] entirely for its side effect, so one
        might be tempted to use [Memo.of_non_reproducible_fiber] here but that is
        wrong, because that would force us to rerun [execute_rule_impl] on every
@@ -630,6 +632,7 @@ end = struct
                   ~execution_parameters
                   ~sandbox_mode
                   ~targets
+                  ~name
               in
               (* Step V. Examine produced targets and store them to the shared
                  cache if needed. *)

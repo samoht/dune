@@ -3257,9 +3257,7 @@ module Lib_cache_spec = struct
     (* Try reading from build lock directory (for auto-lock cases) *)
     let lock_name = Path.basename lock_file in
     let build_lock_dir =
-      Path.Build.relative
-        (Path.Build.relative Dpath.Build.locks_dir "default")
-        lock_name
+      Path.Build.relative (Path.Build.relative Dpath.Build.locks_dir "default") lock_name
     in
     let build_pkgs_dir = Path.Build.relative build_lock_dir "pkgs" in
     let build_lock_file = Path.Build.relative build_lock_dir "lock" in
@@ -3292,8 +3290,7 @@ module Lib_cache_spec = struct
         if Path.Untracked.exists source_path
         then (
           (* Scan fetched source for libraries *)
-          let source_dir = Path.Build.drop_build_context_exn pkg_source_dir in
-          let libraries = Vendor_rules.scan_libraries source_dir ~pkg_name in
+          let libraries = Vendor_rules.scan_libraries' source_path ~pkg_name in
           if List.is_empty libraries
           then (* Fallback to package name as library *)
             [ { Vendor_rules.lib_name = pkg_name; pkg_name; dirname } ]

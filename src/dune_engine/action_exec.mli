@@ -36,6 +36,8 @@ type input =
   ; rule_loc : Loc.t
   ; execution_parameters : Execution_parameters.t
   ; action : Action.t
+  ; rule_name : string option
+    (** When set, used for display output instead of deriving from targets *)
   }
 
 val exec

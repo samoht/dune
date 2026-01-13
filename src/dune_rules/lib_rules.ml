@@ -112,7 +112,11 @@ let build_lib
            ~dir)
     ]
     |> Command.run (Ok compiler) ~dir:(Path.build (Context.build_dir ctx))
-    |> Super_context.add_rule ~dir sctx ~loc:lib.buildable.loc)
+    |> Super_context.add_rule
+         ~dir
+         sctx
+         ~loc:lib.buildable.loc
+         ~name:(Lib_name.Local.to_string (snd lib.name)))
 ;;
 
 let gen_wrapped_compat_modules (lib : Library.t) cctx =

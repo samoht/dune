@@ -59,6 +59,8 @@ type t = private
   ; mode : Mode.t
   ; info : Info.t
   ; loc : Loc.t
+  ; name : string option
+    (** Human-readable name for display purposes (e.g., "mylib" for library rules) *)
   }
 
 include Comparable_intf.S with type key := t
@@ -72,6 +74,7 @@ val to_dyn : t -> Dyn.t
 val make
   :  ?mode:Mode.t
   -> ?info:Info.t
+  -> ?name:string
   -> targets:Targets.t
   -> Action.Full.t Action_builder.t
   -> t

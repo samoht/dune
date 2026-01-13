@@ -31,31 +31,21 @@ let extract_public_name_and_package_from_sexp sexp =
 ;;
 
 (* Determine if a library belongs to a package.
-   - If (package X) is specified, the library belongs to package X
-   - If no (package ...) is specified, use the first component of public_name *)
-let library_belongs_to_package ~pkg_name (public_name, explicit_package) =
+   Only libraries with explicit (package X) field matching pkg_name are included. *)
+let library_belongs_to_package ~pkg_name (_public_name, explicit_package) =
   match explicit_package with
   | Some pkg -> String.equal pkg pkg_name
-  | None ->
-    (* Infer package from public_name: first component before the dot *)
-    let inferred_pkg =
-      match String.lsplit2 public_name ~on:'.' with
-      | Some (prefix, _) -> prefix
-      | None -> public_name
-    in
-    String.equal inferred_pkg pkg_name
+  | None -> false
 ;;
 
-let scan_dune_file ~pkg_name path =
-  let full_path = Path.source path in
-  if Path.Untracked.exists full_path && not (Path.Untracked.is_directory full_path)
+(* Path.t versions - work with any path (source or build) *)
+
+let scan_dune_file' ~pkg_name (path : Path.t) =
+  if Path.Untracked.exists path && not (Path.Untracked.is_directory path)
   then (
-    let contents = Io.read_file ~binary:true full_path in
+    let contents = Io.read_file ~binary:true path in
     match
-      Dune_sexp.Parser.parse_string
-        ~fname:(Path.Source.to_string path)
-        ~mode:Many
-        contents
+      Dune_sexp.Parser.parse_string ~fname:(Path.to_string path) ~mode:Many contents
     with
     | exception _ -> []
     | sexps ->
@@ -69,42 +59,35 @@ let scan_dune_file ~pkg_name path =
   else []
 ;;
 
-let rec scan_dir_for_dune_files ~pkg_name dir =
-  let full_path = Path.source dir in
-  if not (Path.Untracked.exists full_path)
+let rec scan_dir_for_dune_files' ~pkg_name (dir : Path.t) =
+  if not (Path.Untracked.exists dir)
   then []
   else (
-    let dune_file = Path.Source.relative dir "dune" in
-    let libs = scan_dune_file ~pkg_name dune_file in
-    match Path.Untracked.readdir_unsorted_with_kinds full_path with
+    let dune_file = Path.relative dir "dune" in
+    let libs = scan_dune_file' ~pkg_name dune_file in
+    match Path.Untracked.readdir_unsorted_with_kinds dir with
     | Error _ -> libs
     | Ok entries ->
       let subdirs =
         List.filter_map entries ~f:(fun (entry, kind) ->
           match kind with
-          | Unix.S_DIR -> Some (Path.Source.relative dir entry)
+          | Unix.S_DIR -> Some (Path.relative dir entry)
           | _ -> None)
       in
-      let subdir_libs =
-        List.concat_map subdirs ~f:(scan_dir_for_dune_files ~pkg_name)
-      in
+      let subdir_libs = List.concat_map subdirs ~f:(scan_dir_for_dune_files' ~pkg_name) in
       libs @ subdir_libs)
 ;;
 
-let scan_public_libraries ~pkg_name dir = scan_dir_for_dune_files ~pkg_name dir
-
-let scan_meta_libraries dir ~pkg_name =
-  let meta_file_in_pkg = Path.Source.relative dir (pkg_name ^ "/META") in
-  let meta_file = Path.Source.relative dir "META" in
-  if
-    Path.Untracked.exists (Path.source meta_file_in_pkg)
-    || Path.Untracked.exists (Path.source meta_file)
+let scan_meta_libraries' (dir : Path.t) ~pkg_name =
+  let meta_file_in_pkg = Path.relative dir (pkg_name ^ "/META") in
+  let meta_file = Path.relative dir "META" in
+  if Path.Untracked.exists meta_file_in_pkg || Path.Untracked.exists meta_file
   then [ pkg_name ]
   else []
 ;;
 
-let scan_opam_libraries dir =
-  match Path.Untracked.readdir_unsorted (Path.source dir) with
+let scan_opam_libraries' (dir : Path.t) =
+  match Path.Untracked.readdir_unsorted dir with
   | Error _ -> []
   | Ok entries ->
     List.filter_map entries ~f:(fun entry ->
@@ -112,6 +95,24 @@ let scan_opam_libraries dir =
       then Some (Filename.remove_extension entry)
       else None)
 ;;
+
+let scan_libraries' (dir : Path.t) ~pkg_name =
+  match scan_dir_for_dune_files' ~pkg_name dir with
+  | [] ->
+    (match scan_meta_libraries' dir ~pkg_name with
+     | [] -> scan_opam_libraries' dir
+     | libs -> libs)
+  | libs -> libs
+;;
+
+(* Path.Source.t versions - wrappers for backward compatibility *)
+
+let scan_public_libraries ~pkg_name dir =
+  scan_dir_for_dune_files' ~pkg_name (Path.source dir)
+;;
+
+let scan_meta_libraries dir ~pkg_name = scan_meta_libraries' (Path.source dir) ~pkg_name
+let scan_opam_libraries dir = scan_opam_libraries' (Path.source dir)
 
 (* Find opam file in a directory. Checks both "opam" and "<name>.opam".
    We check that it exists and is not a directory to avoid matching opam/ directories. *)
@@ -126,14 +127,7 @@ let find_opam_file ~pkg_name ~pkg_dir =
     Path.Untracked.exists full_path && not (Path.Untracked.is_directory full_path))
 ;;
 
-let scan_libraries dir ~pkg_name =
-  match scan_public_libraries ~pkg_name dir with
-  | [] ->
-    (match scan_meta_libraries dir ~pkg_name with
-     | [] -> scan_opam_libraries dir
-     | libs -> libs)
-  | libs -> libs
-;;
+let scan_libraries dir ~pkg_name = scan_libraries' (Path.source dir) ~pkg_name
 
 let read_project_name dir =
   let dune_project = Path.Source.relative dir "dune-project" in

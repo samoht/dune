@@ -277,8 +277,8 @@ let start_fetch ~name ~version =
   let msg =
     User_message.make
       [ User_message.aligned_message
-          ~left:(User_message.Style.Ok, "Fetching")
-          ~right:(Pp.textf "%s to duniverse/%s" pkg_str pkg_str)
+          ~left:(User_message.Style.Ok, "Vendoring")
+          ~right:(Pp.text pkg_str)
       ]
   in
   Console.print_user_message msg;
@@ -819,29 +819,42 @@ let do_auto_vendor () =
       (* No lock file - nothing to fetch *)
       Fiber.return ()
     | lock_dir_path :: _ ->
-      (* Check if duniverse/ already exists with packages *)
-      let duniverse_path = Path.source Vendor.default_dir in
-      let marker_path =
-        Path.source (Path.Source.relative Vendor.default_dir Vendor.marker_filename)
-      in
-      let marker_is_file =
-        match Path.stat marker_path with
-        | Ok { st_kind = S_REG; _ } -> true
+      (* Check if lock file actually exists in source tree.
+         If not, skip auto-vendor - the build system will generate it via auto-lock. *)
+      let lock_path = Path.source lock_dir_path in
+      let lock_exists =
+        match Path.stat lock_path with
+        | Ok { st_kind = S_DIR | S_REG; _ } -> true
         | _ -> false
       in
-      if Path.exists duniverse_path && marker_is_file
+      if not lock_exists
       then
-        (* Already vendored - skip *)
+        (* No lock file yet - let build system generate it *)
         Fiber.return ()
-      else
-        (* Vendor packages to duniverse/ *)
-        let* solver_env = Pkg_common.poll_solver_env_from_current_system ()
-        and* local_packages = Memo.run Pkg_common.find_local_packages in
-        let local_packages =
-          Package_name.Map.values local_packages
-          |> List.map ~f:Dune_pkg.Local_package.for_solver
+      else (
+        (* Check if duniverse/ already exists with packages *)
+        let duniverse_path = Path.source Vendor.default_dir in
+        let marker_path =
+          Path.source (Path.Source.relative Vendor.default_dir Vendor.marker_filename)
         in
-        fetch_duniverse ~lock_dir_path ~solver_env ~local_packages ()
+        let marker_is_file =
+          match Path.stat marker_path with
+          | Ok { st_kind = S_REG; _ } -> true
+          | _ -> false
+        in
+        if Path.exists duniverse_path && marker_is_file
+        then
+          (* Already vendored - skip *)
+          Fiber.return ()
+        else
+          (* Vendor packages to duniverse/ *)
+          let* solver_env = Pkg_common.poll_solver_env_from_current_system ()
+          and* local_packages = Memo.run Pkg_common.find_local_packages in
+          let local_packages =
+            Package_name.Map.values local_packages
+            |> List.map ~f:Dune_pkg.Local_package.for_solver
+          in
+          fetch_duniverse ~lock_dir_path ~solver_env ~local_packages ())
 ;;
 
 (* Fetch command: pre-fetch package sources to _build for offline builds *)
