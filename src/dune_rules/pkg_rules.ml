@@ -3323,16 +3323,16 @@ let setup_lib_cache_rule () =
     (* No lock files - no lib-cache needed *)
     Memo.return None
   | lock_dir_path :: _ ->
-    (* Get the build lock directory path - this depends on lock generation rules *)
-    let* build_lock_dir =
-      Lock_dir.lock_dir_of_source Context_name.default lock_dir_path
-    in
     let lock_file = Path.source lock_dir_path in
     let+ () = Memo.return () in
     let { Action_builder.With_targets.build; targets } =
       (let open Action_builder.O in
-       (* Depend on the build lock directory (handles auto-lock generation) *)
-       let deps = Dep.Set.singleton (Dep.file build_lock_dir) in
+       (* Depend on the lock file *)
+       let deps =
+         Dep.Set.of_source_files
+           ~files:(Path.Set.singleton lock_file)
+           ~empty_directories:Path.Set.empty
+       in
        Action_builder.deps deps
        >>> (lib_cache_action ~target ~lock_file
             |> Action.Full.make ~can_go_in_shared_cache:false
