@@ -78,12 +78,48 @@ let rec scan_dir_for_dune_files' ~pkg_name (dir : Path.t) =
       libs @ subdir_libs)
 ;;
 
+(* Parse a META file to extract library names.
+   Returns the main library name plus all subpackage names (pkg.subpkg). *)
+let parse_meta_file ~pkg_name contents =
+  let pkg = Package.Name.of_string pkg_name in
+  let meta = Dune_findlib.Meta.of_string contents ~name:(Some pkg) in
+  (* Recursively collect all library names from the META structure.
+     Subpackage names in META are relative, so we build full names by
+     prepending the parent prefix. *)
+  let rec collect_names ~prefix (m : Dune_findlib.Meta.Simplified.t) =
+    let current_name =
+      match m.name with
+      | Some name ->
+        (* For root, name is the package name. For subs, it's the relative name *)
+        let name_str = Lib_name.to_string name in
+        if String.is_empty prefix then name_str else sprintf "%s.%s" prefix name_str
+      | None -> prefix
+    in
+    let sub_names =
+      List.concat_map m.subs ~f:(fun sub -> collect_names ~prefix:current_name sub)
+    in
+    if String.is_empty current_name then sub_names else current_name :: sub_names
+  in
+  collect_names ~prefix:"" meta
+;;
+
 let scan_meta_libraries' (dir : Path.t) ~pkg_name =
-  let meta_file_in_pkg = Path.relative dir (pkg_name ^ "/META") in
-  let meta_file = Path.relative dir "META" in
-  if Path.Untracked.exists meta_file_in_pkg || Path.Untracked.exists meta_file
-  then [ pkg_name ]
-  else []
+  (* Check for META or META.in files in standard locations *)
+  let candidates =
+    [ Path.relative dir "META"
+    ; Path.relative dir "META.in"
+    ; Path.relative dir "pkg/META"
+    ; Path.relative dir "pkg/META.in"
+    ]
+  in
+  match List.find candidates ~f:Path.Untracked.exists with
+  | Some meta_path ->
+    (try
+       let contents = Io.read_file ~binary:true meta_path in
+       parse_meta_file ~pkg_name contents
+     with
+     | _ -> [ pkg_name ])
+  | None -> []
 ;;
 
 let scan_opam_libraries' (dir : Path.t) ~pkg_name =

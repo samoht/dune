@@ -134,3 +134,8 @@ val library_exposed_name : t -> lib_name:Lib_name.t -> Lib_name.t option
 (** [package_visible t ~pkg_name] returns true if the package should
     be visible according to this vendor stanza. *)
 val package_visible : t -> pkg_name:Package_name.t -> bool
+
+(** [explicit_libraries t] returns the list of explicitly specified library
+    names if the vendor stanza has an explicit libraries list. Returns None
+    if [:standard] is used (meaning libraries should be scanned from source). *)
+val explicit_libraries : t -> string list option

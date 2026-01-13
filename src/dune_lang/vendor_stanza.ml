@@ -353,3 +353,14 @@ let library_exposed_name t ~lib_name =
 
 (** Check if a package should be visible based on vendor configuration *)
 let package_visible t ~pkg_name = Packages_spec.package_visible t.packages ~pkg_name
+
+(** Return explicit library names from vendor stanza, if any.
+    Returns None if :standard is used (meaning scan for libraries).
+    Returns Some list if explicit libraries are specified. *)
+let explicit_libraries t =
+  match t.libraries with
+  | Libraries_spec.All | Libraries_spec.All_except _ -> None
+  | Libraries_spec.Explicit entries ->
+    Some
+      (List.map entries ~f:(fun (e : Library_entry.t) -> Lib_name.to_string e.lib_name))
+;;

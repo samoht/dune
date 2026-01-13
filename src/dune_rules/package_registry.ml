@@ -145,7 +145,24 @@ let of_ctx =
                       Package_version.of_string (OpamPackage.Version.to_string v)
                     | None -> Package_version.of_string "dev"))
             in
-            let libraries = Vendor_rules.scan_libraries source_dir ~pkg_name in
+            (* For library mapping:
+               - Explicit list: use directly
+               - :standard or :standard \ exclusions: scan source directory *)
+            let libraries =
+              match Dune_lang.Vendor_stanza.explicit_libraries stanza with
+              | Some libs -> libs
+              | None ->
+                (* :standard or :standard \ exclusions - need to scan *)
+                let scanned = Vendor_rules.scan_libraries source_dir ~pkg_name in
+                (* Apply exclusions if any *)
+                (match stanza.libraries with
+                 | Dune_lang.Vendor_stanza.Libraries_spec.All_except excluded ->
+                   List.filter scanned ~f:(fun lib ->
+                     not
+                       (List.exists excluded ~f:(fun ex ->
+                          String.equal (Lib_name.to_string ex) lib)))
+                 | _ -> scanned)
+            in
             version, libraries
           in
           let entry =
