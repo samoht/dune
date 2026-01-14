@@ -204,7 +204,6 @@ module Paths = struct
 
   (* Get the root directory (parent of target_dir) *)
   let root_of_target_dir target_dir = Path.Build.parent_exn target_dir
-  let root_of_target_dir_path target_dir = Path.parent_exn target_dir
 
   (* Cookie path inside target_dir - gets cached with the installed files.
      The cookie contains the list of installed files and package variables. *)
@@ -215,10 +214,6 @@ module Paths = struct
      This marker indicates that files have been copied to the shared prefix. *)
   let installed_marker_build target_dir =
     Path.Build.relative (root_of_target_dir target_dir) "installed"
-  ;;
-
-  let installed_marker target_dir =
-    Path.relative (root_of_target_dir_path target_dir) "installed"
   ;;
 
   let install_file t =
@@ -491,14 +486,11 @@ module Resolved_pkg = struct
     | Some root -> loop root Path.Local.Set.empty Path.Local.root
   ;;
 
-  (* Depend on the appropriate marker based on install_to_prefix.
-     - install_to_prefix=true: depend on installed marker (files in shared prefix)
-     - install_to_prefix=false: depend on cookie file (build completed, files in target_dir) *)
-  let dep t =
-    if t.install_to_prefix
-    then Dep.file (Paths.installed_marker t.paths.target_dir)
-    else Dep.file (Paths.install_cookie t.paths.target_dir)
-  ;;
+  (* Always depend on the cookie file which indicates target_dir is ready.
+     This ensures dependencies' target/bin files are available before building
+     since install_roots returns paths from target_dir.
+     Installation to shared prefix (if enabled) happens as a side effect. *)
+  let dep t = Dep.file (Paths.install_cookie t.paths.target_dir)
 
   let package_deps t =
     deps_closure t
@@ -524,11 +516,11 @@ module Resolved_pkg = struct
      Use per-package target directory (.pkgs/<ctx>/<pkg>/target/) instead of shared
      install directory (_build/install/<ctx>/) to avoid triggering install rules
      scheme during library resolution. *)
-  let install_roots t =
-    Install.Roots.opam_from_prefix
-      ~relative:Path.relative
-      (Path.build t.write_paths.target_dir)
-  ;;
+  (* Return install roots for PATH and other env vars.
+     Uses paths.install_roots which points to the correct location:
+     - For toolchain packages: the toolchain cache directory
+     - For regular packages: target_dir in .pkgs/ *)
+  let install_roots t = Lazy.force t.paths.install_roots
 
   (* Given a list of packages, construct an env containing variables
      set by each package. Variables containing delimited lists of
@@ -1390,11 +1382,11 @@ end = struct
         ~package_universe
     =
     let is_toolchain =
-      Pkg_toolchain.is_compiler_and_toolchains_enabled info.Pkg_info.name
+      Pkg_cache.Toolchain.is_compiler_and_toolchains_enabled info.Pkg_info.name
     in
-    let is_cached = is_toolchain && Pkg_toolchain.is_installed pkg ~build_id in
+    let is_cached = is_toolchain && Pkg_cache.Toolchain.is_installed pkg ~build_id in
     let toolchain_cache_dir =
-      if is_cached then Some (Pkg_toolchain.cache_dir pkg ~build_id) else None
+      if is_cached then Some (Pkg_cache.Toolchain.cache_dir pkg ~build_id) else None
     in
     let build_command, install_command =
       if is_cached
@@ -1412,7 +1404,7 @@ end = struct
           ; "install_dir", Dyn.string (Path.Build.to_string install_dir)
           ];
         let populate_action =
-          Pkg_toolchain.populate_from_cache_action
+          Pkg_cache.Toolchain.populate_from_cache_action
             pkg
             ~build_id
             ~install_dir
@@ -1503,14 +1495,10 @@ end = struct
           else (
             match Package_registry.find registry name with
             | Some dep_entry ->
-              (* Skip virtual lock packages to avoid dependency cycles.
-                 Virtual packages (no source, no build/install commands) don't need building. *)
-              let is_virtual =
-                match dep_entry.Package_registry.source with
-                | Package_registry.Source.From_lock { pkg } -> is_virtual_lock_package pkg
-                | From_vendor _ | From_workspace _ -> false
-              in
-              if is_virtual then has_dune_dep, acc else has_dune_dep, dep_entry :: acc
+              (* Include all packages including virtual ones - their transitive
+                 dependencies need to be resolved. Virtual packages have empty
+                 build/install commands so they don't actually build anything. *)
+              has_dune_dep, dep_entry :: acc
             | None ->
               (* Not in registry - check if it's a workspace package *)
               (match Package.Name.Map.find workspace_packages name with
@@ -1606,9 +1594,20 @@ end = struct
              | false ->
                let+ resolved = resolve_entry registry dep_entry ~package_universe in
                Either.Right resolved)
-          | Package_registry.Source.From_lock _ ->
-            let+ resolved = resolve_entry registry dep_entry ~package_universe in
-            Either.Right resolved)
+          | Package_registry.Source.From_lock { pkg } ->
+            (* For virtual lock packages (no source, no build/install commands),
+               flatten the dependency: return them with empty depends to break cycles.
+               The virtual package's transitive deps are resolved but we don't
+               create a dependency chain through the virtual package. *)
+            if is_virtual_lock_package pkg
+            then
+              let+ resolved = resolve_entry registry dep_entry ~package_universe in
+              (* Virtual packages have empty build/install, so we can safely
+                 replace them with their direct dependencies to avoid cycles *)
+              Either.Right { resolved with depends = [] }
+            else
+              let+ resolved = resolve_entry registry dep_entry ~package_universe in
+              Either.Right resolved)
       and+ files_dir = resolve_files_dir package_universe info in
       let vendored_depends, depends = List.partition_map all_depends ~f:Fun.id in
       (* Prepare paths and commands *)
@@ -1666,16 +1665,44 @@ end = struct
         (* For toolchain packages (not cached), set prefix to the toolchain cache directory
            so files get installed there. This enables cache sharing across projects. *)
         let is_toolchain =
-          Pkg_toolchain.is_compiler_and_toolchains_enabled info.Pkg_info.name
+          Pkg_cache.Toolchain.is_compiler_and_toolchains_enabled info.Pkg_info.name
         in
         if is_toolchain && not is_cached
         then (
           let toolchain_prefix =
-            Pkg_toolchain.installation_prefix pkg ~build_id |> Path.outside_build_dir
+            Pkg_cache.Toolchain.installation_prefix pkg ~build_id
+            |> Path.outside_build_dir
           in
           let install_roots =
             lazy
-              (Pkg_toolchain.install_roots
+              (Pkg_cache.Toolchain.install_roots
+                 ~prefix:(Path.as_outside_build_dir_exn toolchain_prefix))
+          in
+          let install_paths =
+            lazy
+              (Install.Paths.make
+                 ~relative:Path.relative
+                 ~package:info.name
+                 ~roots:
+                   (Lazy.force install_roots
+                    |> Install.Roots.map ~f:Path.outside_build_dir))
+          in
+          { base_paths with
+            prefix = toolchain_prefix
+          ; install_roots =
+              Lazy.map install_roots ~f:(Install.Roots.map ~f:Path.outside_build_dir)
+          ; install_paths
+          })
+        else if is_toolchain
+        then (
+          (* Cached toolchain package - use toolchain cache for paths *)
+          let toolchain_prefix =
+            Pkg_cache.Toolchain.installation_prefix pkg ~build_id
+            |> Path.outside_build_dir
+          in
+          let install_roots =
+            lazy
+              (Pkg_cache.Toolchain.install_roots
                  ~prefix:(Path.as_outside_build_dir_exn toolchain_prefix))
           in
           let install_paths =
@@ -1694,8 +1721,15 @@ end = struct
           ; install_paths
           })
         else (
-          (* For regular (non-toolchain) packages, use the shared install directory
-             so %{prefix}%, %{lib}%, etc. expand to the correct paths *)
+          (* For regular (non-toolchain) packages, use per-package target_dir for
+             install_roots (used for PATH) to avoid triggering install rules scheme.
+             But use shared prefix for install_paths (used for %{prefix}%, etc.) *)
+          let target_roots =
+            lazy
+              (Install.Roots.opam_from_prefix
+                 ~relative:Path.relative
+                 (Path.build write_paths.target_dir))
+          in
           let shared_prefix = Pkg_opam.Pkg_install.dir ~context |> Path.build in
           let shared_roots = Pkg_opam.Pkg_install.roots ~context in
           let install_paths =
@@ -1707,7 +1741,7 @@ end = struct
           in
           { base_paths with
             prefix = shared_prefix
-          ; install_roots = lazy shared_roots
+          ; install_roots = target_roots
           ; install_paths
           })
       in
@@ -2743,42 +2777,42 @@ module Vendor_build = struct
       Action_builder.of_memo
         (let open Memo.O in
          let* registry = Package_registry.of_ctx ctx_name in
+         (* Get toolchain package name to exclude it - toolchains are built lazily *)
+         let* toolchain_pkg_name =
+           let+ lock_dir_result = Lock_dir.get ctx_name in
+           match lock_dir_result with
+           | Ok ld -> Option.map ld.Dune_pkg.Lock.ocaml ~f:snd
+           | Error _ -> None
+         in
          let entries = Package_registry.to_list registry in
          let+ filtered =
            Memo.parallel_map entries ~f:(fun entry ->
-             let+ status = classify_entry entry in
-             match status with
-             | Vendor_status.Dune_native | Vendor_status.Workspace_package -> None
-             | Vendor_status.Not_vendored | Vendor_status.Opam_sandboxed ->
-               let pkg_id =
-                 Pkg_id.create ~name:entry.Package_registry.name ~version:entry.version
-               in
-               (* Check if this package should be installed to prefix *)
-               let install_to_prefix =
-                 match entry.source with
-                 | Package_registry.Source.From_lock _ -> true
-                 | Package_registry.Source.From_vendor { stanza; _ } ->
-                   stanza.Vendor_stanza.install
-                 | Package_registry.Source.From_workspace _ ->
-                   (* Workspace packages are filtered above, but for completeness *)
-                   true
-               in
-               Some (pkg_id, install_to_prefix))
+             (* Skip toolchain package - it will be built lazily when needed *)
+             match toolchain_pkg_name with
+             | Some tc when Package.Name.equal entry.Package_registry.name tc ->
+               Memo.return None
+             | _ ->
+               let+ status = classify_entry entry in
+               (match status with
+                | Vendor_status.Dune_native | Vendor_status.Workspace_package -> None
+                | Vendor_status.Not_vendored | Vendor_status.Opam_sandboxed ->
+                  let pkg_id =
+                    Pkg_id.create ~name:entry.Package_registry.name ~version:entry.version
+                  in
+                  Some pkg_id))
          in
-         let pkg_infos = List.filter_map filtered ~f:Fun.id in
-         let num_pkgs = List.length pkg_infos in
+         let pkg_ids = List.filter_map filtered ~f:Fun.id in
+         let num_pkgs = List.length pkg_ids in
          Pkg_build_progress.Progress.set_total num_pkgs;
          Dune_engine.Progress.set_total num_pkgs;
-         pkg_infos)
+         pkg_ids)
     in
-    List.map pkg_infos ~f:(fun (pkg_id, install_to_prefix) ->
+    (* Always depend on cookie (target_dir ready) so that target/bin is available *)
+    List.map pkg_infos ~f:(fun pkg_id ->
       let paths =
         Paths.make ~relative:Path.Build.relative pkg_id (Dependencies ctx_name)
       in
-      (* Depend on the appropriate marker based on install_to_prefix *)
-      if install_to_prefix
-      then Paths.installed_marker_build paths.target_dir |> Path.build
-      else Paths.install_cookie_build paths.target_dir |> Path.build)
+      Paths.install_cookie_build paths.target_dir |> Path.build)
     |> Action_builder.paths
   ;;
 
@@ -2802,15 +2836,14 @@ module Vendor_build = struct
       | Some v -> Package_version.of_string (OpamPackage.Version.to_string v)
       | None -> Package_version.of_string "dev"
     in
-    (* Marker is at _build/.pkgs/<ctx>/<name>/installed (root level, sibling of target/) *)
+    (* Always use cookie path (target_dir ready) so that target/bin is available.
+       Cookie is at _build/.pkgs/<ctx>/<name>/target/cookie *)
     Package_registry.of_ctx ctx_name
     >>| fun registry ->
     match Package_registry.find registry pkg_name with
     | Some entry when Package_registry.needs_marker entry ->
       let root = Vendor_rules.pkg_build_dir ~context:ctx_name ~pkg_name in
-      if Package_registry.install_to_prefix entry
-      then Path.Build.relative root "installed"
-      else Path.Build.relative (Path.Build.relative root "target") "cookie"
+      Path.Build.relative (Path.Build.relative root "target") "cookie"
     | _ ->
       (* Fallback: compute the path directly if not in registry yet *)
       let pkg_dir =
@@ -2820,8 +2853,7 @@ module Vendor_build = struct
           (Package_version.to_string pkg_version)
       in
       let root = Path.Build.relative (build_dir ctx_name) pkg_dir in
-      (* Installed marker at root level, sibling of target/ *)
-      Path.Build.relative root "installed"
+      Path.Build.relative (Path.Build.relative root "target") "cookie"
   ;;
 
   let classify_vendor_stanzas ctx_name =
@@ -2907,6 +2939,23 @@ let setup_pkg_install_alias ~dir ctx_name =
           List.partition_map vendor_info ~f:(function
             | `Dune_package dir -> Left dir
             | `Opam_sandbox info -> Right info)
+        in
+        (* Get toolchain package name to exclude it - toolchains are built lazily *)
+        let* toolchain_pkg_name =
+          let+ lock_dir_result = Lock_dir.get ctx_name in
+          match lock_dir_result with
+          | Ok ld -> Option.map ld.Dune_pkg.Lock.ocaml ~f:snd
+          | Error _ -> None
+        in
+        (* Filter out toolchain from opam sandbox packages *)
+        let opam_sandbox_pkgs =
+          match toolchain_pkg_name with
+          | None -> opam_sandbox_pkgs
+          | Some tc ->
+            List.filter opam_sandbox_pkgs ~f:(fun (subdir, _, _) ->
+              let pkg_name_str = Vendor_rules.parse_pkg_name_from_dir subdir in
+              let pkg_name = Package.Name.of_string pkg_name_str in
+              not (Package.Name.equal pkg_name tc))
         in
         let* opam_markers =
           Vendor_build.get_opam_sandbox_markers ctx_name opam_sandbox_pkgs
@@ -3207,6 +3256,21 @@ let dev_tool_ocamlpath dev_tool = ocamlpath (Dev_tool dev_tool)
 let lock_dir_active = Lock_dir.lock_dir_active
 let lock_dir_path = Lock_dir.get_path
 
+(* Return the path to a toolchain binary without forcing the package to be built.
+   This allows lazy toolchain building - binaries are built only when actually needed. *)
+let toolchain_binary_path context prog =
+  Lock_dir.get context
+  >>| function
+  | Error _ -> None
+  | Ok { Dune_pkg.Lock.ocaml = None; _ } -> None
+  | Ok { Dune_pkg.Lock.ocaml = Some (_, pkg_name); _ } ->
+    let pkg_dir =
+      Path.Build.relative (build_dir context) (Package.Name.to_string pkg_name)
+    in
+    let bin_path = Path.Build.relative pkg_dir (sprintf "target/bin/%s" prog) in
+    Some (Path.build bin_path)
+;;
+
 let dev_tool_env tool =
   let package_name = Dune_pkg.Dev_tool.package_name tool in
   Memo.push_stack_frame ~human_readable_description:(fun () ->
@@ -3229,7 +3293,9 @@ let exported_env context =
   Memo.push_stack_frame ~human_readable_description:(fun () ->
     Pp.textf "lock directory environment for context %S" (Context_name.to_string context))
   @@ fun () ->
-  let+ all_project_deps = all_project_deps context in
+  (* Exclude toolchain from exported env - toolchain packages are built lazily
+     and shouldn't contribute to the base environment *)
+  let+ all_project_deps = all_project_deps ~exclude_toolchain:true context in
   let env = Resolved_pkg.build_env_of_deps all_project_deps in
   let vars = Env.Map.map env ~f:Value_list_env.string_of_env_values in
   Env.extend Env.empty ~vars

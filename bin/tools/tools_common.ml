@@ -1,6 +1,6 @@
 open Import
 module Dev_tool = Dune_rules.Dev_tool
-module Dev_tool_cache = Dune_rules.Dev_tool_cache
+module Dev_tool_cache = Dune_rules.Pkg_cache.Dev_tool
 
 let dev_tool_bin_dirs =
   List.map Dev_tool.all ~f:(fun tool ->

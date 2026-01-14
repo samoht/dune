@@ -53,7 +53,7 @@ module Pkg_install = struct
   (* Compiler packages store their libraries in a subdirectory named "ocaml" *)
   let roots_for_package ~pkg_name ~context =
     let base_roots = roots ~context in
-    match Pkg_toolchain.is_compiler_and_toolchains_enabled pkg_name with
+    match Pkg_cache.Toolchain.is_compiler_and_toolchains_enabled pkg_name with
     | false -> base_roots
     | true -> { base_roots with lib_root = Path.relative base_roots.lib_root "ocaml" }
   ;;

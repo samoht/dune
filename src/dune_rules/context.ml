@@ -422,25 +422,6 @@ let create (builder : Builder.t) ~(kind : Kind.t) =
       { builder with env }
   in
   let which_outside_lockdir = Which.which ~path:builder.path in
-  let pkg_toolchain =
-    match kind with
-    | Default | Opam _ -> None
-    | Lock _ ->
-      Some
-        (Memo.lazy_
-           ~human_readable_description:(fun () ->
-             Pp.textf
-               "loading package toolchain for context %S"
-               (Context_name.to_string builder.name))
-           (fun () ->
-              let open Memo.O in
-              Pkg_rules.ocaml_toolchain builder.name
-              >>= function
-              | None -> Memo.return None
-              | Some toolchain ->
-                let+ toolchain, _ = Action_builder.evaluate_and_collect_facts toolchain in
-                Some toolchain))
-  in
   let which =
     match kind with
     | Default | Opam _ -> which_outside_lockdir
@@ -456,13 +437,11 @@ let create (builder : Builder.t) ~(kind : Kind.t) =
           (fun () ->
              if Ocaml_toolchain.is_toolchain_binary prog
              then
-               (* Toolchain binary - get from toolchain lazily *)
-               Memo.Lazy.force (Option.value_exn pkg_toolchain)
+               (* Toolchain binary - return path directly without forcing build.
+                  The binary will be built lazily when actually needed. *)
+               Pkg_rules.toolchain_binary_path builder.name prog
                >>= function
-               | Some tc ->
-                 (match Ocaml_toolchain.which tc prog with
-                  | Some p -> Memo.return (Some p)
-                  | None -> Which.which ~path:builder.path prog)
+               | Some p -> Memo.return (Some p)
                | None -> Which.which ~path:builder.path prog
              else
                (* Non-toolchain binary - use package binaries *)
