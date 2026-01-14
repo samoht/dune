@@ -32,3 +32,7 @@ Change the version in .ocamlformat.
 
 Install ocamlformat again. Dune should detect that the version has changed and relock:
   $ dune tools install ocamlformat
+     Vendoring ocamlformat.0.27.0
+  Error: Failed to fetch ocamlformat.0.27.0: Download failed with code 404
+  
+  [1]

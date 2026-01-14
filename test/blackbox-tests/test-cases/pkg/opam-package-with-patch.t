@@ -45,5 +45,6 @@ The lockfile should contain the patch action.
   > EOF
 
   $ build_pkg with-patch 
+     Vendoring with-patch.0.0.1
   Error: Patch file foo.patch not found in package directory
   [1]

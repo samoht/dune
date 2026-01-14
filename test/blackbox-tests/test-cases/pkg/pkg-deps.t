@@ -57,6 +57,7 @@ Now we define the external package using a dune project:
   > (build (run dune build @install --promote-install-files))
   > EOF
   $ dune build @foo 2>&1 | sanitize_pkg_digest foo.0.0.1
+     Vendoring foo.0.0.1
   File "dune", lines 2-8, characters 0-101:
   2 | (rule
   3 |  (alias foo)

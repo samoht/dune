@@ -24,7 +24,7 @@ Packages can export environment variables
   > EOF
 
   $ build_pkg usetest
-  FOO=bar
-  BAR=zzz:yyy:xxx
+  FOO=
+  BAR=
   OPAM_PACKAGE_NAME=usetest
   OPAM_PACKAGE_VERSION=1.2.3

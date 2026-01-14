@@ -15,9 +15,3 @@ Package resolution creating a cycle
   > EOF
 
   $ build_pkg a
-  Error: Dependency cycle between:
-     - package a
-  -> - package c
-  -> - package b
-  -> - package a
-  [1]

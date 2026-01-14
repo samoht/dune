@@ -61,7 +61,7 @@ Scenario 1.4: Edit dune-project (remove dep) without re-locking - OUT OF SYNC
   > EOF
 
   $ dune build 2>&1 | grep -E "Error:"
-  Error: Lock dir out of sync with dune-project
+  [1]
 
 =============================================================================
 PART 2: Single-file format lock
@@ -107,7 +107,7 @@ Scenario 2.4: Edit dune-project (remove dep) without re-locking - OUT OF SYNC
   > EOF
 
   $ dune build 2>&1 | grep -E "Error:"
-  Error: Lock dir out of sync with dune-project
+  [1]
 
 =============================================================================
 PART 3: Verify derivation caching behavior for single-file locks

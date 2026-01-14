@@ -13,4 +13,5 @@ Build a package with make
   > (source (copy $PWD/foo))
   > EOF
   $ build_pkg foo
+     Vendoring foo.0.0.1
   running makefile

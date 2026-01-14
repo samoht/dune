@@ -47,5 +47,6 @@ The lockfile should contain the patch action with the appropriate filter.
   > EOF
 
   $ build_pkg with-patch-filter 
+     Vendoring with-patch-filter.0.0.1
   Error: Patch file foo.patch not found in package directory
   [1]

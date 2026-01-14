@@ -19,6 +19,7 @@ Fetch from more than one source
   > EOF
 
   $ build_pkg test 2>&1 | strip_sandbox
+     Vendoring test.0.0.1
   Internal error, please report upstream including the contents of _build/log.
   Description:
     ("fetch_local: unpack is not set",
@@ -160,12 +161,13 @@ url and the extra source.
      (url http://localhost:2)
      (checksum md5=$HASH))))
   
-  (build_id 7dccd1ededf1cda5b8298bc12698b8c6)
+  (build_id 5fd1a536e7d277d1ca06bc060610fa17)
 
 Running the binary should download the tarball & patch, build them and show the
 correct, patched, message:
 
   $ dune exec ./display.exe
+     Vendoring needs-patch.0.0.1
   File "dune", line 1, characters 45-56:
   1 | (executable (public_name display) (libraries needs-patch))
                                                    ^^^^^^^^^^^
@@ -211,10 +213,4 @@ Lock the project to use that new package
 Running the binary should work and output the double patched message:
 
   $ dune exec ./display.exe
-  File "dune", line 1, characters 45-56:
-  1 | (executable (public_name display) (libraries needs-patch))
-                                                   ^^^^^^^^^^^
-  Error: Library "needs-patch" not found.
-  -> required by _build/default/.display.eobjs/native/dune__exe__Display.cmx
-  -> required by _build/default/display.exe
-  [1]
+  Patch successfully applied

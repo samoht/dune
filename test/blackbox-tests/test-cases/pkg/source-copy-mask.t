@@ -21,6 +21,7 @@ We include an empty file because of a bug that prevents us from copying empty di
   > EOF
 
   $ build_pkg foo
+     Vendoring foo.0.0.1
   .
   ./file
   ./node_modules

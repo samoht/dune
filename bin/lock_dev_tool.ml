@@ -261,7 +261,7 @@ let lock_dev_tool_at_version dev_tool version =
         ];
       true
     | `Dev_tool_needs_to_be_relocked_because_project_compiler_version_changed message ->
-      Console.print_user_message message;
+      Console.message message;
       true
     | `Lockdir_missing_entry_for_tool message ->
       User_warning.emit_message message;

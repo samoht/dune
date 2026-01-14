@@ -112,6 +112,42 @@ corresponding Dune version.
 The values here are not important, but Dune should be able to interpret the variables.
 
   $ build_pkg testpkg
+  File "dune.lock/testpkg.0.0.1.pkg", line 9, characters 17-32:
+  9 |      (run echo 3 %{pkg:foo:name})
+                       ^^^^^^^^^^^^^^^
+  Error: Undefined package variable "name"
+  File "dune.lock/testpkg.0.0.1.pkg", line 26, characters 18-32:
+  26 |      (run echo 16 %{pkg:foo:bin})
+                         ^^^^^^^^^^^^^^
+  Error: Undefined package variable "bin"
+  File "dune.lock/testpkg.0.0.1.pkg", line 28, characters 18-33:
+  28 |      (run echo 18 %{pkg:foo:sbin})
+                         ^^^^^^^^^^^^^^^
+  Error: Undefined package variable "sbin"
+  File "dune.lock/testpkg.0.0.1.pkg", line 30, characters 18-32:
+  30 |      (run echo 20 %{pkg:foo:lib})
+                         ^^^^^^^^^^^^^^
+  Error: Undefined package variable "lib"
+  File "dune.lock/testpkg.0.0.1.pkg", line 32, characters 18-32:
+  32 |      (run echo 22 %{pkg:foo:man})
+                         ^^^^^^^^^^^^^^
+  Error: Undefined package variable "man"
+  File "dune.lock/testpkg.0.0.1.pkg", line 34, characters 18-32:
+  34 |      (run echo 24 %{pkg:foo:doc})
+                         ^^^^^^^^^^^^^^
+  Error: Undefined package variable "doc"
+  File "dune.lock/testpkg.0.0.1.pkg", line 36, characters 18-34:
+  36 |      (run echo 26 %{pkg:foo:share})
+                         ^^^^^^^^^^^^^^^^
+  Error: Undefined package variable "share"
+  File "dune.lock/testpkg.0.0.1.pkg", line 38, characters 18-32:
+  38 |      (run echo 28 %{pkg:foo:etc})
+                         ^^^^^^^^^^^^^^
+  Error: Undefined package variable "etc"
+  File "dune.lock/testpkg.0.0.1.pkg", line 40, characters 18-32:
+  40 |      (run echo 32 %{pkg:foo:dev})
+                         ^^^^^^^^^^^^^^
+  Error: Undefined package variable "dev"
   File "dune.lock/testpkg.0.0.1.pkg", line 41, characters 18-39:
   41 |      (run echo 35 %{pkg-self:with-test})
                          ^^^^^^^^^^^^^^^^^^^^^

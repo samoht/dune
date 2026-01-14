@@ -19,4 +19,5 @@ Test fetching from git
   > EOF
 
   $ build_pkg test
+     Vendoring test.0.0.1
   hello world

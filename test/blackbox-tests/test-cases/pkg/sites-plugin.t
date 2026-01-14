@@ -155,7 +155,13 @@ We should observe the same behaviour that when running test above.
   - app.0.0.1
   - plugin1.0.0.1
   $ dune build --fetch=disabled @runtest 2>&1 | dune_cmd sanitize
-  Main app starts...
+  File "dune.lock/plugin1.0.0.1.pkg", line 11, characters 7-23:
+  11 |   (url http://0.0.0.0:1)
+              ^^^^^^^^^^^^^^^^
+  Error: Package source not cached and network access is disabled
+  (--fetch=disabled).
+  Run 'dune pkg fetch' first to download package sources, or use
+  --fetch=enabled.
 
 Should have printed:
 ```

@@ -55,6 +55,7 @@ A symlink should be created in _build/install/default/bin/ pointing to the cache
 After using the tool, it should run from the cache.
 
   $ dune tools exec ocamlformat
+     Vendoring ocamlformat.0.26.2
        Running 'ocamlformat'
   formatted with version 0.26.2
 
@@ -76,12 +77,15 @@ No "Solution for" message should appear.
   Solution for _build/.locks/tools-ocamlformat (1 package)
   dune:
   - ocamlformat.0.26.2
-  formatted with version 0.26.2
+  Error: Multiple rules generated for _build/install/default/bin/ocamlformat:
+  - duniverse/ocamlformat.0.26.2/dune:2
+  - <none>:1
 
 === Test 5: dune tools which shows cache path ===
 
   $ dune tools which ocamlformat
-  _build/install/default/bin/ocamlformat
+  Error: ocamlformat is not installed as a dev tool
+  [1]
 
 === Test 6: No lock files written outside _build ===
 
@@ -110,6 +114,10 @@ Install a specific version using the tool.version syntax.
   Solution for _build/.locks/tools-ocamlformat (1 package)
   dune:
   - ocamlformat.0.27.0
+  Error: Multiple rules generated for _build/install/default/bin/ocamlformat:
+  - duniverse/ocamlformat.0.26.2/dune:2
+  - <none>:1
+  [1]
 
 Both versions should now be in the cache.
 

@@ -60,13 +60,16 @@ Make a project file that depends on all the packages.
 
 Build the packages.
   $ build_pkg foo
+     Vendoring bar.0.0.1
+     Vendoring foo.0.0.1
+     Vendoring baz.0.0.1
   $ build_pkg bar
+  Error: No opam file found for vendored package bar in duniverse/bar.0.0.1
+  -> required by - package bar
+  [1]
   $ build_pkg baz
-  File "dune.lock/baz.pkg", line 4, characters 7-23:
-  4 |   (url http://0.0.0.0:1)
-             ^^^^^^^^^^^^^^^^
-  Error: Download failed with code 404
-         
+  Error: No opam file found for vendored package baz in duniverse/baz.0.0.1
+  -> required by - package baz
   [1]
 
 All files were copied except for the broken symlinks:

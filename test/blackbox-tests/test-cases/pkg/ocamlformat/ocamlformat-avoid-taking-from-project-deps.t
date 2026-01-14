@@ -47,6 +47,7 @@ dev-tool (0.26.3).
   Solution for _build/.locks/tools-ocamlformat (1 package)
   dune:
   - ocamlformat.0.26.3
+     Vendoring ocamlformat.0.26.3
   File "foo.ml", line 1, characters 0-0:
   Error: Files _build/default/foo.ml and _build/default/.formatted/foo.ml
   differ.
@@ -61,9 +62,9 @@ behavior when OCamlFormat is installed simultaneously as both a dev-tool and as 
 regular package dependency.
   $ rm -r "${dev_tool_lock_dir}"
   $ dune fmt --preview
-  File "foo.ml", line 1, characters 0-0:
-  Error: Files _build/default/foo.ml and _build/default/.formatted/foo.ml
-  differ.
+  File "duniverse/dune", line 1, characters 0-0:
+  Error: Files _build/default/duniverse/dune and
+  _build/default/duniverse/.formatted/dune differ.
   [1]
   $ cat _build/default/.formatted/foo.ml
-  formatted with version 0.26.2
+  formatted with version 0.26.3

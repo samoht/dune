@@ -58,6 +58,7 @@ rather than "ocaml-base-compiler.5.2.0" from opam-repository.
   - ocaml-lsp-server.0.0.1
 
   $ dune tools exec ocamllsp
+     Vendoring ocaml-base-compiler.dev
   The version of the compiler package ("ocaml-base-compiler") in this project's
   lockdir has changed to dev (formerly the compiler version was dev). The
   dev-tool "ocaml-lsp-server" will be re-locked and rebuilt with this version

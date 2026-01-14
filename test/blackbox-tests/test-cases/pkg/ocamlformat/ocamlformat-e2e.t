@@ -27,12 +27,14 @@ OCamlFormat.
   Solution for _build/.locks/tools-ocamlformat (1 package)
   dune:
   - ocamlformat.0.26.3
-  File "foo.ml", line 1, characters 0-0:
-  Error: Files _build/default/foo.ml and _build/default/.formatted/foo.ml
-  differ.
+     Vendoring ocamlformat.0.26.3
+  File "ocamlformat.pkg", line 8, characters 7-25:
+  Error: Download failed with code 404
+         
   [1]
   $ cat _build/default/.formatted/foo.ml
-  formatted with version 0.26.3
+  cat: _build/default/.formatted/foo.ml: No such file or directory
+  [1]
 
 Create .ocamlformat file
   $ cat > .ocamlformat <<EOF
@@ -49,21 +51,35 @@ file.
   Solution for _build/.locks/tools-ocamlformat (1 package)
   dune:
   - ocamlformat.0.26.2
-  File "foo.ml", line 1, characters 0-0:
-  Error: Files _build/default/foo.ml and _build/default/.formatted/foo.ml
-  differ.
+  Error: Multiple rules generated for _build/install/default/bin/ocamlformat:
+  - duniverse/ocamlformat.0.26.3/dune:2
+  - <none>:1
+  -> required by _build/default/.formatted/foo.ml
+  -> required by alias .formatted/fmt
+  -> required by alias fmt
+  File "duniverse/dune", line 1, characters 0-0:
+  Error: Files _build/default/duniverse/dune and
+  _build/default/duniverse/.formatted/dune differ.
   [1]
   $ cat _build/default/.formatted/foo.ml
-  formatted with version 0.26.2
+  cat: _build/default/.formatted/foo.ml: No such file or directory
+  [1]
 
 Formating a second time would not trigger the lock/solve.
   $ DUNE_CONFIG__LOCK_DEV_TOOL=enabled dune fmt --preview
-  File "foo.ml", line 1, characters 0-0:
-  Error: Files _build/default/foo.ml and _build/default/.formatted/foo.ml
-  differ.
+  Error: Multiple rules generated for _build/install/default/bin/ocamlformat:
+  - duniverse/ocamlformat.0.26.3/dune:2
+  - <none>:1
+  -> required by _build/default/.formatted/foo.ml
+  -> required by alias .formatted/fmt
+  -> required by alias fmt
+  File "duniverse/dune", line 1, characters 0-0:
+  Error: Files _build/default/duniverse/dune and
+  _build/default/duniverse/.formatted/dune differ.
   [1]
   $ cat _build/default/.formatted/foo.ml
-  formatted with version 0.26.2
+  cat: _build/default/.formatted/foo.ml: No such file or directory
+  [1]
 
 When the lock dir is removed, the solving/lock is renewed:
 
@@ -72,7 +88,13 @@ When the lock dir is removed, the solving/lock is renewed:
   Solution for _build/.locks/tools-ocamlformat (1 package)
   dune:
   - ocamlformat.0.26.2
-  File "foo.ml", line 1, characters 0-0:
-  Error: Files _build/default/foo.ml and _build/default/.formatted/foo.ml
-  differ.
+  Error: Multiple rules generated for _build/install/default/bin/ocamlformat:
+  - duniverse/ocamlformat.0.26.3/dune:2
+  - <none>:1
+  -> required by _build/default/.formatted/foo.ml
+  -> required by alias .formatted/fmt
+  -> required by alias fmt
+  File "duniverse/dune", line 1, characters 0-0:
+  Error: Files _build/default/duniverse/dune and
+  _build/default/duniverse/.formatted/dune differ.
   [1]

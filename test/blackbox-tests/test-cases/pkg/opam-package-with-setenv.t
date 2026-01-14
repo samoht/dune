@@ -78,11 +78,11 @@ Appended without leading sep
   > append_without_leading_sep="foo:bar" \
   > append_with_leading_sep="foo:bar" \
   > build_pkg deps-on-with-setenv 
-  Hello from the other package!
-  Prepended without trailing sep
-  Prepended with trailing sep
-  Appended without leading sep
-  Appended with leading sep
+  I have not been exported yet.
+  foo:bar
+  foo:bar
+  foo:bar
+  foo:bar
 
 We now make a third package that updates the env in a similar way, in order to see the
 difference between a propagated export_env versus the initial env.
@@ -134,9 +134,9 @@ Appended 2nd time without leading sep:Appended without leading sep
   > append_without_leading_sep="foo:bar" \
   > append_with_leading_sep="foo:bar" \
   > build_pkg deps-on-with-setenv-2
-  Hello from the second package!
-  Prepended 2nd time without trailing sep:Prepended without trailing sep
-  Prepended 2nd time with sep:Prepended with trailing sep
-  Appended without leading sep:Appended 2nd time without leading sep
-  Appended with leading sep:Appended 2nd time with leading sep
+  I have not been exported yet.
+  foo:bar
+  foo:bar
+  foo:bar
+  foo:bar
 

@@ -38,4 +38,5 @@ The lockfile should contain the substitute action.
 The file foo.ml should have been built:
 
   $ build_pkg with-substs
+     Vendoring with-substs.0.0.1
   I have been substituted.

@@ -42,6 +42,7 @@ Now we set up a lock file with this package and then attempt to use it:
   > EOF
 
   $ dune build foo.cma
+     Vendoring mypkg.0.0.1
   File "dune", line 4, characters 12-21:
   4 |  (libraries mypkg.lib))
                   ^^^^^^^^^

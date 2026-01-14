@@ -16,5 +16,6 @@ Test the %{pkg:installed}% form inside file substitution:
   > EOF
 
   $ build_pkg test
+     Vendoring test.0.0.1
   somepkg installation false
   foo: false

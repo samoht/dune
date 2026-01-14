@@ -21,6 +21,7 @@ Additional files overlaid on top of the source can be found in the
   > EOF
 
   $ build_pkg test
+     Vendoring test.0.0.1
   foo:
   foo from test.files
   bar:

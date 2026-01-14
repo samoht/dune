@@ -75,12 +75,6 @@ Change the version of ocaml that the project depends on.
   > EOF
 
   $ dune build
-  File "dune.lock/pkgs/lock.dune", line 1, characters 0-0:
-  Error: Lock dir out of sync with dune-project
-  Hint: Run 'dune pkg lock' to regenerate
-  Hint: Or use '--lock=always' or set '(lock always)' in ~/.config/dune/config
-  for automatic re-locking
-  [1]
 
 Running "dune ocaml doc" causes odoc to be relocked and rebuilt
 before running. Odoc now depends on ocaml.5.1.0.
@@ -95,11 +89,13 @@ before running. Odoc now depends on ocaml.5.1.0.
   - ocaml-base-compiler.5.2.0
   - ocaml-compiler.5.2.0
   - odoc.0.0.1
-  File "dune.lock/pkgs/lock.dune", line 1, characters 0-0:
-  Error: Lock dir out of sync with dune-project
-  Hint: Run 'dune pkg lock' to regenerate
-  Hint: Or use '--lock=always' or set '(lock always)' in ~/.config/dune/config
-  for automatic re-locking
+  hello from fake odoc
+  hello from fake odoc
+  File "_doc/_html/_unknown_", line 1, characters 0-0:
+  Error: Rule failed to produce directory "_doc/_html/odoc.support"
+  File "_doc/_odoc/pkg/foo/_unknown_", line 1, characters 0-0:
+  Error: Rule failed to generate the following targets:
+  - _doc/_odoc/pkg/foo/page-index.odoc
   [1]
   $ grep "version" "${dev_tool_lock_dir}"/ocaml-base-compiler.pkg
   (version 5.2.0)

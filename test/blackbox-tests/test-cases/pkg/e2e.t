@@ -76,6 +76,7 @@ Lock, build, and run the executable in the project:
   dune:
   - foo.0.0.1
   $ dune exec bar
+     Vendoring foo.0.0.1
   File "dune", line 3, characters 12-15:
   3 |  (libraries foo))
                   ^^^

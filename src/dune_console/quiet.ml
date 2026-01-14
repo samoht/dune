@@ -1,7 +1,12 @@
 module M : Backend_intf.S = struct
   let start () = ()
   let finish () = ()
-  let print_user_message _ = ()
+
+  let print_user_message msg =
+    Dumb.print_msg msg;
+    flush stderr
+  ;;
+
   let set_status_line _ = ()
   let print_if_no_status_line _ = ()
   let reset () = ()
@@ -13,7 +18,11 @@ module M : Backend_intf.S = struct
   let activity_finish ~name:_ = ()
   let activity_fail ~name:_ = ()
   let activity_log ~name:_ _ = ()
-  let message _ = ()
+
+  let message msg =
+    Dumb.print_msg msg;
+    flush stderr
+  ;;
 
   let error msg =
     Dumb.print_msg msg;

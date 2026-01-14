@@ -26,6 +26,7 @@ file in the package's source.
   > EOF
 
   $ build_pkg foo 2>&1 | strip_sandbox
+     Vendoring foo.1
   Internal error, please report upstream including the contents of _build/log.
   Description:
     ("fetch_local: unpack is not set",

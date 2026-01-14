@@ -620,7 +620,7 @@ let solve
         (lock_dir_path, lock_dir, files), summary)
       |> List.split
     in
-    List.iter summary_messages ~f:Console.print_user_message;
+    List.iter summary_messages ~f:Console.message;
     (* All the file IO side effects happen here: *)
     List.iter lock_dirs_with_summaries ~f:(fun (lock_dir_path, lock_dir, files) ->
       match format with

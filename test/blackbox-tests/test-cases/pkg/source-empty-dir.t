@@ -15,4 +15,5 @@ Demonstrate that we copy empty directories
   > EOF
 
   $ build_pkg foo
+     Vendoring foo.0.0.1
   .

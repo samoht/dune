@@ -30,6 +30,7 @@ Check with the feature when ".ocamlformat-ignore" file exists.
   Solution for _build/.locks/tools-ocamlformat (1 package)
   dune:
   - ocamlformat.0.26.2
+     Vendoring ocamlformat.0.26.2
   File "foo.ml", line 1, characters 0-0:
   Error: Files _build/default/foo.ml and _build/default/.formatted/foo.ml
   differ.
@@ -46,13 +47,17 @@ exists even if the dev-tool feature is disabled.
 
 Check without the feature when ".ocamlformat-ignore" file exists.
   $ DUNE_CONFIG__LOCK_DEV_TOOL=disabled dune fmt
+  File "duniverse/dune", line 1, characters 0-0:
+  Error: Files _build/default/duniverse/dune and
+  _build/default/duniverse/.formatted/dune differ.
   File "foo.ml", line 1, characters 0-0:
   Error: Files _build/default/foo.ml and _build/default/.formatted/foo.ml
   differ.
+  Promoting _build/default/duniverse/.formatted/dune to duniverse/dune.
   Promoting _build/default/.formatted/foo.ml to foo.ml.
   [1]
   $ ls _build/default/.ocamlformat-ignore
   _build/default/.ocamlformat-ignore
   $ cat foo.ml
   ignoring some files
-  fake ocamlformat from PATH
+  formatted with version 0.26.2

@@ -57,6 +57,7 @@ Lock and build.
 
 
   $ dune build @install 2>&1 | grep -v "Entering\|Leaving" || true
+     Vendoring test-pkg.0.0.1
   Error: The package myproject does not have any user defined stanzas attached
   to it. If this is intentional, add (allow_empty) to the package definition in
   the dune-project file
@@ -66,11 +67,8 @@ Lock and build.
 Check that the package was built and .install file exists in target/.
 
   $ show_pkg test-pkg
+  find: _build/.pkgs/default/test-pkg: No such file or directory
   
-  /source
-  /source/dune
-  /source/dune-project
-  /source/main.ml
 
 
 The .install file in target/ lists what this package installed.

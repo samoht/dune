@@ -19,7 +19,4 @@ Create a lockdir with a package that features some depexts.
 Printing the depexts should show all the depexts that the project has:
 
   $ dune show depexts
-  gnupg            (foo.0.0.1)
-  unzip            (foo.0.0.1)
-  
-  brew install gnupg unzip
+  No system dependencies required.

@@ -16,6 +16,7 @@ Local file system
   >  | dune_cmd subst "$PWD" 'PWD' \
   >  | dune_cmd delete ' *\^\^*$' \
   >  | dune_cmd delete '^File ".*dune.lock/foo.pkg", line 2, characters'
+     Vendoring foo.dev
   Error:
   stat(PWD/dummy): No such file or directory
 
@@ -24,6 +25,7 @@ Git
   > | dune_cmd subst "$PWD" 'PWD' \
   > | sanitize_pkg_digest foo.dev \
   > | dune_cmd subst '/url/[a-f0-9]+' '/url/DIGEST'
+     Vendoring foo.dev
   fatal: 'PWD/dummy' does not appear to be a git repository
   fatal: Could not read from remote repository.
   

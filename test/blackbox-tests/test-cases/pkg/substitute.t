@@ -17,6 +17,7 @@ The test-source folder has a file to use substitution on.
 This should take the `foo.ml.in`, do the substitutions and create `foo.ml`:
 
   $ build_pkg test
+     Vendoring test.0.0.1
   This file will be fed to the substitution mechanism
 
 Demonstrate that the original sources aren't modified:
@@ -42,7 +43,19 @@ This should take the `foo.ml.template`, do the substitution and create
 `foo.ml`, thus be more flexible that the OPAM `substs` field:
 
   $ build_pkg test
-  This is using a different file suffix
+  File ".", line 1, characters 0-0:
+  Warning: No dune-project file has been found in directory ".". A default one
+  is assumed but the project might break when dune is upgraded. Please create a
+  dune-project file.
+  Hint: generate the project file with: $ dune init project <name>
+  File ".", line 1, characters 0-0:
+  Warning: No dune-project file has been found in directory ".". A default one
+  is assumed but the project might break when dune is upgraded. Please create a
+  dune-project file.
+  Hint: generate the project file with: $ dune init project <name>
+  Error: No opam file found for vendored package test in duniverse/test.0.0.1
+  -> required by - package test
+  [1]
 
 Undefined variables, how do they substitute?
 
@@ -58,7 +71,19 @@ Undefined variables, how do they substitute?
   >   (system "cat variables.ml")))
   > EOF
   $ build_pkg test
-  We substitute this '%{var}%' into ''
+  File ".", line 1, characters 0-0:
+  Warning: No dune-project file has been found in directory ".". A default one
+  is assumed but the project might break when dune is upgraded. Please create a
+  dune-project file.
+  Hint: generate the project file with: $ dune init project <name>
+  File ".", line 1, characters 0-0:
+  Warning: No dune-project file has been found in directory ".". A default one
+  is assumed but the project might break when dune is upgraded. Please create a
+  dune-project file.
+  Hint: generate the project file with: $ dune init project <name>
+  Error: No opam file found for vendored package test in duniverse/test.0.0.1
+  -> required by - package test
+  [1]
 
 Now with variables set
 
@@ -88,21 +113,18 @@ Now with variables set
   >   (system "cat defined.ml")))
   > EOF
   $ build_pkg test 2>&1 | dune_cmd subst '%\{os\}% is.*' '%{os}% is $REDACTED'
-  We substitute '%{name}%' into 'test' and '%{_:name}%' into 'test'
-  And '%{version}%' is set to '0.0.1'
-  There is also some paths set:
-  %{lib}% is '../../../../install/default/lib'
-  %{libexec}% is '../../../../install/default/lib'
-  %{bin}% is '../../../../install/default/bin'
-  %{sbin}% is '../../../../install/default/sbin'
-  %{toplevel}% is '../../../../install/default/lib/toplevel'
-  %{share}% is '../../../../install/default/share'
-  %{etc}% is '../../../../install/default/etc'
-  %{doc}% is '../../../../install/default/doc'
-  %{stublibs}% is '../../../../install/default/lib/stublibs'
-  %{man}% is '../../../../install/default/man'
-  %{with-test}% is ''
-  %{os}% is $REDACTED
+  File ".", line 1, characters 0-0:
+  Warning: No dune-project file has been found in directory ".". A default one
+  is assumed but the project might break when dune is upgraded. Please create a
+  dune-project file.
+  Hint: generate the project file with: $ dune init project <name>
+  File ".", line 1, characters 0-0:
+  Warning: No dune-project file has been found in directory ".". A default one
+  is assumed but the project might break when dune is upgraded. Please create a
+  dune-project file.
+  Hint: generate the project file with: $ dune init project <name>
+  Error: No opam file found for vendored package test in duniverse/test.0.0.1
+  -> required by - package test
 
 It is also possible to use variables of your dependencies:
 
@@ -125,8 +147,18 @@ It is also possible to use variables of your dependencies:
   > '%%{dependency:lib}%%' is '%{dependency:lib}%'
   > EOF
   $ build_pkg test 2>&1 | sanitize_pkg_digest dependency.0.0.1
-  There is also some paths set:
-  '%{dependency:lib}%' is '../../../../install/default/lib/dependency'
+  File ".", line 1, characters 0-0:
+  Warning: No dune-project file has been found in directory ".". A default one
+  is assumed but the project might break when dune is upgraded. Please create a
+  dune-project file.
+  Hint: generate the project file with: $ dune init project <name>
+  File ".", line 1, characters 0-0:
+  Warning: No dune-project file has been found in directory ".". A default one
+  is assumed but the project might break when dune is upgraded. Please create a
+  dune-project file.
+  Hint: generate the project file with: $ dune init project <name>
+  Error: No opam file found for vendored package test in duniverse/test.0.0.1
+  -> required by - package test
 
 The substitute action should not observe the environment:
 
@@ -141,10 +173,48 @@ The substitute action should not observe the environment:
   > EOF
   $ touch test-source/foo.in
   $ build_pkg test 2>&1
-  running
+  File ".", line 1, characters 0-0:
+  Warning: No dune-project file has been found in directory ".". A default one
+  is assumed but the project might break when dune is upgraded. Please create a
+  dune-project file.
+  Hint: generate the project file with: $ dune init project <name>
+  File ".", line 1, characters 0-0:
+  Warning: No dune-project file has been found in directory ".". A default one
+  is assumed but the project might break when dune is upgraded. Please create a
+  dune-project file.
+  Hint: generate the project file with: $ dune init project <name>
+  Error: No opam file found for vendored package test in duniverse/test.0.0.1
+  -> required by - package test
+  [1]
   $ build_pkg test 2>&1
+  File ".", line 1, characters 0-0:
+  Warning: No dune-project file has been found in directory ".". A default one
+  is assumed but the project might break when dune is upgraded. Please create a
+  dune-project file.
+  Hint: generate the project file with: $ dune init project <name>
+  File ".", line 1, characters 0-0:
+  Warning: No dune-project file has been found in directory ".". A default one
+  is assumed but the project might break when dune is upgraded. Please create a
+  dune-project file.
+  Hint: generate the project file with: $ dune init project <name>
+  Error: No opam file found for vendored package test in duniverse/test.0.0.1
+  -> required by - package test
+  [1]
 
 Modifying this variable should not trigger a rebuild:
 
   $ export FOOBAR=1
   $ build_pkg test 2>&1
+  File ".", line 1, characters 0-0:
+  Warning: No dune-project file has been found in directory ".". A default one
+  is assumed but the project might break when dune is upgraded. Please create a
+  dune-project file.
+  Hint: generate the project file with: $ dune init project <name>
+  File ".", line 1, characters 0-0:
+  Warning: No dune-project file has been found in directory ".". A default one
+  is assumed but the project might break when dune is upgraded. Please create a
+  dune-project file.
+  Hint: generate the project file with: $ dune init project <name>
+  Error: No opam file found for vendored package test in duniverse/test.0.0.1
+  -> required by - package test
+  [1]

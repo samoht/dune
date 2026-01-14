@@ -13,6 +13,7 @@ Make sure that we verify archives of local archives
   > EOF
 
   $ build_pkg foo
+     Vendoring foo.0.0.1
   Error: Checksum mismatch for foo.0.0.1 (got
   md5=d41d8cd98f00b204e9800998ecf8427e)
   [1]

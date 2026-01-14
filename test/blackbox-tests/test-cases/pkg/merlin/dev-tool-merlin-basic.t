@@ -29,9 +29,9 @@ a lockdir containing an "ocaml" lockfile.
 
   $ dune tools exec ocamlmerlin
   File "dune.lock", line 1, characters 0-0:
-  Error: Package ocaml.5.2.0 not found in any repository
-  File "dune.lock", line 1, characters 0-0:
   Error: Package ocaml-base-compiler.5.2.0 not found in any repository
   File "dune.lock", line 1, characters 0-0:
   Error: Package ocaml-compiler.5.2.0 not found in any repository
+  File "dune.lock", line 1, characters 0-0:
+  Error: Package ocaml.5.2.0 not found in any repository
   [1]

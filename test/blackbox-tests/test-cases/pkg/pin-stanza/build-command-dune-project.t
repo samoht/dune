@@ -78,5 +78,9 @@ Demonstrate the build command we construct for different types of projects:
 If we build the deps, everything works fine and we see the output of the opam
 pins:
   $ dune build @pkg-install
+     Vendoring dune-only.dev
+     Vendoring mixed.dev
+     Vendoring opam-only.dev
+     Vendoring template.dev
   mixed
   opam only

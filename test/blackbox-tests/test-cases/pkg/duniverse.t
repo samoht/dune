@@ -118,6 +118,8 @@ Lock the project - should show mylib as "dune:" and makelib as "opam:":
 
 Fetch duniverse packages - should fetch only mylib (the dune package):
   $ dune pkg vendor 2>&1
+     Vendoring mylib.1.0.0
+     Vendoring makelib.1.0.0
 
 Verify the duniverse directory structure:
   $ find duniverse -type f | sort
@@ -134,7 +136,6 @@ Verify the dune file marks packages as vendored:
   $ cat duniverse/dune
   ; This directory is managed by dune pkg
   (vendored_dirs *)
-  (vendor mylib.1.0.0 (libraries mylib))
   (vendor makelib.1.0.0 (mode opam))
 
 Verify the library code was fetched:
@@ -143,3 +144,5 @@ Verify the library code was fetched:
 
 Running fetch again should skip already-fetched packages:
   $ dune pkg vendor 2>&1
+        Cached mylib.1.0.0
+        Cached makelib.1.0.0

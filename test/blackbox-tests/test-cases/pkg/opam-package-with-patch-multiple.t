@@ -88,5 +88,6 @@ The lockfile should contain the patch action.
 The build step of the opam file correctly cats the patched files.
 
   $ build_pkg with-patch 
+     Vendoring with-patch.0.0.1
   Error: Patch file foo.patch not found in package directory
   [1]

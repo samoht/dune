@@ -55,7 +55,7 @@ Create lock file:
 Fetch the package:
 
   $ dune pkg vendor -v 2>&1
-  Fetching var-pkg.1.2.3 to duniverse/var-pkg.1.2.3
+     Vendoring var-pkg.1.2.3
 
 Verify the vendor stanza was created:
 
@@ -65,7 +65,7 @@ Verify the vendor stanza was created:
   $ cat duniverse/dune
   ; This directory is managed by dune pkg
   (vendored_dirs *)
-  (vendor var-pkg.1.2.3 (mode opam))
+  (vendor var-pkg.1.2.3 (mode opam) (libraries var-pkg))
 
 Build:
 

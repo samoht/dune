@@ -44,14 +44,12 @@ Solve to create a proper lock directory with dependency hash:
 Build the packages, when it fails building 'foo' package, it shows the depexts
 error message.
   $ dune build @pkg-install
-  File "dune.lock/foo.0.0.1.pkg", line 4, characters 30-34:
-  4 |  (all_platforms ((action (run dune build)))))
-                                    ^^^^
-  Error: Logs for package foo
-  File "dune-project", line 1, characters 0-0:
-  Error: Invalid first line, expected: (lang <lang> <version>)
-  
-  Hint: Missing system dependencies: gnupg, unzipTo install:
-    brew install gnupg unzip
+  File "_build/.locks/default/dune.lock/foo.0.0.1.pkg", line 12, characters 3-140:
+  12 |    file:///Users/samoht/git/dune/_build/.sandbox/e7317dfd5522e11628e69ccdbb2a872b/default/test/blackbox-tests/test-cases/pkg/depexts/foo.tar)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  Error: Package source not cached and network access is disabled
+  (--fetch=disabled).
+  Run 'dune pkg fetch' first to download package sources, or use
+  --fetch=enabled.
   [1]
 

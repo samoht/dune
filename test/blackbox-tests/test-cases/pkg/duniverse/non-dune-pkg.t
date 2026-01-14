@@ -78,7 +78,7 @@ Create a lock file with a source URL pointing to our local directory:
 Fetch the package - non-dune packages should also be fetched to duniverse:
 
   $ dune pkg vendor -v
-  Fetching make-pkg.1.0.0 to duniverse/make-pkg.1.0.0
+     Vendoring make-pkg.1.0.0
 
 Verify the package was placed in duniverse/:
 
@@ -94,7 +94,7 @@ The duniverse directory should have the vendored_dirs stanza:
   $ cat duniverse/dune
   ; This directory is managed by dune pkg
   (vendored_dirs *)
-  (vendor make-pkg.1.0.0 (mode opam))
+  (vendor make-pkg.1.0.0 (mode opam) (libraries make-pkg))
 
 Now test the full workflow: build a project that uses the duniverse non-dune package.
 
@@ -111,9 +111,6 @@ Check source directory exists:
   opam
 
   $ dune build @pkg-install 2>&1
-  Error:
-  stat($TESTCASE_ROOT/pkg-source): No such file or directory
-  [1]
 
 Check package was built (opam packages use .pkgs sandbox, not duniverse build):
 
@@ -136,9 +133,6 @@ Force rebuild by cleaning:
 
   $ dune clean
   $ dune build @pkg-install 2>&1
-  Error:
-  stat($TESTCASE_ROOT/pkg-source): No such file or directory
-  [1]
 
 This confirms that non-dune packages fetched to duniverse:
 1. Are built using the .pkg sandbox (existing behavior)

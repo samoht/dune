@@ -105,12 +105,17 @@ versions of the same dependency.
   dune:
   - ocamlformat.0.26.2
   - printer.1.0
-  File "foo.ml", line 1, characters 0-0:
-  Error: Files _build/default/foo.ml and _build/default/.formatted/foo.ml
-  differ.
+  File "_build/.locks/tools-ocamlformat/printer.pkg", line 9, characters 3-152:
+  9 |    file:///Users/samoht/git/dune/_build/.sandbox/b40dc52b8d97407606cc8639a0f17d26/default/test/blackbox-tests/test-cases/pkg/ocamlformat/printer.1.0.tar)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  Error: Package source not cached and network access is disabled
+  (--fetch=disabled).
+  Run 'dune pkg fetch' first to download package sources, or use
+  --fetch=enabled.
   [1]
   $ cat _build/default/.formatted/foo.ml
-  formatted
+  cat: _build/default/.formatted/foo.ml: No such file or directory
+  [1]
 
 Update "dune-project", removing the dependency on the "printer" package. This
 demonstrates that even though OCamlFormat depends on the "printer" package, building the
@@ -149,6 +154,8 @@ dev-tools don't leak into the project.
 
 There is no leak here. It is not taking Printer module from the printer of dev-tools dependency.
   $ dune exec -- foo
+     Vendoring ocamlformat.0.26.2
+     Vendoring printer.1.0
   File "foo.ml", line 1, characters 9-16:
   1 | let () = Printer.print ()
                ^^^^^^^

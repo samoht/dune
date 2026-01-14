@@ -22,6 +22,7 @@ Applying patches
   > EOF
 
   $ build_pkg test
+     Vendoring test.0.0.1
   Error: Patch file foo.patch not found in package directory
   [1]
 

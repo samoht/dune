@@ -42,6 +42,8 @@ It fails as we have not regenerated the lock:
   $ dune build
   File "dune.lock/lock.dune", line 1, characters 0-0:
   Error: Lock dir out of sync with dune-project
+  Dependencies not in lock file: bar
+  Current dependencies in dune-project: bar, foo
   Hint: Run 'dune pkg lock' to regenerate
   Hint: Or use '--lock=always' or set '(lock always)' in ~/.config/dune/config
   for automatic re-locking
@@ -99,6 +101,8 @@ Out-of-sync should be detected for single-file lock too:
   $ dune build
   File "dune.lock/pkgs/lock.dune", line 1, characters 0-0:
   Error: Lock dir out of sync with dune-project
+  Dependencies not in lock file: bar
+  Current dependencies in dune-project: bar, foo
   Hint: Run 'dune pkg lock' to regenerate
   Hint: Or use '--lock=always' or set '(lock always)' in ~/.config/dune/config
   for automatic re-locking

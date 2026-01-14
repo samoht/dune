@@ -32,6 +32,7 @@ command is currently not respected when the package is pinned.
   dune:
   - opam-template.dev
   $ build_pkg opam-template
+     Vendoring opam-template.dev
 
   $ dune_cmd delete-between 'source' '^$' < "${default_lock_dir}/opam-template.dev.pkg"
   (version dev)

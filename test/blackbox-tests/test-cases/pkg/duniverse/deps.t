@@ -96,8 +96,8 @@ Create lock files with source URLs:
 Fetch both packages:
 
   $ dune pkg vendor -v
-  Fetching pkg-a.1.0.0 to duniverse/pkg-a.1.0.0
-  Fetching pkg-b.1.0.0 to duniverse/pkg-b.1.0.0
+     Vendoring pkg-a.1.0.0
+     Vendoring pkg-b.1.0.0
 
 Verify both packages are in duniverse:
 
@@ -129,23 +129,29 @@ Build the project - this should work even though both packages are in duniverse
 and pkg-b depends on pkg-a (tests the closure computation):
 
   $ dune build
+  File "_build/.locks/default/dune.lock/pkg-a.pkg", line 3, characters 14-151:
+  3 | (source (copy $TESTCASE_ROOT/pkg-a-source))
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   Error:
-  stat($TESTCASE_ROOT/pkg-a-source): No such file or directory
+  $TESTCASE_ROOT/pkg-a-source
+  does not exist
+  File "_build/.locks/default/dune.lock/pkg-b.pkg", line 4, characters 14-151:
+  4 | (source (copy $TESTCASE_ROOT/pkg-b-source))
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   Error:
-  stat($TESTCASE_ROOT/pkg-b-source): No such file or directory
+  $TESTCASE_ROOT/pkg-b-source
+  does not exist
   [1]
 
 Verify the library was built correctly:
 
   $ cat _build/default/mylib.ml
-  cat: _build/default/mylib.ml: No such file or directory
-  [1]
+  let greeting = Pkg_b.value
 
 Both duniverse libraries should be built in the main build context:
 
   $ ls _build/default/duniverse/pkg-a.1.0.0/.pkg_a.objs/byte/*.cmo
-  ls: _build/default/duniverse/pkg-a.1.0.0/.pkg_a.objs/byte/*.cmo: No such file or directory
-  [1]
+  _build/default/duniverse/pkg-a.1.0.0/.pkg_a.objs/byte/pkg_a.cmo
   $ ls _build/default/duniverse/pkg-b.1.0.0/.pkg_b.objs/byte/*.cmo
   ls: _build/default/duniverse/pkg-b.1.0.0/.pkg_b.objs/byte/*.cmo: No such file or directory
   [1]

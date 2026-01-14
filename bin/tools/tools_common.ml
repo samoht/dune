@@ -193,7 +193,7 @@ let lock_and_build_dev_tool ~common ~config builder dev_tool =
 
 let run_dev_tool_from_path workspace_root dev_tool ~exe_path_string ~args =
   let exe_name = Dev_tool.exe_name dev_tool in
-  Console.print_user_message
+  Console.message
     (Dune_rules.Pkg_build_progress.format_user_message
        ~verb:"Running"
        ~object_:(User_message.command (String.concat ~sep:" " (exe_name :: args))));

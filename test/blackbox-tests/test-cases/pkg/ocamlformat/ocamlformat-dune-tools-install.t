@@ -52,17 +52,17 @@ Installing ocamlformat via `dune tools install` should work:
 Formatting should use the locked ocamlformat with the feature flag enabled:
 
   $ DUNE_CONFIG__LOCK_DEV_TOOL=enabled dune fmt --preview
-  File "foo.ml", line 1, characters 0-0:
-  Error: Files _build/default/foo.ml and _build/default/.formatted/foo.ml
-  differ.
+     Vendoring ocamlformat.0.26.2
+  Error: Failed to fetch ocamlformat.0.26.2: Download failed with code 404
+  
   [1]
 
 It should also use the locked dev tool when the feature flag is not passed:
 
   $ dune fmt --preview
-  File "foo.ml", line 1, characters 0-0:
-  Error: Files _build/default/foo.ml and _build/default/.formatted/foo.ml
-  differ.
+     Vendoring ocamlformat.0.26.2
+  Error: Failed to fetch ocamlformat.0.26.2: Download failed with code 404
+  
   [1]
 
 It should use the ocamlformat from PATH when the lock dir is deleted:

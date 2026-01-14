@@ -36,6 +36,9 @@ Create a project that depends on the dune package:
 Lock the dependencies:
 
   $ dune pkg lock --format=directory
+  Solution for dune.lock (1 package)
+  dune:
+  - dune-pkg.1.0.0
 
 Check that fetch command runs silently when packages have no sources:
 
@@ -69,6 +72,7 @@ Create a lock file with a source URL pointing to our local directory:
 Fetch the package (using -v for one-liner status messages):
 
   $ dune pkg vendor -v
+     Vendoring mypkg.1.0.0
 
 Verify the package was placed in duniverse/:
 
@@ -85,13 +89,13 @@ First remove the original source to avoid duplicate package definition:
 
   $ rm -rf pkg-source
   $ dune pkg vendor -v
+        Cached mypkg.1.0.0
 
 The duniverse directory should have the vendored_dirs stanza:
 
   $ cat duniverse/dune
   ; This directory is managed by dune pkg
   (vendored_dirs *)
-  (vendor mypkg.1.0.0 (libraries mypkg))
 
 A .gitignore file is generated to exclude fetched sources by default:
 
@@ -123,6 +127,13 @@ Create a new project that uses the duniverse library:
 Build the project - it should use the duniverse library, not the .pkg sandbox:
 
   $ dune build
+  File "_build/.locks/default/dune.lock/mypkg.pkg", line 3, characters 14-149:
+  3 | (source (copy $TESTCASE_ROOT/pkg-source))
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  Error:
+  $TESTCASE_ROOT/pkg-source
+  does not exist
+  [1]
 
 Verify the library was built correctly:
 
@@ -151,6 +162,13 @@ Test that edits to duniverse packages are picked up:
 Rebuild - the edit should be picked up:
 
   $ dune build
+  File "_build/.locks/default/dune.lock/mypkg.pkg", line 3, characters 14-149:
+  3 | (source (copy $TESTCASE_ROOT/pkg-source))
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  Error:
+  $TESTCASE_ROOT/pkg-source
+  does not exist
+  [1]
 
   $ cat _build/default/duniverse/mypkg.1.0.0/mypkg.ml
   let hello = "EDITED: hello from mypkg v2"

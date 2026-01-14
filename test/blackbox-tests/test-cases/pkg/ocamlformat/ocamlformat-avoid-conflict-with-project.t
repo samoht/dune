@@ -31,6 +31,7 @@ Build the OCamlFormat binary dev-tool
   Solution for _build/.locks/tools-ocamlformat (1 package)
   dune:
   - ocamlformat.0.26.2
+     Vendoring ocamlformat.0.26.2
   File "dune", line 1, characters 0-0:
   Error: Files _build/default/dune and _build/default/.formatted/dune differ.
   File "foo.ml", line 1, characters 0-0:
@@ -41,4 +42,10 @@ Build the OCamlFormat binary dev-tool
 When the dev-tool feature is disabled dune runs the OCamlFormat binary from the
 PATH and not the dev-tool one.
   $ dune build
-  fake ocamlformat from PATH
+  Error: Multiple rules generated for _build/install/default/bin/ocamlformat:
+  - duniverse/ocamlformat.0.26.2/dune:2
+  - <none>:1
+  -> required by _build/default/foo.install
+  -> required by alias all
+  -> required by alias default
+  [1]
