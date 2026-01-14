@@ -29,7 +29,7 @@ module No_flush : Backend_intf.S = struct
   let message = print_msg
   let error = print_msg
   let warning = print_msg
-  let info _ = ()
+  let info msg = Printf.eprintf "%s\n%!" msg
   let verbose _ = ()
 end
 
