@@ -73,21 +73,20 @@ Build:
 
 Check cookie was created (inside target/ directory):
 
-  $ test -f _build/.pkgs/default/var-pkg.1.2.3/target/cookie && echo "cookie exists"
-  [1]
+  $ test -f _build/.pkgs/default/var-pkg/target/cookie && echo "cookie exists"
+  cookie exists
 
 Check that variables were expanded correctly.
 Note: For packages with install actions, %{prefix}% expands to target_dir (for caching).
-The PREFIX env var points to target_dir but recorded paths use the expanded %{prefix}% value.
-Files are written to target_dir then copied to shared prefix by the copy_to_prefix rule.
+Files are written to target_dir during install.
 
-  $ cat _build/install/default/lib/var-pkg/vars.txt | head -2
+  $ cat _build/.pkgs/default/var-pkg/target/lib/var-pkg/vars.txt | head -2
   name=var-pkg
   version=1.2.3
 
 The prefix and lib paths point to target_dir (inside sandbox) for caching:
 
-  $ cat _build/install/default/lib/var-pkg/vars.txt | grep prefix= | grep -q "target$" && echo "prefix ends with target"
+  $ cat _build/.pkgs/default/var-pkg/target/lib/var-pkg/vars.txt | grep prefix= | grep -q "target$" && echo "prefix ends with target"
   prefix ends with target
-  $ cat _build/install/default/lib/var-pkg/vars.txt | grep lib= | grep -q "target/lib$" && echo "lib ends with target/lib"
+  $ cat _build/.pkgs/default/var-pkg/target/lib/var-pkg/vars.txt | grep lib= | grep -q "target/lib$" && echo "lib ends with target/lib"
   lib ends with target/lib
