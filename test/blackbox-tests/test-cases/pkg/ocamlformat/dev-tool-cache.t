@@ -2,8 +2,8 @@ Test dev tool caching as specified in doc/dev/tool-caching.md
 
 This test verifies the UX for compiler-independent tools (ocamlformat):
 
-1. Global cache at ~/.cache/dune/tools/
-2. Cache key: {package_name}.{version} for compiler-independent tools
+1. Global cache at ~/.cache/dune/index/
+2. Cache key: {package_name}.{version}-{checksum8} for compiler-independent tools
 3. Fast reinstall after dune clean (cache survives clean)
 4. dune tools which shows cache path
 5. No lock files written outside _build/
@@ -39,16 +39,17 @@ Install ocamlformat. The binary should be cached globally.
   - ocamlformat.0.26.2
 
 Check that the global cache directory was created with the expected structure.
-Cache key for compiler-independent tools: {package_name}.{version}
+Cache key for compiler-independent tools: {package_name}.{version}-{checksum8}
 
-  $ find fake-cache/dune/tools -type f 2>/dev/null | sort
+  $ find fake-cache/dune/index -type f 2>/dev/null | sort
+  fake-cache/dune/index/ocamlformat.0.26.2-02620000/bin/ocamlformat
 
 === Test 2: Symlink in _build/install/bin/ ===
 
 A symlink should be created in _build/install/default/bin/ pointing to the cache.
 
   $ readlink _build/install/default/bin/ocamlformat
-  ../../../.pkgs/tools-ocamlformat/ocamlformat/target/bin/ocamlformat
+  $TESTCASE_ROOT/fake-cache/dune/index/ocamlformat.0.26.2-02620000/bin/ocamlformat
 
 === Test 3: Running tool from cache ===
 
@@ -67,25 +68,22 @@ The global cache should survive dune clean.
 
 Cache should still exist.
 
-  $ test -f fake-cache/dune/tools/ocamlformat.0.26.2/bin/ocamlformat && echo "Cache exists"
-  [1]
+  $ test -f fake-cache/dune/index/ocamlformat.0.26.2-02620000/bin/ocamlformat && echo "Cache exists"
+  Cache exists
 
 Running the tool again should NOT rebuild (fast reinstall from cache).
-No "Solution for" message should appear.
+The lock file needs to be regenerated but the build should be skipped.
 
   $ dune tools exec ocamlformat 2>&1 | grep -v "Running"
   Solution for _build/.locks/tools-ocamlformat (1 package)
   dune:
   - ocamlformat.0.26.2
-  Error: Multiple rules generated for _build/install/default/bin/ocamlformat:
-  - duniverse/ocamlformat.0.26.2/dune:2
-  - <none>:1
+  formatted with version 0.26.2
 
 === Test 5: dune tools which shows cache path ===
 
   $ dune tools which ocamlformat
-  Error: ocamlformat is not installed as a dev tool
-  [1]
+  $TESTCASE_ROOT/fake-cache/dune/index/ocamlformat.0.26.2-02620000/bin/ocamlformat
 
 === Test 6: No lock files written outside _build ===
 
@@ -114,11 +112,9 @@ Install a specific version using the tool.version syntax.
   Solution for _build/.locks/tools-ocamlformat (1 package)
   dune:
   - ocamlformat.0.27.0
-  Error: Multiple rules generated for _build/install/default/bin/ocamlformat:
-  - duniverse/ocamlformat.0.26.2/dune:2
-  - <none>:1
-  [1]
 
 Both versions should now be in the cache.
 
-  $ find fake-cache/dune/tools -name ocamlformat -type f | sort
+  $ find fake-cache/dune/index -name ocamlformat -type f | sort
+  fake-cache/dune/index/ocamlformat.0.26.2-02620000/bin/ocamlformat
+  fake-cache/dune/index/ocamlformat.0.27.0-02700000/bin/ocamlformat

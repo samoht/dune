@@ -39,16 +39,21 @@ val index_dir : unit -> Path.Outside_build_dir.t
 (** Compute the cache key for a package.
     Returns [None] for Workspace and Vendored packages (never cached).
 
+    For dev tools, uses source_checksum if available (for sharing across projects),
+    otherwise falls back to build_id (less sharing but more correct).
+
     @param pkg_type The type of package
     @param name Package name
     @param version Package version
     @param build_id Recursive build ID (hash of content + deps' build_ids)
+    @param source_checksum Optional checksum of the package source (from opam url)
     @return [Some cache_key] or [None] if package is not cacheable *)
 val cache_key
   :  pkg_type:Pkg_type.t
   -> name:Package.Name.t
   -> version:Package_version.t
   -> build_id:Dune_digest.t
+  -> source_checksum:Dune_digest.t option
   -> string option
 
 (** Check if a cached package exists in the secondary index.
@@ -130,54 +135,59 @@ module Toolchain : sig
     -> Dune_lang.Action.t
 end
 
-(** Compatibility module for dev_tool_cache.mli interface.
-    Provides the same interface as the existing [Dev_tool_cache] module
-    for gradual migration. *)
+(** Dev tool cache module.
+    Handles caching of dev tools like ocamlformat, odoc, etc. *)
 module Dev_tool : sig
-  (** OCaml compiler info for cache key computation *)
-  type ocaml_compiler_info =
-    { version : string (** e.g., "5.2.0" *)
-    ; build_id : Dune_digest.t (** Hash of compiler package + dependencies *)
-    }
-
   (** Compute the cache key for a dev tool.
-      Returns [{package_name}.{version}] for compiler-independent tools,
-      or [{package_name}.{version}-{ocaml_version}-{build_id_short}] for
-      compiler-dependent tools. *)
+      Returns [Some key] or [None] if no cache key can be computed.
+
+      Cache key format:
+      - Compiler-independent tools (e.g., ocamlformat): [{name}.{version}-{checksum8}]
+        Uses source_checksum from opam url for cross-project sharing.
+      - Compiler-dependent tools (e.g., odoc): [{name}.{version}-{build_id8}]
+        Uses the dev tool's recursive build_id which includes all deps (compiler, etc.).
+
+      @param source_checksum The checksum from the opam url field (optional)
+      @param build_id The recursive build_id from the lock file (optional) *)
   val cache_key
     :  dev_tool:Dune_pkg.Dev_tool.t
     -> version:string
-    -> ocaml_compiler:ocaml_compiler_info option
-    -> string
+    -> source_checksum:Dune_pkg.Checksum.t option
+    -> build_id:Dune_digest.t option
+    -> string option
 
   (** Get the cache directory for a dev tool *)
   val cache_dir
     :  dev_tool:Dune_pkg.Dev_tool.t
     -> version:string
-    -> ocaml_compiler:ocaml_compiler_info option
-    -> Path.Outside_build_dir.t
+    -> source_checksum:Dune_pkg.Checksum.t option
+    -> build_id:Dune_digest.t option
+    -> Path.Outside_build_dir.t option
 
   (** Get the path to a specific executable in the cache *)
   val exe_path
     :  dev_tool:Dune_pkg.Dev_tool.t
     -> version:string
-    -> ocaml_compiler:ocaml_compiler_info option
-    -> Path.Outside_build_dir.t
+    -> source_checksum:Dune_pkg.Checksum.t option
+    -> build_id:Dune_digest.t option
+    -> Path.Outside_build_dir.t option
 
   (** Check if a dev tool is already installed in the cache.
       Returns true if the executable exists. *)
   val is_installed
     :  dev_tool:Dune_pkg.Dev_tool.t
     -> version:string
-    -> ocaml_compiler:ocaml_compiler_info option
+    -> source_checksum:Dune_pkg.Checksum.t option
+    -> build_id:Dune_digest.t option
     -> bool
 
   (** Get the cache directory path (as Path.t) *)
   val cache_dir_path
     :  dev_tool:Dune_pkg.Dev_tool.t
     -> version:string
-    -> ocaml_compiler:ocaml_compiler_info option
-    -> Path.t
+    -> source_checksum:Dune_pkg.Checksum.t option
+    -> build_id:Dune_digest.t option
+    -> Path.t option
 
   (** Copy built dev tool to global cache.
       This should be called after the dev tool is successfully built.
@@ -185,7 +195,8 @@ module Dev_tool : sig
   val populate_cache
     :  dev_tool:Dune_pkg.Dev_tool.t
     -> version:string
-    -> ocaml_compiler:ocaml_compiler_info option
+    -> source_checksum:Dune_pkg.Checksum.t option
+    -> build_id:Dune_digest.t option
     -> source_dir:Path.t
     -> unit
 end

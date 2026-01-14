@@ -20,16 +20,6 @@ let dev_tool_build_target dev_tool =
        (Path.to_string (dev_tool_exe_path dev_tool)))
 ;;
 
-(* Get the expected version for a dev tool from config files (not lock files).
-   This is used for cache lookup before building. *)
-let get_expected_version_from_config dev_tool =
-  match (dev_tool : Dune_pkg.Dev_tool.t) with
-  | Ocamlformat ->
-    Dune_pkg.Ocamlformat.version_of_current_project's_ocamlformat_config ()
-    |> Option.map ~f:Package_version.to_string
-  | _ -> None
-;;
-
 (* Find a package by name in the lock file packages. *)
 let find_pkg_in_packages packages pkg_name =
   Dune_pkg.Lock.Packages.to_pkg_list packages
@@ -37,9 +27,28 @@ let find_pkg_in_packages packages pkg_name =
     Package_name.equal pkg.info.name pkg_name)
 ;;
 
-(* Read version from a dev tool's lock file synchronously.
+(* Extract the source checksum from a package's info.
+   The source checksum (from opam url) is used for compiler-independent
+   dev tools to enable cross-project cache sharing. *)
+let get_source_checksum (pkg : Dune_pkg.Pkg.t) =
+  match pkg.info.source with
+  | Some { checksum = Some (_, checksum); _ } -> Some checksum
+  | _ -> None
+;;
+
+(** Info returned from reading a dev tool lock file.
+    For cache key computation:
+    - Compiler-independent tools use source_checksum for cross-project sharing
+    - Compiler-dependent tools use build_id (recursive hash including deps) *)
+type dev_tool_lock_info =
+  { version : string
+  ; source_checksum : Dune_pkg.Checksum.t option
+  ; build_id : Dune_digest.t option
+  }
+
+(* Read version and checksums from a dev tool's lock file synchronously.
    Returns None if the lock file doesn't exist. *)
-let read_dev_tool_version_sync ~workspace_root dev_tool =
+let read_dev_tool_lock_info_sync ~workspace_root dev_tool =
   let lock_dir = Dev_tool.lock_dir dev_tool in
   let lock_dir_str =
     Filename.concat (Path.to_string workspace_root) (Path.Build.to_string lock_dir)
@@ -54,37 +63,10 @@ let read_dev_tool_version_sync ~workspace_root dev_tool =
       let pkg_name = Dune_pkg.Dev_tool.package_name dev_tool in
       find_pkg_in_packages packages pkg_name
       |> Option.map ~f:(fun (pkg : Dune_pkg.Pkg.t) ->
-        Package_version.to_string pkg.info.version))
-;;
-
-(* Compute a build_id for a package from its lockfile info.
-   Uses the package's digest_feed for a proper hash of all relevant fields.
-   Note: For a proper RECURSIVE build_id including deps, see pkg_rules.ml.
-   This is a simplified version that doesn't include dependency hashes.
-   TODO: Consider storing the recursive build_id in the lockfile. *)
-let compute_pkg_build_id (pkg : Dune_pkg.Pkg.t) =
-  Dune_digest.Feed.compute_digest Dune_pkg.Pkg.Info.digest_feed pkg.info
-;;
-
-(* Read OCaml compiler info from project's lock file synchronously.
-   Returns None if the lock file doesn't exist or has no compiler. *)
-let read_project_ocaml_compiler_sync ~workspace_root =
-  let lock_dir_str = Filename.concat (Path.to_string workspace_root) "dune.lock" in
-  let lock_dir_path = Path.of_string lock_dir_str in
-  if not (Path.exists lock_dir_path)
-  then None
-  else (
-    match Dune_pkg.Lock.read_disk lock_dir_path with
-    | Error _ -> None
-    | Ok { packages; ocaml; _ } ->
-      (match ocaml with
-       | None -> None
-       | Some (_loc, pkg_name) ->
-         find_pkg_in_packages packages pkg_name
-         |> Option.map ~f:(fun (pkg : Dune_pkg.Pkg.t) ->
-           { Dev_tool_cache.version = Package_version.to_string pkg.info.version
-           ; build_id = compute_pkg_build_id pkg
-           })))
+        { version = Package_version.to_string pkg.info.version
+        ; source_checksum = get_source_checksum pkg
+        ; build_id = pkg.build_id
+        }))
 ;;
 
 (* Create a symlink in _build/install/default/bin/ pointing to the cached binary. *)
@@ -121,21 +103,21 @@ let populate_cache_sync ~workspace_root dev_tool =
   if not (Path.exists source_dir)
   then ()
   else (
-    match read_dev_tool_version_sync ~workspace_root dev_tool with
+    match read_dev_tool_lock_info_sync ~workspace_root dev_tool with
     | None -> ()
-    | Some version ->
-      let ocaml_compiler =
-        if Dune_pkg.Dev_tool.needs_to_build_with_same_compiler_as_project dev_tool
-        then read_project_ocaml_compiler_sync ~workspace_root
-        else None
-      in
-      Dev_tool_cache.populate_cache ~dev_tool ~version ~ocaml_compiler ~source_dir;
+    | Some { version; source_checksum; build_id } ->
+      Dev_tool_cache.populate_cache
+        ~dev_tool
+        ~version
+        ~source_checksum
+        ~build_id
+        ~source_dir;
       (* Create symlink in _build/install/default/bin/ pointing to cached binary *)
-      let cached_exe_path =
-        Dev_tool_cache.exe_path ~dev_tool ~version ~ocaml_compiler
-        |> Path.outside_build_dir
-      in
-      create_install_symlink ~workspace_root dev_tool ~cached_exe_path)
+      (match Dev_tool_cache.exe_path ~dev_tool ~version ~source_checksum ~build_id with
+       | Some exe_path ->
+         let cached_exe_path = Path.outside_build_dir exe_path in
+         create_install_symlink ~workspace_root dev_tool ~cached_exe_path
+       | None -> ()))
 ;;
 
 let build_dev_tool_directly common dev_tool =
@@ -207,52 +189,22 @@ let run_dev_tool workspace_root dev_tool ~args =
   run_dev_tool_from_path workspace_root dev_tool ~exe_path_string ~args
 ;;
 
-(* Try to get cached exe path using config-based version (not lock file).
-   This is used for fast reinstall after dune clean. *)
-let get_cached_exe_path_from_config dev_tool =
-  match get_expected_version_from_config dev_tool with
-  | None -> None
-  | Some version ->
-    (* For compiler-dependent tools, we'd need the OCaml compiler info.
-       But after dune clean, we can't get it without the project lock file.
-       So for now, only compiler-independent tools support fast reinstall. *)
-    if Dune_pkg.Dev_tool.needs_to_build_with_same_compiler_as_project dev_tool
-    then None
-    else if Dev_tool_cache.is_installed ~dev_tool ~version ~ocaml_compiler:None
-    then Some (Dev_tool_cache.exe_path ~dev_tool ~version ~ocaml_compiler:None)
-    else None
-;;
-
 let lock_build_and_run_dev_tool ~common ~config builder dev_tool ~args =
-  (* Check if tool is already in global cache (fast reinstall after clean) *)
-  match get_cached_exe_path_from_config dev_tool with
-  | Some cached_exe_path ->
-    (* Tool is in cache, run directly without lock/build *)
-    let exe_path_string = Path.to_string (Path.outside_build_dir cached_exe_path) in
-    run_dev_tool_from_path (Common.root common) dev_tool ~exe_path_string ~args
-  | None ->
-    (* Need to lock and build *)
-    lock_and_build_dev_tool ~common ~config builder dev_tool;
-    run_dev_tool (Common.root common) dev_tool ~args
+  (* Always lock and build - we need the lock file for the source checksum.
+     The lock process is fast and the cache will be used if available. *)
+  lock_and_build_dev_tool ~common ~config builder dev_tool;
+  run_dev_tool (Common.root common) dev_tool ~args
 ;;
 
 (* Get the cached exe path for a dev tool if it exists in the global cache.
-   First tries the lock file, then falls back to config-based version. *)
+   Requires the lock file to get version and cache key info. *)
 let get_cached_exe_path ~workspace_root dev_tool =
-  (* First try reading version from lock file *)
-  match read_dev_tool_version_sync ~workspace_root dev_tool with
-  | Some version ->
-    let ocaml_compiler =
-      if Dune_pkg.Dev_tool.needs_to_build_with_same_compiler_as_project dev_tool
-      then read_project_ocaml_compiler_sync ~workspace_root
-      else None
-    in
-    if Dev_tool_cache.is_installed ~dev_tool ~version ~ocaml_compiler
-    then Some (Dev_tool_cache.exe_path ~dev_tool ~version ~ocaml_compiler)
+  match read_dev_tool_lock_info_sync ~workspace_root dev_tool with
+  | Some { version; source_checksum; build_id } ->
+    if Dev_tool_cache.is_installed ~dev_tool ~version ~source_checksum ~build_id
+    then Dev_tool_cache.exe_path ~dev_tool ~version ~source_checksum ~build_id
     else None
-  | None ->
-    (* Lock file doesn't exist (e.g., after clean), try config-based version *)
-    get_cached_exe_path_from_config dev_tool
+  | None -> None
 ;;
 
 let which_command dev_tool =

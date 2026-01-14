@@ -64,25 +64,27 @@ let index_dir () =
   dir
 ;;
 
-let cache_key ~pkg_type ~name ~version ~build_id =
+let cache_key ~pkg_type ~name ~version ~build_id ~source_checksum =
   let name_str = Package.Name.to_string name in
   let version_str = Package_version.to_string version in
   match pkg_type with
   | Pkg_type.Workspace | Pkg_type.Vendored -> None
   | Pkg_type.Locked | Pkg_type.Toolchain ->
     Some (sprintf "%s.%s-%s" name_str version_str (bid_short build_id))
-  | Pkg_type.Dev_tool { compiler_dependent = false; _ } ->
-    Some (sprintf "%s.%s" name_str version_str)
-  | Pkg_type.Dev_tool { compiler_dependent = true; compiler_info = None } ->
-    Some (sprintf "%s.%s" name_str version_str)
-  | Pkg_type.Dev_tool { compiler_dependent = true; compiler_info = Some info } ->
-    Some
-      (sprintf
-         "%s.%s-%s-%s"
-         name_str
-         version_str
-         info.ocaml_version
-         (bid_short info.ocaml_build_id))
+  | Pkg_type.Dev_tool { compiler_dependent; _ } ->
+    (match compiler_dependent with
+     | false ->
+       (* Compiler-independent: use source_checksum for cross-project sharing.
+          Fall back to build_id if no checksum available. *)
+       let content_hash =
+         match source_checksum with
+         | Some checksum -> bid_short checksum
+         | None -> bid_short build_id
+       in
+       Some (sprintf "%s.%s-%s" name_str version_str content_hash)
+     | true ->
+       (* Compiler-dependent: use build_id which includes compiler deps *)
+       Some (sprintf "%s.%s-%s" name_str version_str (bid_short build_id)))
 ;;
 
 let is_cached ~cache_key =
@@ -272,56 +274,83 @@ module Toolchain = struct
 end
 
 module Dev_tool = struct
-  type ocaml_compiler_info =
-    { version : string
-    ; build_id : Dune_digest.t
-    }
+  (* Extract first 8 characters of a checksum value (after the algorithm prefix) *)
+  let checksum_short checksum =
+    let s = Dune_pkg.Checksum.to_string checksum in
+    (* Checksum format is "algo=hexvalue", e.g. "md5=abc123..." *)
+    match String.index_opt s '=' with
+    | Some i -> String.sub s ~pos:(i + 1) ~len:8
+    | None -> String.sub s ~pos:0 ~len:8
+  ;;
 
-  let cache_key ~dev_tool ~version ~ocaml_compiler =
+  (** Compute the cache key for a dev tool.
+      - Compiler-independent: name.version-checksum8 (source checksum for sharing)
+      - Compiler-dependent: name.version-build_id8 (dev tool's recursive build_id) *)
+  let cache_key ~dev_tool ~version ~source_checksum ~build_id =
     let pkg_name = Dune_pkg.Dev_tool.package_name dev_tool in
-    let base = sprintf "%s.%s" (Package.Name.to_string pkg_name) version in
+    let name_str = Package.Name.to_string pkg_name in
     match Dune_pkg.Dev_tool.needs_to_build_with_same_compiler_as_project dev_tool with
-    | false -> base
+    | false ->
+      (* Compiler-independent: use source_checksum for sharing across projects *)
+      (match source_checksum with
+       | Some checksum ->
+         Some (sprintf "%s.%s-%s" name_str version (checksum_short checksum))
+       | None ->
+         (* Fall back to build_id if no source checksum *)
+         Option.map build_id ~f:(fun bid ->
+           sprintf "%s.%s-%s" name_str version (bid_short bid)))
     | true ->
-      (match ocaml_compiler with
-       | None -> base
-       | Some { version = ocaml_ver; build_id } ->
-         let build_id_short = bid_short build_id in
-         sprintf "%s-%s-%s" base ocaml_ver build_id_short)
+      (* Compiler-dependent: use dev tool's build_id which includes deps (compiler, etc.) *)
+      (match build_id with
+       | Some bid -> Some (sprintf "%s.%s-%s" name_str version (bid_short bid))
+       | None ->
+         (* Fall back to source_checksum if no build_id *)
+         Option.map source_checksum ~f:(fun checksum ->
+           sprintf "%s.%s-%s" name_str version (checksum_short checksum)))
   ;;
 
-  let cache_dir ~dev_tool ~version ~ocaml_compiler =
-    let key = cache_key ~dev_tool ~version ~ocaml_compiler in
-    Path.Outside_build_dir.relative (index_dir ()) key
+  let cache_dir ~dev_tool ~version ~source_checksum ~build_id =
+    match cache_key ~dev_tool ~version ~source_checksum ~build_id with
+    | Some key -> Some (Path.Outside_build_dir.relative (index_dir ()) key)
+    | None -> None
   ;;
 
-  let exe_path ~dev_tool ~version ~ocaml_compiler =
-    let prefix = cache_dir ~dev_tool ~version ~ocaml_compiler in
-    let exe_components = Dune_pkg.Dev_tool.exe_path_components_within_package dev_tool in
-    List.fold_left exe_components ~init:prefix ~f:Path.Outside_build_dir.relative
+  let exe_path ~dev_tool ~version ~source_checksum ~build_id =
+    match cache_dir ~dev_tool ~version ~source_checksum ~build_id with
+    | Some prefix ->
+      let exe_components =
+        Dune_pkg.Dev_tool.exe_path_components_within_package dev_tool
+      in
+      Some (List.fold_left exe_components ~init:prefix ~f:Path.Outside_build_dir.relative)
+    | None -> None
   ;;
 
-  let is_installed ~dev_tool ~version ~ocaml_compiler =
-    let exe = exe_path ~dev_tool ~version ~ocaml_compiler in
-    Path.Untracked.exists (Path.outside_build_dir exe)
+  let is_installed ~dev_tool ~version ~source_checksum ~build_id =
+    match exe_path ~dev_tool ~version ~source_checksum ~build_id with
+    | Some exe -> Path.Untracked.exists (Path.outside_build_dir exe)
+    | None -> false
   ;;
 
-  let cache_dir_path ~dev_tool ~version ~ocaml_compiler =
-    Path.outside_build_dir (cache_dir ~dev_tool ~version ~ocaml_compiler)
+  let cache_dir_path ~dev_tool ~version ~source_checksum ~build_id =
+    Option.map
+      (cache_dir ~dev_tool ~version ~source_checksum ~build_id)
+      ~f:Path.outside_build_dir
   ;;
 
-  let populate_cache ~dev_tool ~version ~ocaml_compiler ~source_dir =
-    let cache_target = cache_dir_path ~dev_tool ~version ~ocaml_compiler in
-    Path.mkdir_p cache_target;
-    let source_bin = Path.relative source_dir "bin" in
-    let target_bin = Path.relative cache_target "bin" in
-    if Path.Untracked.exists source_bin
-    then (
-      Path.mkdir_p target_bin;
-      let exe_name = Dune_pkg.Dev_tool.exe_name dev_tool in
-      let source_exe = Path.relative source_bin exe_name in
-      let target_exe = Path.relative target_bin exe_name in
-      if Path.Untracked.exists source_exe
-      then Io.copy_file ~src:source_exe ~dst:target_exe ())
+  let populate_cache ~dev_tool ~version ~source_checksum ~build_id ~source_dir =
+    match cache_dir_path ~dev_tool ~version ~source_checksum ~build_id with
+    | None -> ()
+    | Some cache_target ->
+      Path.mkdir_p cache_target;
+      let source_bin = Path.relative source_dir "bin" in
+      let target_bin = Path.relative cache_target "bin" in
+      if Path.Untracked.exists source_bin
+      then (
+        Path.mkdir_p target_bin;
+        let exe_name = Dune_pkg.Dev_tool.exe_name dev_tool in
+        let source_exe = Path.relative source_bin exe_name in
+        let target_exe = Path.relative target_bin exe_name in
+        if Path.Untracked.exists source_exe
+        then Io.copy_file ~src:source_exe ~dst:target_exe ())
   ;;
 end

@@ -40,6 +40,10 @@ make_ocamlformat_opam_pkg() {
   else
     port=""
   fi
+  # Use a fixed checksum for predictable cache keys in tests.
+  # The checksum is version-dependent so different versions get different cache keys.
+  # We put the version at the START so the 8-char prefix is unique per version.
+  checksum="md5=${version//./}00000000000000000000000000"
   if [ ! "$port" = "" ]
   then
     mkpkg ocamlformat $version <<EOF
@@ -55,7 +59,7 @@ build: [
 url {
   src: "http://127.0.0.1:$port"
   checksum: [
-    "md5=$(md5sum ocamlformat-$version.tar | cut -f1 -d' ')"
+    "$checksum"
   ]
 }
 EOF
@@ -73,7 +77,7 @@ build: [
 url {
   src: "file://$PWD/ocamlformat-$version.tar"
   checksum: [
-    "md5=$(md5sum ocamlformat-$version.tar | cut -f1 -d' ')"
+    "$checksum"
   ]
 }
 EOF

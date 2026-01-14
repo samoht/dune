@@ -81,15 +81,16 @@ well-behaved OCaml packages (ocamlformat, odoc, ocamllsp all do).
 
 **`dune tools install ocamlformat` flow:**
 1. Determine version (from `.ocamlformat` config or CLI flag)
-2. Check global cache `~/.cache/dune/tools/ocamlformat.0.26.2/`
-3. **Cache hit**: Promote directly from cache to `_build/install/default/bin/`
-4. **Cache miss**:
-   - Generate lock file in `_build/.locks/tools-ocamlformat/`
+2. Generate lock file in `_build/.locks/tools-ocamlformat/` (needed for cache key)
+3. Compute cache key from lock file (e.g., `ocamlformat.0.26.2-a1b2c3d4`)
+4. Check global cache `~/.cache/dune/index/ocamlformat.0.26.2-a1b2c3d4/`
+5. **Cache hit**: Promote directly from cache to `_build/install/default/bin/`
+6. **Cache miss**:
    - Build all packages in `_build/.pkgs/tools-ocamlformat/`
    - Packages install to `_build/install/tools-ocamlformat/`
    - Read `target/ocamlformat.install` to find tool's installed files
    - Promote only the tool's files to `_build/install/default/`
-   - Copy to global cache for future use
+   - Copy to global cache (`~/.cache/dune/index/`) for future use
 
 **Key design points:**
 - Full isolation: each tool has its own context (different deps, OCaml version)
@@ -102,39 +103,52 @@ well-behaved OCaml packages (ocamlformat, odoc, ocamllsp all do).
 ### Two-Level Cache Model
 
 ```
-~/.cache/dune/tools/                              # Global cache (shared)
-├── ocamlformat.0.26.2/bin/ocamlformat
-├── odoc.2.4.0-5.2.0/bin/odoc                     # compiler-dependent
-└── ocamllsp.1.18.0-5.2.0/bin/ocamllsp
+~/.cache/dune/
+├── db/files/v5/<hash>/...                        # Content-addressed cache
+└── index/                                        # Secondary index (symlinks)
+    ├── ocamlformat.0.26.2-a1b2c3d4/bin/ocamlformat
+    ├── odoc.2.4.0-f7e8d9c0/bin/odoc              # compiler-dependent
+    └── ocamllsp.1.18.0-b2c3d4e5/bin/ocamllsp
 
 _build/install/default/bin/                        # Project install dir
-└── ocamlformat -> ~/.cache/dune/tools/ocamlformat.0.26.2/bin/ocamlformat
+└── ocamlformat -> ~/.cache/dune/index/ocamlformat.0.26.2-a1b2c3d4/bin/ocamlformat
 ```
 
-After promotion, binaries can optionally be cached globally and replaced with
-symlinks for cross-project sharing.
+After promotion, binaries are cached in `~/.cache/dune/index/` and replaced with
+symlinks for cross-project sharing. The index entries point to the content-addressed
+store (`~/.cache/dune/db/files/v5/`).
 
 **Benefits:**
 - No workspace pollution (everything in `_build/`)
 - `dune clean` removes symlinks but keeps cached binaries (fast reinstall)
 - Cross-project sharing via global cache
 - Full isolation via per-tool contexts
+- Deduplication via content-addressed storage
 
 ### Cache Key Design
 
-Simple keys without digest complexity:
+Cache keys use an 8-character digest suffix to ensure correctness while enabling sharing:
 
 **Compiler-independent tools:**
 ```
-{package_name}.{version}
+{package_name}.{version}-{checksum8}
 ```
+Where `checksum8` is the first 8 characters of the source checksum hash from the
+opam URL. This enables cross-project sharing regardless of which OCaml version
+the project uses.
 
 **Compiler-dependent tools:**
 ```
-{package_name}.{version}-{ocaml_version}
+{package_name}.{version}-{build_id8}
 ```
+Where `build_id8` is from the dev tool's recursive `build_id` (Merkle hash of
+opam content + all deps' build_ids). This automatically includes the compiler
+as a dependency, ensuring projects with different compilers get separate cache
+entries while projects with the same compiler share.
 
-If the opam package definition changes, the version should change. Trust semver.
+**Fallback:** If source checksum is unavailable (e.g., git sources), fall back
+to using `build_id8` for compiler-independent tools as well. This reduces sharing
+but maintains correctness.
 
 ### Compiler Dependency Classification
 
@@ -154,17 +168,17 @@ If the opam package definition changes, the version should change. Trust semver.
 When user runs `dune fmt`:
 
 1. Check `_build/install/default/bin/ocamlformat` → use if exists
-2. Parse `.ocamlformat` for version (e.g., `version = 0.26.2`)
-3. Check global cache `~/.cache/dune/tools/ocamlformat.0.26.2/`
-4. **Cache hit**: Create symlink in `_build/install/default/bin/`, run
-5. **Cache miss**:
-   - Generate lock dir at `_build/.locks/tools-ocamlformat/`
+2. Generate lock dir at `_build/.locks/tools-ocamlformat/` (needed for cache key)
+3. Compute cache key from lock file: `ocamlformat.0.26.2-<checksum8>`
+4. Check global cache `~/.cache/dune/index/ocamlformat.0.26.2-<checksum8>/`
+5. **Cache hit**: Create symlink in `_build/install/default/bin/`, run
+6. **Cache miss**:
    - Build packages in `_build/.pkgs/tools-ocamlformat/`
-   - Promote `_build/.pkgs/tools-ocamlformat/ocamlformat.0.26.2-<digest>/target/bin/*`
+   - Promote `_build/.pkgs/tools-ocamlformat/ocamlformat/target/bin/*`
      to `_build/install/default/bin/`
-   - Copy binary to global cache
+   - Copy binary to global cache (`~/.cache/dune/index/`)
    - Replace with symlink pointing to cache
-6. Run tool from `_build/install/default/bin/`
+7. Run tool from `_build/install/default/bin/`
 
 **No files outside `_build/` in user's repo.**
 
@@ -304,10 +318,10 @@ https://cache.dune.build/tools/
 
 ### Download Flow
 
-1. Compute expected cache key
+1. Compute expected cache key from lock file
 2. Check `https://cache.dune.build/tools/{name}/{key}/{platform}.tar.gz`
 3. Verify checksum
-4. Extract to `~/.cache/dune/tools/{name}.{key}/`
+4. Extract to `~/.cache/dune/index/{name}.{key}/`
 5. Fall back to source build if binary unavailable
 
 ### Security
@@ -325,10 +339,9 @@ https://cache.dune.build/tools/
 **Dev tool caching:**
 | File | Changes |
 |------|---------|
-| `src/dune_rules/pkg_toolchain.ml` | Generalize to support dev tools |
-| `src/dune_rules/pkg_dev_tool.ml` | Cache lookup, symlink creation |
-| `src/dune_pkg/dev_tool.ml` | Simplified cache key computation |
-| `bin/tools/tools_common.ml` | Auto-install flow, binary download |
+| `src/dune_rules/pkg_cache.ml` | Unified cache for all package types |
+| `src/dune_rules/pkg_cache.mli` | Cache key computation, index management |
+| `bin/tools/tools_common.ml` | Auto-install flow, cache lookup, symlink creation |
 
 **Content-addressed digests:**
 | File | Changes |
