@@ -75,7 +75,8 @@ let check_runtime_deps_relative_path local_path ~loc ~lib_info =
 module Stanzas_to_entries : sig
   val stanzas_to_entries
     :  Super_context.t
-    -> Install.Entry.Sourced.Unexpanded.t list Package.Name.Map.t Memo.t
+    -> Package.Name.t
+    -> Install.Entry.Sourced.Unexpanded.t list Memo.t
 end = struct
   let lib_ppxs ctx ~scope ~(lib : Library.t) =
     match lib.kind with
@@ -379,61 +380,22 @@ end = struct
       ]
   ;;
 
-  let keep_if expander ~scope stanza =
+  let keep_if expander ~scope:_ stanza =
     let+ keep =
       match Stanza.repr stanza with
       | Library.T lib ->
-        let* enabled_if = Expander.eval_blang expander lib.enabled_if in
-        if enabled_if
-        then
-          if lib.optional
-          then (
-            let src_dir =
-              Expander.dir expander
-              |> Path.build
-              |> Path.drop_optional_build_context_src_exn
-            in
-            Lib.DB.available_by_lib_id
-              (Scope.libs scope)
-              (Local (Library.to_lib_id ~src_dir lib)))
-          else Memo.return true
-        else Memo.return false
+        (* Don't check optional library availability during install entry
+           computation - this can trigger library instantiation and cause
+           dependency cycles. The availability will be checked at build time. *)
+        Expander.eval_blang expander lib.enabled_if
       | Documentation.T _ -> Memo.return true
       | Install_conf.T { enabled_if; _ } -> Expander.eval_blang expander enabled_if
       | Plugin.T _ -> Memo.return true
       | Executables.T ({ install_conf = Some _; _ } as exes) ->
+        (* Don't check optional executable dependencies during install entry
+           computation - this can trigger library instantiation and cause
+           dependency cycles. The availability will be checked at build time. *)
         Expander.eval_blang expander exes.enabled_if
-        >>= (function
-         | false -> Memo.return false
-         | true ->
-           if not exes.optional
-           then Memo.return true
-           else
-             let* compile_info =
-               let dune_version = Scope.project scope |> Dune_project.dune_version in
-               let+ pps =
-                 (* This is wrong. If the preprocessors fail to resolve,
-                    we shouldn't install the binary rather than failing outright
-                 *)
-                 Instrumentation.with_instrumentation
-                   exes.buildable.preprocess
-                   ~instrumentation_backend:
-                     (Lib.DB.instrumentation_backend (Scope.libs scope))
-                 |> Resolve.Memo.read_memo
-                 >>| Preprocess.Per_module.pps
-               in
-               Lib.DB.resolve_user_written_deps
-                 (Scope.libs scope)
-                 ~forbidden_libraries:[]
-                 (`Exe exes.names)
-                 exes.buildable.libraries
-                 ~allow_unused_libraries:exes.buildable.allow_unused_libraries
-                 ~pps
-                 ~dune_version
-                 ~allow_overlaps:exes.buildable.allow_overlapping_dependencies
-             in
-             let+ requires = Lib.Compile.direct_requires compile_info in
-             Resolve.is_ok requires)
       | Coq_stanza.Theory.T d -> Memo.return (Option.is_some d.package)
       | Rocq_stanza.Theory.T d -> Memo.return (Option.is_some d.package)
       | _ -> Memo.return false
@@ -542,13 +504,25 @@ end = struct
 
   module Package_map_traversals = Memo.Make_parallel_map (Package.Name.Map)
 
-  let stanzas_to_entries sctx =
+  (* Filter stanzas that belong to a specific package.
+     This is done BEFORE calling keep_if to avoid triggering library
+     availability checks for unrelated packages, which can cause dependency cycles. *)
+  let stanza_belongs_to_package stanza target_package =
+    match Stanzas.stanza_package stanza with
+    | None -> false
+    | Some pkg_id -> Package.Name.equal (Package.Id.name pkg_id) target_package
+  ;;
+
+  let stanzas_to_entries sctx target_package =
     let ctx = Context.build_context (Super_context.context sctx) in
     let* stanzas = Dune_load.dune_files ctx.name
     and* vendored_packages = Dune_load.vendored_packages () in
     let* packages = Dune_load.packages () in
-    let+ init =
-      Package_map_traversals.parallel_map packages ~f:(fun _name (pkg : Package.t) ->
+    (* Compute per-package init entries (meta files, opam files, doc files) *)
+    let* init =
+      match Package.Name.Map.find packages target_package with
+      | None -> Memo.return []
+      | Some pkg ->
         let opam_file = Package_paths.opam_file ctx pkg in
         let init =
           let file section local_file dst =
@@ -585,70 +559,75 @@ end = struct
         in
         let pkg_dir = Package.dir pkg in
         Source_tree.find_dir pkg_dir
-        >>| function
-        | None -> init
-        | Some dir ->
-          let pkg_dir = Path.Build.append_source ctx.build_dir pkg_dir in
-          Source_tree.Dir.filenames dir
-          |> Filename.Set.fold ~init ~f:(fun fn acc ->
-            if is_odig_doc_file fn
-            then (
-              let odig_file = Path.Build.relative pkg_dir fn in
-              let entry =
-                Install.Entry.Unexpanded.make
-                  Doc
-                  ~kind:Install.Entry.Unexpanded.File
-                  odig_file
-              in
-              Install.Entry.Sourced.Unexpanded.create entry :: acc)
-            else acc))
-    and+ entries =
+        >>| (function
+         | None -> init
+         | Some dir ->
+           let pkg_dir = Path.Build.append_source ctx.build_dir pkg_dir in
+           Source_tree.Dir.filenames dir
+           |> Filename.Set.fold ~init ~f:(fun fn acc ->
+             if is_odig_doc_file fn
+             then (
+               let odig_file = Path.Build.relative pkg_dir fn in
+               let entry =
+                 Install.Entry.Unexpanded.make
+                   Doc
+                   ~kind:Install.Entry.Unexpanded.File
+                   odig_file
+               in
+               Install.Entry.Sourced.Unexpanded.create entry :: acc)
+             else acc))
+    in
+    let+ entries =
       let* package_db = Package_db.create ctx.name in
+      (* Filter stanzas to only those belonging to target_package BEFORE
+         calling stanza_to_entries, which would trigger keep_if and
+         potentially cause dependency cycles when checking library availability *)
       Dune_file.fold_static_stanzas stanzas ~init:[] ~f:(fun dune_file stanza acc ->
-        let source_dir = Dune_file.dir dune_file in
-        let dir = Path.Build.append_source ctx.build_dir source_dir in
-        let named_entries =
-          let* expander = Super_context.expander sctx ~dir
-          and* scope = Scope.DB.find_by_dir dir in
-          stanza_to_entries
-            ~vendored_packages
-            ~package_db
-            ~sctx
-            ~dir
-            ~scope
-            ~expander
-            stanza
-        in
-        named_entries :: acc)
+        if not (stanza_belongs_to_package stanza target_package)
+        then acc
+        else (
+          let source_dir = Dune_file.dir dune_file in
+          let dir = Path.Build.append_source ctx.build_dir source_dir in
+          let named_entries =
+            let* expander = Super_context.expander sctx ~dir
+            and* scope = Scope.DB.find_by_dir dir in
+            stanza_to_entries
+              ~vendored_packages
+              ~package_db
+              ~sctx
+              ~dir
+              ~scope
+              ~expander
+              stanza
+          in
+          named_entries :: acc))
       |> Memo.all_concurrently
     in
-    List.fold_left entries ~init ~f:(fun acc named_entries ->
-      match named_entries with
-      | None -> acc
-      | Some (name, entries) -> Package.Name.Map.Multi.add_all acc name entries)
-    |> Package.Name.Map.map ~f:(fun entries ->
-      (* Sort entries so that the ordering in [dune-package] is independent
-         of Dune's current implementation. *)
-      (* jeremiedimino: later on, we group this list by section and sort
-         each section. It feels like we should just do this here once and
-         for all. *)
-      List.sort
-        entries
-        ~compare:
-          (fun
-            (a : Install.Entry.Sourced.Unexpanded.t)
-            (b : Install.Entry.Sourced.Unexpanded.t)
-          -> Install.Entry.Unexpanded.compare a.entry b.entry))
+    let entries =
+      List.fold_left entries ~init ~f:(fun acc named_entries ->
+        match named_entries with
+        | None -> acc
+        | Some (_name, entries) -> List.rev_append entries acc)
+    in
+    (* Sort entries so that the ordering in [dune-package] is independent
+       of Dune's current implementation. *)
+    List.sort
+      entries
+      ~compare:
+        (fun
+          (a : Install.Entry.Sourced.Unexpanded.t)
+          (b : Install.Entry.Sourced.Unexpanded.t)
+        -> Install.Entry.Unexpanded.compare a.entry b.entry)
   ;;
 
   let stanzas_to_entries =
     let memo =
       Memo.create
-        ~input:(module Super_context.As_memo_key)
+        ~input:(module Super_context.As_memo_key.And_package_name)
         "stanzas-to-entries"
-        stanzas_to_entries
+        (fun (sctx, pkg) -> stanzas_to_entries sctx pkg)
     in
-    Memo.exec memo
+    fun sctx pkg -> Memo.exec memo (sctx, pkg)
   ;;
 end
 
@@ -761,8 +740,8 @@ end = struct
         Lib_name.Map.add_exn acc name x)
     in
     let+ files =
-      let+ map = Stanzas_to_entries.stanzas_to_entries sctx in
-      Package.Name.Map.Multi.find map pkg_name
+      let+ entries = Stanzas_to_entries.stanzas_to_entries sctx pkg_name in
+      entries
       |> List.map ~f:(fun (e : Install.Entry.Sourced.Unexpanded.t) ->
         let kind =
           match e.entry.kind with
@@ -1066,10 +1045,7 @@ let promote_install_file (ctx : Context.t) =
   | Opam _ -> false
 ;;
 
-let install_entries sctx package =
-  let+ packages = Stanzas_to_entries.stanzas_to_entries sctx in
-  Package.Name.Map.Multi.find packages package
-;;
+let install_entries sctx package = Stanzas_to_entries.stanzas_to_entries sctx package
 
 let packages =
   let f sctx =

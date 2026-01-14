@@ -19,6 +19,7 @@ end
 
 include T
 
+let equal a b = Ordering.is_eq (compare a b)
 let create ~name ~dir = { name; dir }
 let hash { name; dir } = Tuple.T2.hash Package_name.hash Path.Source.hash (name, dir)
 let name t = t.name

@@ -129,6 +129,10 @@ module DB : sig
 
   val installed : Context.t -> t Memo.t
 
+  (** Create a library database from locked packages in _build/.pkgs/<ctx>/<pkg>/target/lib/.
+      This allows looking up libraries from locked packages without triggering install rules. *)
+  val from_pkgs : Context.t -> parent:t option -> t Memo.t
+
   module Resolve_result : sig
     type db := t
     type t

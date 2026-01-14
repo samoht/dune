@@ -177,6 +177,26 @@ The `duniverse/dune` file is auto-generated with appropriate vendor stanzas.
 
 Note: `vendored_dirs` only matches directories at the current level (no paths with `/`).
 
+## Known Limitations
+
+### `%{bin-available:...}` and `(mode opam)` packages
+
+The `%{bin-available:...}` pform only detects:
+- Local project binaries (from install stanzas and public executables)
+- Binaries on PATH
+- Binaries from `(vendor ... (mode dune))` packages
+
+It does **not** detect binaries from `(vendor ... (mode opam))` packages. This is
+because `%{bin-available:...}` is expanded during dune file loading (rule generation),
+before opam-mode packages are built. Checking opam-mode binaries would require
+resolving all packages, which creates dependency cycles.
+
+**Workaround:** If you need to conditionally enable features based on binaries from
+opam-mode packages, use a different approach such as:
+- Moving the binary check to build time (in a rule action)
+- Using `(mode dune)` for the package if possible
+- Assuming the binary will be available and handling errors at build time
+
 ## Open Questions
 
 **Shared prefix vs isolated derivations?**

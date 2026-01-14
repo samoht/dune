@@ -422,11 +422,30 @@ let create (builder : Builder.t) ~(kind : Kind.t) =
       { builder with env }
   in
   let which_outside_lockdir = Which.which ~path:builder.path in
+  let pkg_toolchain =
+    match kind with
+    | Default | Opam _ -> None
+    | Lock _ ->
+      Some
+        (Memo.lazy_
+           ~human_readable_description:(fun () ->
+             Pp.textf
+               "loading package toolchain for context %S"
+               (Context_name.to_string builder.name))
+           (fun () ->
+              let open Memo.O in
+              Pkg_rules.ocaml_toolchain builder.name
+              >>= function
+              | None -> Memo.return None
+              | Some toolchain ->
+                let+ toolchain, _ = Action_builder.evaluate_and_collect_facts toolchain in
+                Some toolchain))
+  in
   let which =
     match kind with
     | Default | Opam _ -> which_outside_lockdir
     | Lock _ ->
-      let which = Staged.unstage @@ Pkg_rules.which builder.name in
+      let pkg_which = Staged.unstage @@ Pkg_rules.which builder.name in
       fun prog ->
         Memo.push_stack_frame
           ~human_readable_description:(fun () ->
@@ -435,10 +454,22 @@ let create (builder : Builder.t) ~(kind : Kind.t) =
               prog
               (Context_name.to_string builder.name))
           (fun () ->
-             which prog
-             >>= function
-             | Some p -> Memo.return (Some p)
-             | None -> Which.which ~path:builder.path prog)
+             if Ocaml_toolchain.is_toolchain_binary prog
+             then
+               (* Toolchain binary - get from toolchain lazily *)
+               Memo.Lazy.force (Option.value_exn pkg_toolchain)
+               >>= function
+               | Some tc ->
+                 (match Ocaml_toolchain.which tc prog with
+                  | Some p -> Memo.return (Some p)
+                  | None -> Which.which ~path:builder.path prog)
+               | None -> Which.which ~path:builder.path prog
+             else
+               (* Non-toolchain binary - use package binaries *)
+               pkg_which prog
+               >>= function
+               | Some p -> Memo.return (Some p)
+               | None -> Which.which ~path:builder.path prog)
   in
   let ocamlpath =
     Memo.lazy_

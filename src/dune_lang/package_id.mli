@@ -10,5 +10,6 @@ val name : t -> Package_name.t
 val hash : t -> int
 val to_dyn : t -> Dyn.t
 val compare : t -> t -> Ordering.t
+val equal : t -> t -> bool
 
 include Comparable_intf.S with type key := t

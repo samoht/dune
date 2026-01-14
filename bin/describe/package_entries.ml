@@ -14,9 +14,16 @@ let term =
   build_exn
   @@ fun () ->
   let open Memo.O in
-  Dune_rules.Install_rules.stanzas_to_entries super_context
-  >>| Package.Name.Map.to_dyn (Dyn.list Install.Entry.Sourced.Unexpanded.to_dyn)
-  >>| Describe_format.print_dyn format
+  let* packages = Dune_rules.Dune_load.packages () in
+  let+ entries =
+    Package.Name.Map.to_list packages
+    |> Memo.parallel_map ~f:(fun (name, _pkg) ->
+      let+ entries = Dune_rules.Install_rules.stanzas_to_entries super_context name in
+      name, entries)
+  in
+  Package.Name.Map.of_list_exn entries
+  |> Package.Name.Map.to_dyn (Dyn.list Install.Entry.Sourced.Unexpanded.to_dyn)
+  |> Describe_format.print_dyn format
 ;;
 
 let command =

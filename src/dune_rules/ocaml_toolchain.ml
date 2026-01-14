@@ -188,3 +188,20 @@ let check_fdo_support { version; lib_config = { has_native; _ }; ocaml_config; _
             version_string
         ]
 ;;
+
+let toolchain_binaries =
+  [ "ocaml"; "ocamlc"; "ocamlopt"; "ocamldep"; "ocamlmklib"; "ocamlobjinfo" ]
+;;
+
+let is_toolchain_binary prog = List.mem toolchain_binaries prog ~equal:String.equal
+
+let which t prog =
+  match prog with
+  | "ocaml" -> Result.to_option t.ocaml
+  | "ocamlc" -> Some t.ocamlc
+  | "ocamlopt" -> Result.to_option t.ocamlopt
+  | "ocamldep" -> Result.to_option t.ocamldep
+  | "ocamlmklib" -> Result.to_option t.ocamlmklib
+  | "ocamlobjinfo" -> Result.to_option t.ocamlobjinfo
+  | _ -> None
+;;

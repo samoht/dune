@@ -382,8 +382,12 @@ module DB = struct
     in
     let instrument_with = Context.instrument_with context in
     let+ public_libs =
-      let+ installed_libs = Lib.DB.installed context in
-      public_libs t ~instrument_with ~installed_libs stanzas
+      (* Hierarchy: public_libs -> pkgs_libs -> installed_libs (findlib)
+         The pkgs_libs layer checks _build/.pkgs/<ctx>/<pkg>/target/lib/ for
+         libraries from locked packages, avoiding install rule evaluation cycles. *)
+      let* installed_libs = Lib.DB.installed context in
+      let+ pkgs_libs = Lib.DB.from_pkgs context ~parent:(Some installed_libs) in
+      public_libs t ~instrument_with ~installed_libs:pkgs_libs stanzas
     in
     let by_dir =
       scopes_by_dir

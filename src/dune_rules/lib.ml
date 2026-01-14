@@ -2389,6 +2389,57 @@ module DB = struct
       ~instrument_with:(Context.instrument_with context)
   ;;
 
+  let from_pkgs (context : Context.t) ~parent =
+    let open Memo.O in
+    (* Compute paths to each package's lib directory:
+       _build/.pkgs/<ctx>/<pkg>/target/lib/
+       Scan .pkgs/<ctx>/ directory directly - this works even before lib-cache is generated. *)
+    let context_name = Context.name context in
+    let pkgs_ctx_dir =
+      Path.Build.relative Dpath.Build.pkgs_dir (Context_name.to_string context_name)
+      |> Path.build
+    in
+    let paths =
+      if Path.Untracked.exists pkgs_ctx_dir
+      then (
+        match Path.Untracked.readdir_unsorted pkgs_ctx_dir with
+        | Error _ -> []
+        | Ok entries ->
+          List.filter_map entries ~f:(fun entry ->
+            let pkg_dir = Path.relative pkgs_ctx_dir entry in
+            if Path.Untracked.is_directory pkg_dir
+            then (
+              let lib_dir = Path.relative (Path.relative pkg_dir "target") "lib" in
+              if Path.Untracked.exists lib_dir then Some lib_dir else None)
+            else None))
+      else []
+    in
+    match paths with
+    | [] ->
+      (* No pkgs directories found, return an empty DB that just delegates to parent *)
+      Memo.return
+        (create
+           ()
+           ~parent
+           ~resolve:(fun _ -> Memo.return [ Not_found ])
+           ~resolve_lib_id:(fun _ -> Memo.return Not_found)
+           ~all:(fun () -> Memo.return [])
+           ~instrument_with:(Context.instrument_with context))
+    | _ ->
+      (* Create a findlib DB from the pkgs paths.
+         For package libraries, we assume modern OCaml (5.0+) which has bigarray
+         in stdlib, so has_bigarray_library is false. This avoids forcing the
+         toolchain to be built just to determine the OCaml version. *)
+      let+ findlib = Findlib.create_with_paths (Context.name context) ~paths in
+      let db =
+        create_from_findlib
+          findlib
+          ~has_bigarray_library:false
+          ~instrument_with:(Context.instrument_with context)
+      in
+      with_parent db ~parent
+  ;;
+
   let find t name =
     let open Memo.O in
     Resolve_names.find_internal t name

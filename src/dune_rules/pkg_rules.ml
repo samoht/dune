@@ -520,10 +520,14 @@ module Resolved_pkg = struct
     |> Dep.Set.of_list
   ;;
 
-  (* All packages install files to the shared _build/install/<ctx>/ directory.
-     The per-package target_dir/cookie is used only for dependency tracking. *)
+  (* Return install roots for build environment.
+     Use per-package target directory (.pkgs/<ctx>/<pkg>/target/) instead of shared
+     install directory (_build/install/<ctx>/) to avoid triggering install rules
+     scheme during library resolution. *)
   let install_roots t =
-    Pkg_opam.Pkg_install.roots_for_package ~pkg_name:t.info.name ~context:t.context
+    Install.Roots.opam_from_prefix
+      ~relative:Path.relative
+      (Path.build t.write_paths.target_dir)
   ;;
 
   (* Given a list of packages, construct an env containing variables
@@ -566,6 +570,17 @@ module Resolved_pkg = struct
      to build the package [t] *)
   let exported_value_env t =
     let package_env = build_env t |> Env.Map.superpose (base_env t) in
+    (* If this package depends on vendored dune packages, add the shared install
+       directory to OCAMLPATH so it can find their libraries. *)
+    let package_env =
+      match t.vendored_depends with
+      | [] -> package_env
+      | _ :: _ ->
+        let { Install.Roots.lib_root = install_lib; _ } =
+          Pkg_opam.Pkg_install.roots ~context:t.context
+        in
+        Value_list_env.add_path package_env Dune_findlib.Config.ocamlpath_var install_lib
+    in
     (* TODO: Run actions in a constrained environment. [Global.env ()] is the
        environment from which dune was executed, and some of the environment
        variables may affect builds in unintended ways and make builds less
@@ -3112,9 +3127,18 @@ let ocaml_toolchain context =
           Some (Action_builder.memoize "ocaml_toolchain" toolchain)))
 ;;
 
-let all_deps universe =
+let all_deps ?(exclude_toolchain = false) universe =
   let ctx = Package_universe.context_name universe in
   let* registry = Package_registry.of_ctx ctx in
+  let* toolchain_pkg =
+    if exclude_toolchain
+    then
+      let+ lock_dir_result = Lock_dir.get ctx in
+      match lock_dir_result with
+      | Ok ld -> ld.Dune_pkg.Lock.ocaml
+      | Error _ -> None
+    else Memo.return None
+  in
   Package_registry.to_list registry
   |> Memo.parallel_map ~f:(fun entry ->
     (* Filter out vendored dune packages and workspace packages - they're built as regular code *)
@@ -3132,14 +3156,22 @@ let all_deps universe =
       (* Skip virtual packages - they don't need building *)
       if is_virtual_lock_package pkg
       then Memo.return None
-      else
-        let+ resolved = Resolve.resolve_entry registry entry ~package_universe:universe in
-        Some resolved)
+      else (
+        (* Skip toolchain package if requested - it will be built lazily when needed *)
+        match toolchain_pkg with
+        | Some (_, tp) when Package.Name.equal entry.name tp -> Memo.return None
+        | _ ->
+          let+ resolved =
+            Resolve.resolve_entry registry entry ~package_universe:universe
+          in
+          Some resolved))
   >>| List.filter_map ~f:Fun.id
   >>| Resolved_pkg.top_closure
 ;;
 
-let all_project_deps context = all_deps (Dependencies context)
+let all_project_deps ?(exclude_toolchain = false) context =
+  all_deps ~exclude_toolchain (Dependencies context)
+;;
 
 let which context =
   let artifacts_and_deps =
@@ -3150,7 +3182,8 @@ let which context =
           (Context_name.to_string context))
       (fun () ->
          let+ { binaries; dep_info = _ } =
-           all_project_deps context >>= Action_expander.Artifacts_and_deps.of_closure
+           all_project_deps ~exclude_toolchain:true context
+           >>= Action_expander.Artifacts_and_deps.of_closure
          in
          binaries)
   in
@@ -3293,14 +3326,40 @@ module Lib_cache_spec = struct
       Dune_pkg.Lock_pkg.read_disk ~solver_env ~local_packages:[] actual_lock_file
     in
     let pkgs = Dune_pkg.Lock.Packages.to_pkg_list lock_dir.packages in
-    (* Collect library→package→directory mappings from the lock file.
-       Scan _build/.pkgs/default/<pkg>/source/ for libraries if fetched,
-       otherwise fall back to package name. *)
-    let entries =
-      List.concat_map pkgs ~f:(fun (pkg : Dune_pkg.Pkg.t) ->
+    (* Collect library→package→directory mappings.
+       Sources: 1) vendor stanzas (opam-mode) in workspace, 2) lock file packages.
+       Scan _build/.pkgs/default/ for all packages - this includes both sources. *)
+    let pkgs_ctx_dir = Path.Build.relative Dpath.Build.pkgs_dir "default" |> Path.build in
+    (* Scan .pkgs/default/ directory for all package directories *)
+    let pkg_dirs_from_pkgs =
+      if Path.Untracked.exists pkgs_ctx_dir
+      then (
+        match Path.Untracked.readdir_unsorted pkgs_ctx_dir with
+        | Error _ -> []
+        | Ok entries ->
+          List.filter_map entries ~f:(fun entry ->
+            let entry_path = Path.relative pkgs_ctx_dir entry in
+            if Path.Untracked.is_directory entry_path then Some entry else None))
+      else []
+    in
+    (* Also include lock packages that might not be fetched yet *)
+    let lock_pkg_dirs =
+      List.map pkgs ~f:(fun (pkg : Dune_pkg.Pkg.t) ->
         let pkg_name = Package.Name.to_string pkg.info.name in
         let version = Dune_pkg.Package_version.to_string pkg.info.version in
-        let dirname = sprintf "%s.%s" pkg_name version in
+        sprintf "%s.%s" pkg_name version)
+    in
+    (* Merge: .pkgs dirs take precedence (they exist), lock dirs as fallback *)
+    let all_pkg_dirs =
+      List.fold_left
+        lock_pkg_dirs
+        ~init:(String.Set.of_list pkg_dirs_from_pkgs)
+        ~f:String.Set.add
+      |> String.Set.to_list
+    in
+    let entries =
+      List.concat_map all_pkg_dirs ~f:(fun dirname ->
+        let pkg_name = Vendor_rules.parse_pkg_name_from_dir dirname in
         (* Check _build/.pkgs/default/<pkg>/source/ for fetched source *)
         let pkg_source_dir =
           Path.Build.relative

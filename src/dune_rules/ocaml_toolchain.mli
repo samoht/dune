@@ -41,3 +41,11 @@ val best_mode : t -> Mode.t
 
 val check_fdo_support : t -> Context_name.t -> unit
 val register_response_file_support : t -> unit
+
+(** Check if a program name is a known toolchain binary. *)
+val is_toolchain_binary : string -> bool
+
+(** Look up a binary by name. Returns [Some path] if the name is a known
+    toolchain binary (ocaml, ocamlc, ocamlopt, ocamldep, ocamlmklib, ocamlobjinfo),
+    [None] otherwise. *)
+val which : t -> string -> Path.t option
