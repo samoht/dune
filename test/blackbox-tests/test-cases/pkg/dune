@@ -28,7 +28,7 @@
 
 (cram
  (deps %{bin:make})
- (applies_to make rule-deps duniverse duniverse/non-dune-pkg))
+ (applies_to lazy-toolchain make rule-deps duniverse duniverse/non-dune-pkg))
 
 (cram
  (deps %{bin:which})

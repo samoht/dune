@@ -13,11 +13,11 @@ Create a C-only package that doesn't need OCaml:
   $ cat >c-pkg-source/Makefile <<'EOF'
   > all:
   > 	@echo "Building C package (no OCaml needed)"
-  > 	$(CC) -o hello hello.c
+  > 	@$(CC) -o hello hello.c
   > install:
   > 	@echo "Installing C package"
-  > 	mkdir -p $(PREFIX)/bin
-  > 	cp hello $(PREFIX)/bin/
+  > 	@mkdir -p $(PREFIX)/bin
+  > 	@cp hello $(PREFIX)/bin/
   > EOF
   $ cat >c-pkg-source/opam <<'EOF'
   > opam-version: "2.0"
@@ -78,7 +78,7 @@ Create lock file with both packages (ocaml as the toolchain, c-pkg as dependency
 
 Build c-pkg - this should NOT trigger ocaml toolchain build:
 
-  $ dune build _build/.pkgs/default/c-pkg.1.0/target/bin/hello 2>&1
+  $ dune build _build/.pkgs/default/c-pkg/target/bin/hello 2>&1
      Vendoring c-pkg.1.0
      Vendoring ocaml.5.0.0
   Building C package (no OCaml needed)
@@ -86,10 +86,10 @@ Build c-pkg - this should NOT trigger ocaml toolchain build:
 
 Verify the C binary was built:
 
-  $ test -f _build/.pkgs/default/c-pkg.1.0/target/bin/hello && echo "C package built successfully"
+  $ test -f _build/.pkgs/default/c-pkg/target/bin/hello && echo "C package built successfully"
   C package built successfully
 
 The ocaml toolchain should NOT have been built (since c-pkg doesn't depend on it):
 
-  $ test -d _build/.pkgs/default/ocaml.5.0.0/target && echo "OCaml was built (unexpected!)" || echo "OCaml was NOT built (expected - lazy toolchain working)"
+  $ test -d _build/.pkgs/default/ocaml/target && echo "OCaml was built (unexpected!)" || echo "OCaml was NOT built (expected - lazy toolchain working)"
   OCaml was NOT built (expected - lazy toolchain working)
