@@ -339,29 +339,6 @@ CAMLprim value dune_fsevents_kind(value v_flags) {
   CAMLreturn(v_kind);
 }
 
-static const FSEventStreamEventFlags action_mask =
-    kFSEventStreamEventFlagItemCreated | kFSEventStreamEventFlagItemRemoved |
-    kFSEventStreamEventFlagItemRenamed | kFSEventStreamEventFlagItemModified;
-
-CAMLprim value dune_fsevents_action(value v_flags) {
-  CAMLparam1(v_flags);
-  CAMLlocal1(v_action);
-
-  uint32_t flags = Int32_val(v_flags) & action_mask;
-  if (flags & kFSEventStreamEventFlagItemCreated) {
-    v_action = Val_int(0);
-  } else if (flags & kFSEventStreamEventFlagItemRemoved) {
-    v_action = Val_int(1);
-  } else if (flags & kFSEventStreamEventFlagItemModified) {
-    v_action = Val_int(2);
-  } else if (flags & kFSEventStreamEventFlagItemRenamed) {
-    v_action = Val_int(3);
-  } else {
-    v_action = Val_int(4);
-  }
-
-  CAMLreturn(v_action);
-}
 static const FSEventStreamEventFlags all_flags[] = {
     kFSEventStreamEventFlagMustScanSubDirs,
     kFSEventStreamEventFlagUserDropped,

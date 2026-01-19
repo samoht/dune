@@ -207,9 +207,18 @@ module Event = struct
     | Rename
     | Unknown
 
-  external action : Int32.t -> action = "dune_fsevents_action"
-
-  let action t = action t.flags
+  let action t =
+    let { Raw.item_renamed; item_created; item_removed; item_modified; _ } =
+      raw t.flags
+    in
+    match item_renamed, item_created, item_removed, item_modified with
+    | true, _, _, _ -> Rename
+    | false, true, true, _ -> Unknown
+    | false, true, false, _ -> Create
+    | false, false, true, _ -> Remove
+    | false, false, false, true -> Modify
+    | false, false, false, false -> Unknown
+  ;;
 
   let dyn_of_action a =
     Dyn.string

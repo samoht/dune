@@ -28,6 +28,8 @@ module Fs_memo_event = struct
     record [ "path", Path.to_dyn path; "kind", dyn_of_kind kind ]
   ;;
 
+  let equal a b = Path.equal a.path b.path && a.kind = b.kind
+
   let create ~kind ~path =
     (match Path.as_in_build_dir path with
      | None -> ()
@@ -47,6 +49,15 @@ module Event = struct
     | Queue_overflow
     | Sync of Sync_id.t
     | Watcher_terminated
+
+  let equal a b =
+    match a, b with
+    | Fs_memo_event a, Fs_memo_event b -> Fs_memo_event.equal a b
+    | Queue_overflow, Queue_overflow -> true
+    | Sync a, Sync b -> Sync_id.equal a b
+    | Watcher_terminated, Watcher_terminated -> true
+    | _ -> false
+  ;;
 end
 
 module Scheduler = struct
@@ -552,12 +563,22 @@ let fsevents_callback ?exclusion_paths (scheduler : Scheduler.t) ~f events =
     | None -> fun _ -> false
     | Some paths -> fun p -> List.mem paths p ~equal:Path.equal
   in
+  let dedup events =
+    let rec loop acc = function
+      | [] -> List.rev acc
+      | [ x ] -> List.rev (x :: acc)
+      | x :: (y :: _ as rest) ->
+        if Event.equal x y then loop acc rest else loop (x :: acc) rest
+    in
+    loop [] events
+  in
   scheduler.thread_safe_send_emit_events_job (fun () ->
     List.filter_map events ~f:(fun event ->
       let path =
         Fsevents.Event.path event |> Path.of_string |> Path.Expert.try_localize_external
       in
-      if skip_path path then None else f event path))
+      if skip_path path then None else f event path)
+    |> dedup)
 ;;
 
 let fsevents ?exclusion_paths ~latency ~paths scheduler f =
@@ -577,7 +598,8 @@ let fsevents_standard_event ~should_exclude event path =
   else (
     let kind =
       match Fsevents.Event.action event with
-      | Rename | Unknown -> Fs_memo_event.Unknown
+      | Unknown -> Fs_memo_event.Unknown
+      | Rename -> if Path.exists path then Created else Deleted
       | Create -> Created
       | Remove -> Deleted
       | Modify -> if Fsevents.Event.kind event = File then File_changed else Unknown
